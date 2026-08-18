@@ -1,0 +1,124 @@
+<script setup lang="ts">
+import InputError from '@/Components/InputError.vue';
+import InputLabel from '@/Components/InputLabel.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
+import TextInput from '@/Components/TextInput.vue';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
+
+defineProps<{
+    mustVerifyEmail?: boolean;
+    status?: string;
+}>();
+
+const user = usePage().props.auth.user as any;
+
+const form = useForm({
+    name: user.name,
+    email: user.email,
+    phone_number: user.phone_number || '',
+});
+</script>
+
+<template>
+    <section>
+        <header>
+            <h2 class="text-lg font-medium text-slate-900">
+                Informasi Profil
+            </h2>
+
+            <p class="mt-1 text-sm text-slate-600">
+                Perbarui nama, alamat email, dan nomor WhatsApp Anda untuk kebutuhan notifikasi.
+            </p>
+        </header>
+
+        <form
+            @submit.prevent="form.patch(route('profile.update'))"
+            class="mt-6 space-y-6"
+        >
+            <div>
+                <InputLabel for="name" value="Nama Lengkap" />
+
+                <TextInput
+                    id="name"
+                    type="text"
+                    class="mt-1 block w-full"
+                    v-model="form.name"
+                    required
+                    autofocus
+                    autocomplete="name"
+                />
+
+                <InputError class="mt-2" :message="form.errors.name" />
+            </div>
+
+            <div>
+                <InputLabel for="email" value="Email" />
+
+                <TextInput
+                    id="email"
+                    type="email"
+                    class="mt-1 block w-full"
+                    v-model="form.email"
+                    required
+                    autocomplete="username"
+                />
+
+                <InputError class="mt-2" :message="form.errors.email" />
+            </div>
+            
+            <div>
+                <InputLabel for="phone_number" value="Nomor WhatsApp" />
+                <p class="text-xs text-slate-500 mb-2">Contoh: 628123456789 atau 08123456789</p>
+
+                <TextInput
+                    id="phone_number"
+                    type="text"
+                    class="mt-1 block w-full"
+                    v-model="form.phone_number"
+                    required
+                />
+
+                <InputError class="mt-2" :message="form.errors.phone_number" />
+            </div>
+
+            <div v-if="mustVerifyEmail && user.email_verified_at === null">
+                <p class="mt-2 text-sm text-slate-800">
+                    Your email address is unverified.
+                    <Link
+                        :href="route('verification.send')"
+                        method="post"
+                        as="button"
+                        class="rounded-md text-sm text-slate-600 underline hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-kominfo-primary focus:ring-offset-2"
+                    >
+                        Click here to re-send the verification email.
+                    </Link>
+                </p>
+
+                <div
+                    v-show="status === 'verification-link-sent'"
+                    class="mt-2 text-sm font-medium text-green-600"
+                >
+                    A new verification link has been sent to your email address.
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <PrimaryButton :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">Simpan</PrimaryButton>
+
+                <Transition
+                    enter-active-class="transition ease-in-out"
+                    enter-from-class="opacity-0"
+                    leave-active-class="transition ease-in-out"
+                    leave-to-class="opacity-0"
+                >
+                    <p
+                        v-if="form.recentlySuccessful"
+                        class="text-sm text-emerald-600 font-medium"
+                    >
+                        Tersimpan.
+                    </p>
+                </Transition>
+            </div>
+        </form>
+    </section>
+</template>

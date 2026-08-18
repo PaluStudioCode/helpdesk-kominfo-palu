@@ -3,23 +3,107 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Department;
+use App\Models\TicketCategory;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // 1. Seed Departments
+        $dinkes = Department::create([
+            'code' => 'DINKES',
+            'name' => 'Dinas Kesehatan Kota Palu',
+            'address' => 'Jl. Kesehatan No. 1, Kota Palu',
+            'pic_name' => 'Budi Santoso',
+            'pic_phone' => '6281122334455',
+            'status' => 'active',
+        ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $disdik = Department::create([
+            'code' => 'DISDIK',
+            'name' => 'Dinas Pendidikan Kota Palu',
+            'address' => 'Jl. Pendidikan No. 2, Kota Palu',
+            'pic_name' => 'Siti Aminah',
+            'pic_phone' => '6285566778899',
+            'status' => 'active',
+        ]);
+
+        // 2. Seed Ticket Categories
+        TicketCategory::create([
+            'name' => 'Kabel Fiber Optic Putus',
+            'network_type' => 'fiber_optic',
+            'sla_hours' => 24, // 24 hours SLA
+            'status' => 'active',
+        ]);
+
+        TicketCategory::create([
+            'name' => 'Koneksi LAN Gedung Bermasalah',
+            'network_type' => 'lan',
+            'sla_hours' => 12, // 12 hours SLA
+            'status' => 'active',
+        ]);
+
+        TicketCategory::create([
+            'name' => 'Access Point WiFi Tidak Memancarkan Sinyal',
+            'network_type' => 'wifi',
+            'sla_hours' => 8, // 8 hours SLA
+            'status' => 'active',
+        ]);
+
+        TicketCategory::create([
+            'name' => 'Internet Mati Total (Emergency)',
+            'network_type' => 'fiber_optic',
+            'sla_hours' => 6, // 6 hours SLA
+            'status' => 'active',
+        ]);
+
+        // 3. Seed Users
+        // Admin
+        User::create([
+            'name' => 'Administrator Kominfo',
+            'email' => 'admin@kominfo.palukota.go.id',
+            'password' => Hash::make('password123'),
+            'role' => 'admin',
+            'phone_number' => '6280011112222',
+            'status' => 'active',
+        ]);
+
+        // Technician
+        User::create([
+            'name' => 'Ahmad Teknisi',
+            'email' => 'teknisi1@kominfo.palukota.go.id',
+            'password' => Hash::make('password123'),
+            'role' => 'technician',
+            'phone_number' => '6280033334444',
+            'status' => 'active',
+        ]);
+
+        // OPD User (Dinas Kesehatan)
+        User::create([
+            'name' => 'Operator Dinkes',
+            'email' => 'operator@dinkes.palukota.go.id',
+            'password' => Hash::make('password123'),
+            'department_id' => $dinkes->id,
+            'role' => 'opd_user',
+            'phone_number' => '6280055556666',
+            'status' => 'active',
+        ]);
+        
+        // OPD User (Dinas Pendidikan)
+        User::create([
+            'name' => 'Operator Disdik',
+            'email' => 'operator@disdik.palukota.go.id',
+            'password' => Hash::make('password123'),
+            'department_id' => $disdik->id,
+            'role' => 'opd_user',
+            'phone_number' => '6280077778888',
+            'status' => 'active',
         ]);
     }
 }
