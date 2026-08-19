@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
 import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Button } from '@/Components/ui/button';
 import { Input } from '@/Components/ui/input';
-import InputLabel from '@/Components/InputLabel.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import StatusBadge from '@/Components/ui/status-badge/StatusBadge.vue';
 import DataTable from '@/Components/DataTable.vue';
-import { FileSpreadsheet, Printer, Filter, RotateCcw, Download } from 'lucide-vue-next';
+import { FileSpreadsheet, Printer, RotateCcw, Loader2 } from 'lucide-vue-next';
 
 interface Department {
     id: number;
@@ -43,6 +42,9 @@ const props = defineProps<{
         total: number;
         from: number;
         to: number;
+        current_page: number;
+        last_page: number;
+        per_page: number;
     };
     departments: Department[];
     technicians: Technician[];
@@ -72,6 +74,11 @@ const applyFilters = () => {
     });
 };
 
+const handleSelectChange = (key: keyof typeof form, val: string) => {
+    form[key] = val;
+    applyFilters();
+};
+
 const resetFilters = () => {
     form.start_date = '';
     form.end_date = '';
@@ -82,14 +89,60 @@ const resetFilters = () => {
     applyFilters();
 };
 
-const downloadPdf = () => {
-    const query = new URLSearchParams(form as any).toString();
-    window.open(route('admin.reports.export.pdf') + '?' + query, '_blank');
+const handlePage = (page: number) => {
+    router.get(route('admin.reports.index'), {
+        ...form,
+        page
+    }, { preserveState: true });
 };
 
-const downloadExcel = () => {
-    const query = new URLSearchParams(form as any).toString();
-    window.location.href = route('admin.reports.export.excel') + '?' + query;
+const isExportingPdf = ref(false);
+const isExportingExcel = ref(false);
+
+const downloadPdf = async () => {
+    if (isExportingPdf.value) return;
+    isExportingPdf.value = true;
+    try {
+        const response = await axios.get(route('admin.reports.export.pdf'), {
+            params: form,
+            responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Laporan-Rekapitulasi-Helpdesk-${new Date().toISOString().slice(0, 10)}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Gagal mengekspor PDF:', error);
+    } finally {
+        isExportingPdf.value = false;
+    }
+};
+
+const downloadExcel = async () => {
+    if (isExportingExcel.value) return;
+    isExportingExcel.value = true;
+    try {
+        const response = await axios.get(route('admin.reports.export.excel'), {
+            params: form,
+            responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv;charset=utf-8;' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Laporan-Rekapitulasi-Helpdesk-${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (error) {
+        console.error('Gagal mengekspor Excel:', error);
+    } finally {
+        isExportingExcel.value = false;
+    }
 };
 
 const tableColumns = [
@@ -105,65 +158,79 @@ const tableColumns = [
 </script>
 
 <template>
-    <Head title="Laporan & Rekapitulasi - Helpdesk Kominfo Palu" />
+    <Head title="Laporan & Rekapitulasi" />
 
     <AuthenticatedLayout>
         <template #header>
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Laporan & Rekapitulasi</h2>
-                    <p class="text-sm text-slate-500">Filter, evaluasi, dan cetak rekapitulasi gangguan jaringan kota Palu</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <Button variant="outline" class="gap-2 text-rose-700 border-rose-200 hover:bg-rose-50" @click="downloadPdf">
-                        <Printer class="h-4 w-4" />
-                        Ekspor PDF
-                    </Button>
-                    <Button class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" @click="downloadExcel">
-                        <FileSpreadsheet class="h-4 w-4" />
-                        Ekspor Excel
-                    </Button>
-                </div>
-            </div>
+            Laporan & Rekapitulasi
         </template>
 
         <div class="space-y-6">
-            <!-- Filter Card -->
-            <Card>
-                <CardHeader class="pb-3 border-b border-slate-100">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <Filter class="h-5 w-5 text-kominfo-primary" />
-                            <CardTitle class="text-base font-semibold">Parameter Filter Laporan</CardTitle>
-                        </div>
-                        <Button variant="ghost" size="sm" class="text-slate-500 h-8 gap-1.5" @click="resetFilters">
-                            <RotateCcw class="h-3.5 w-3.5" />
-                            Reset Filter
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent class="pt-4">
-                    <form @submit.prevent="applyFilters" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <!-- Tanggal Mulai -->
-                        <div class="space-y-1.5">
-                            <InputLabel for="start_date" value="Tanggal Mulai" class="text-xs text-slate-600 font-medium" />
-                            <Input id="start_date" type="date" v-model="form.start_date" class="h-9 text-xs" />
+            <!-- Header Title and Export Actions -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 pb-5">
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Laporan & Rekapitulasi Gangguan</h1>
+                    <p class="text-sm text-slate-500 mt-1">
+                        Filter, analisis, dan ekspor data rekapitulasi gangguan jaringan ke format PDF maupun Excel.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <Button 
+                        variant="outline" 
+                        class="gap-2 text-rose-700 border-rose-200 hover:bg-rose-50 shadow-sm" 
+                        :disabled="isExportingPdf || isExportingExcel"
+                        @click="downloadPdf"
+                    >
+                        <Loader2 v-if="isExportingPdf" class="h-4 w-4 animate-spin" />
+                        <Printer v-else class="h-4 w-4" />
+                        {{ isExportingPdf ? 'Mengekspor PDF...' : 'Ekspor PDF' }}
+                    </Button>
+                    <Button 
+                        class="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm" 
+                        :disabled="isExportingPdf || isExportingExcel"
+                        @click="downloadExcel"
+                    >
+                        <Loader2 v-if="isExportingExcel" class="h-4 w-4 animate-spin" />
+                        <FileSpreadsheet v-else class="h-4 w-4" />
+                        {{ isExportingExcel ? 'Mengekspor Excel...' : 'Ekspor Excel' }}
+                    </Button>
+                </div>
+            </div>
+
+            <!-- Unified DataTable with Integrated Filter Bar -->
+            <div class="space-y-4">
+                <!-- Compact Inline Filter Toolbar -->
+                <div class="p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                        <!-- Date Start -->
+                        <div>
+                            <Input 
+                                type="date" 
+                                v-model="form.start_date" 
+                                @change="applyFilters"
+                                class="h-9 text-xs" 
+                                title="Tanggal Mulai"
+                            />
                         </div>
 
-                        <!-- Tanggal Selesai -->
-                        <div class="space-y-1.5">
-                            <InputLabel for="end_date" value="Tanggal Selesai" class="text-xs text-slate-600 font-medium" />
-                            <Input id="end_date" type="date" v-model="form.end_date" class="h-9 text-xs" />
+                        <!-- Date End -->
+                        <div>
+                            <Input 
+                                type="date" 
+                                v-model="form.end_date" 
+                                @change="applyFilters"
+                                class="h-9 text-xs" 
+                                title="Tanggal Selesai"
+                            />
                         </div>
 
-                        <!-- Filter OPD -->
-                        <div class="space-y-1.5">
-                            <InputLabel value="Instansi / OPD" class="text-xs text-slate-600 font-medium" />
-                            <Select v-model="form.department_id">
+                        <!-- Department Filter -->
+                        <div>
+                            <Select :modelValue="form.department_id" @update:modelValue="(v) => handleSelectChange('department_id', v)">
                                 <SelectTrigger class="h-9 text-xs">
                                     <SelectValue placeholder="Semua OPD" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent class="max-h-56">
                                     <SelectItem value="all">Semua Instansi / OPD</SelectItem>
                                     <SelectItem v-for="dept in departments" :key="dept.id" :value="String(dept.id)">
                                         {{ dept.name }}
@@ -172,10 +239,9 @@ const tableColumns = [
                             </Select>
                         </div>
 
-                        <!-- Filter Jenis Jaringan -->
-                        <div class="space-y-1.5">
-                            <InputLabel value="Jenis Jaringan" class="text-xs text-slate-600 font-medium" />
-                            <Select v-model="form.network_type">
+                        <!-- Network Type Filter -->
+                        <div>
+                            <Select :modelValue="form.network_type" @update:modelValue="(v) => handleSelectChange('network_type', v)">
                                 <SelectTrigger class="h-9 text-xs">
                                     <SelectValue placeholder="Semua Jaringan" />
                                 </SelectTrigger>
@@ -183,15 +249,14 @@ const tableColumns = [
                                     <SelectItem value="all">Semua Jaringan</SelectItem>
                                     <SelectItem value="fiber_optic">Fiber Optic (FO)</SelectItem>
                                     <SelectItem value="lan">Jaringan LAN</SelectItem>
-                                    <SelectItem value="wifi">WiFi / Hotspot</SelectItem>
+                                    <SelectItem value="wifi">WiFi / Nirkabel</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        <!-- Filter Status -->
-                        <div class="space-y-1.5">
-                            <InputLabel value="Status Tiket" class="text-xs text-slate-600 font-medium" />
-                            <Select v-model="form.status">
+                        <!-- Status Filter -->
+                        <div>
+                            <Select :modelValue="form.status" @update:modelValue="(v) => handleSelectChange('status', v)">
                                 <SelectTrigger class="h-9 text-xs">
                                     <SelectValue placeholder="Semua Status" />
                                 </SelectTrigger>
@@ -206,10 +271,9 @@ const tableColumns = [
                             </Select>
                         </div>
 
-                        <!-- Filter Teknisi & Aksi -->
-                        <div class="space-y-1.5 flex flex-col justify-end">
-                            <InputLabel value="Teknisi" class="text-xs text-slate-600 font-medium" />
-                            <Select v-model="form.assigned_to">
+                        <!-- Technician Filter & Reset Button -->
+                        <div class="flex items-center gap-2">
+                            <Select :modelValue="form.assigned_to" @update:modelValue="(v) => handleSelectChange('assigned_to', v)" class="flex-1">
                                 <SelectTrigger class="h-9 text-xs">
                                     <SelectValue placeholder="Semua Teknisi" />
                                 </SelectTrigger>
@@ -220,61 +284,59 @@ const tableColumns = [
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
 
-                        <div class="md:col-span-3 lg:col-span-6 flex justify-end">
-                            <Button type="submit" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs h-9 px-4">
-                                Terapkan Filter
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                class="h-9 w-9 shrink-0 text-slate-500 hover:text-slate-900 border-slate-200" 
+                                @click="resetFilters" 
+                                title="Reset Filter"
+                            >
+                                <RotateCcw class="h-3.5 w-3.5" />
                             </Button>
                         </div>
-                    </form>
-                </CardContent>
-            </Card>
-
-            <!-- Table Preview -->
-            <Card>
-                <CardHeader class="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle class="text-base font-semibold">Pratinjau Data Rekapitulasi</CardTitle>
-                        <CardDescription class="text-xs">Menampilkan {{ tickets.total }} tiket sesuai kriteria filter</CardDescription>
                     </div>
-                </CardHeader>
-                <CardContent class="p-0">
-                    <DataTable :columns="tableColumns" :data="tickets.data" :pagination="tickets">
-                        <template #cell-ticket_number="{ row }">
-                            <span class="font-mono font-medium text-kominfo-primary text-xs">{{ row.ticket_number }}</span>
-                        </template>
+                </div>
 
-                        <template #cell-department="{ row }">
-                            <span class="font-medium text-slate-800 text-xs">{{ row.department?.name || '-' }}</span>
-                        </template>
+                <!-- DataTable Component -->
+                <DataTable 
+                    :columns="tableColumns" 
+                    :data="tickets"
+                    @page="handlePage"
+                >
+                    <template #cell-ticket_number="{ item }">
+                        <span class="font-mono font-medium text-kominfo-primary text-xs">{{ item.ticket_number }}</span>
+                    </template>
 
-                        <template #cell-network_type="{ row }">
-                            <StatusBadge type="network" :value="row.network_type" />
-                        </template>
+                    <template #cell-department="{ item }">
+                        <span class="font-medium text-slate-800 text-xs">{{ item.department?.name || '-' }}</span>
+                    </template>
 
-                        <template #cell-title="{ row }">
-                            <span class="text-xs font-medium text-slate-900 block truncate max-w-xs">{{ row.title }}</span>
-                        </template>
+                    <template #cell-network_type="{ item }">
+                        <StatusBadge type="network" :status="item.network_type" />
+                    </template>
 
-                        <template #cell-priority="{ row }">
-                            <StatusBadge type="priority" :value="row.priority" />
-                        </template>
+                    <template #cell-title="{ item }">
+                        <span class="text-xs font-medium text-slate-900 block truncate max-w-xs" :title="item.title">{{ item.title }}</span>
+                    </template>
 
-                        <template #cell-status="{ row }">
-                            <StatusBadge type="ticket" :value="row.status" />
-                        </template>
+                    <template #cell-priority="{ item }">
+                        <StatusBadge type="priority" :status="item.priority" />
+                    </template>
 
-                        <template #cell-assignee="{ row }">
-                            <span class="text-xs text-slate-600">{{ row.assignee?.name || '-' }}</span>
-                        </template>
+                    <template #cell-status="{ item }">
+                        <StatusBadge type="ticket" :status="item.status" />
+                    </template>
 
-                        <template #cell-created_at="{ row }">
-                            <span class="text-xs text-slate-500">{{ new Date(row.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) }}</span>
-                        </template>
-                    </DataTable>
-                </CardContent>
-            </Card>
+                    <template #cell-assignee="{ item }">
+                        <span class="text-xs text-slate-600">{{ item.assignee?.name || '-' }}</span>
+                    </template>
+
+                    <template #cell-created_at="{ item }">
+                        <span class="text-xs text-slate-500">{{ new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) }}</span>
+                    </template>
+                </DataTable>
+            </div>
         </div>
     </AuthenticatedLayout>
 </template>

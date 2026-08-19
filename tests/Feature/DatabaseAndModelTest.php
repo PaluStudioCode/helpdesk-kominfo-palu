@@ -13,7 +13,11 @@ class DatabaseAndModelTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true; // Use DatabaseSeeder
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
 
     public function test_models_are_seeded_correctly(): void
     {

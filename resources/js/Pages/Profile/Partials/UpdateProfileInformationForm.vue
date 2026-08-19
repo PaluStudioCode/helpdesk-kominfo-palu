@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
+import { User, Mail, Phone, Check, Loader2 } from 'lucide-vue-next';
 
 defineProps<{
     mustVerifyEmail?: boolean;
@@ -17,108 +17,105 @@ const form = useForm({
     email: user.email,
     phone_number: user.phone_number || '',
 });
+
+const submit = () => {
+    form.patch(route('profile.update'), {
+        preserveScroll: true,
+    });
+};
 </script>
 
 <template>
-    <section>
-        <header>
-            <h2 class="text-lg font-medium text-slate-900">
-                Informasi Profil
-            </h2>
-
-            <p class="mt-1 text-sm text-slate-600">
-                Perbarui nama, alamat email, dan nomor WhatsApp Anda untuk kebutuhan notifikasi.
-            </p>
-        </header>
-
-        <form
-            @submit.prevent="form.patch(route('profile.update'))"
-            class="mt-6 space-y-6"
-        >
-            <div>
-                <InputLabel for="name" value="Nama Lengkap" />
-
-                <TextInput
+    <form @submit.prevent="submit" class="space-y-4">
+        <div class="space-y-1.5">
+            <label for="name" class="block text-xs font-semibold text-slate-700">Nama Lengkap</label>
+            <div class="relative">
+                <Input
                     id="name"
                     type="text"
-                    class="mt-1 block w-full"
+                    class="pl-9 h-9 text-sm bg-white"
                     v-model="form.name"
                     required
-                    autofocus
                     autocomplete="name"
+                    placeholder="Nama lengkap pengguna"
                 />
-
-                <InputError class="mt-2" :message="form.errors.name" />
+                <User class="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
+            <InputError :message="form.errors.name" class="mt-1" />
+        </div>
 
-            <div>
-                <InputLabel for="email" value="Email" />
-
-                <TextInput
+        <div class="space-y-1.5">
+            <label for="email" class="block text-xs font-semibold text-slate-700">Alamat Email</label>
+            <div class="relative">
+                <Input
                     id="email"
                     type="email"
-                    class="mt-1 block w-full"
+                    class="pl-9 h-9 text-sm bg-white"
                     v-model="form.email"
                     required
                     autocomplete="username"
+                    placeholder="nama@palukota.go.id"
                 />
-
-                <InputError class="mt-2" :message="form.errors.email" />
+                <Mail class="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
-            
-            <div>
-                <InputLabel for="phone_number" value="Nomor WhatsApp" />
-                <p class="text-xs text-slate-500 mb-2">Contoh: 628123456789 atau 08123456789</p>
-
-                <TextInput
+            <InputError :message="form.errors.email" class="mt-1" />
+        </div>
+        
+        <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+                <label for="phone_number" class="block text-xs font-semibold text-slate-700">Nomor WhatsApp</label>
+                <span class="text-[11px] text-slate-400">Notifikasi Tiket</span>
+            </div>
+            <div class="relative">
+                <Input
                     id="phone_number"
                     type="text"
-                    class="mt-1 block w-full"
+                    class="pl-9 h-9 text-sm bg-white"
                     v-model="form.phone_number"
                     required
+                    placeholder="08123456789 atau 628..."
                 />
-
-                <InputError class="mt-2" :message="form.errors.phone_number" />
+                <Phone class="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
             </div>
+            <InputError :message="form.errors.phone_number" class="mt-1" />
+        </div>
 
-            <div v-if="mustVerifyEmail && user.email_verified_at === null">
-                <p class="mt-2 text-sm text-slate-800">
-                    Your email address is unverified.
-                    <Link
-                        :href="route('verification.send')"
-                        method="post"
-                        as="button"
-                        class="rounded-md text-sm text-slate-600 underline hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-kominfo-primary focus:ring-offset-2"
-                    >
-                        Click here to re-send the verification email.
-                    </Link>
-                </p>
-
-                <div
-                    v-show="status === 'verification-link-sent'"
-                    class="mt-2 text-sm font-medium text-green-600"
-                >
-                    A new verification link has been sent to your email address.
-                </div>
+        <div v-if="mustVerifyEmail && user.email_verified_at === null" class="p-3 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-800">
+            <span>Email Anda belum diverifikasi. </span>
+            <Link
+                :href="route('verification.send')"
+                method="post"
+                as="button"
+                class="font-semibold underline hover:text-amber-900 focus:outline-none"
+            >
+                Kirim ulang email verifikasi.
+            </Link>
+            <div v-show="status === 'verification-link-sent'" class="mt-1 font-medium text-emerald-600">
+                Link verifikasi baru telah dikirim ke email Anda.
             </div>
+        </div>
 
-            <div class="flex items-center gap-4">
-                <PrimaryButton :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">Simpan</PrimaryButton>
+        <div class="flex items-center gap-3 pt-2">
+            <Button 
+                type="submit" 
+                size="sm"
+                :disabled="form.processing || !form.isDirty" 
+                class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white px-4 h-9"
+            >
+                <Loader2 v-if="form.processing" class="mr-2 h-4 w-4 animate-spin" />
+                Simpan Perubahan
+            </Button>
 
-                <Transition
-                    enter-active-class="transition ease-in-out"
-                    enter-from-class="opacity-0"
-                    leave-active-class="transition ease-in-out"
-                    leave-to-class="opacity-0"
-                >
-                    <p
-                        v-if="form.recentlySuccessful"
-                        class="text-sm text-emerald-600 font-medium"
-                    >
-                        Tersimpan.
-                    </p>
-                </Transition>
-            </div>
-        </form>
-    </section>
+            <Transition
+                enter-active-class="transition ease-in-out duration-300"
+                enter-from-class="opacity-0 translate-x-1"
+                leave-active-class="transition ease-in-out duration-300"
+                leave-to-class="opacity-0"
+            >
+                <span v-if="form.recentlySuccessful" class="inline-flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                    <Check class="h-3.5 w-3.5" /> Tersimpan
+                </span>
+            </Transition>
+        </div>
+    </form>
 </template>

@@ -13,12 +13,16 @@ class TicketLifecycleTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
 
     protected function createMockTicket()
     {
         $dinkes = Department::where('code', 'DINKES')->first();
-        $opdDinkes = User::where('email', 'operator@dinkes.palukota.go.id')->first();
+        $opdDinkes = User::where('role', 'opd_user')->where('department_id', $dinkes->id)->first();
         $category = TicketCategory::first();
 
         return Ticket::create([
@@ -66,7 +70,7 @@ class TicketLifecycleTest extends TestCase
     {
         $ticket = $this->createMockTicket();
         $technician = User::where('role', 'technician')->first();
-        $opdUser = User::where('email', 'operator@dinkes.palukota.go.id')->first();
+        $opdUser = User::where('role', 'opd_user')->where('department_id', $ticket->department_id)->first();
 
         $ticket->update(['status' => 'resolved', 'assigned_to' => $technician->id, 'resolved_at' => now(), 'resolution_note' => 'Done']);
 
@@ -84,7 +88,7 @@ class TicketLifecycleTest extends TestCase
     {
         $ticket = $this->createMockTicket();
         $technician = User::where('role', 'technician')->first();
-        $opdUser = User::where('email', 'operator@dinkes.palukota.go.id')->first();
+        $opdUser = User::where('role', 'opd_user')->where('department_id', $ticket->department_id)->first();
 
         // Put in resolved state
         $ticket->update([
@@ -114,7 +118,7 @@ class TicketLifecycleTest extends TestCase
     {
         $ticket = $this->createMockTicket();
         $technician = User::where('role', 'technician')->first();
-        $opdUser = User::where('email', 'operator@dinkes.palukota.go.id')->first();
+        $opdUser = User::where('role', 'opd_user')->where('department_id', $ticket->department_id)->first();
 
         $this->actingAs($technician)->post("/tickets/{$ticket->id}/replies", [
             'message' => 'Catatan ini hanya untuk tim internal.',

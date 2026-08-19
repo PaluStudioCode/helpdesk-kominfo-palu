@@ -37,11 +37,17 @@ const formatDate = (dateStr: string) => {
     <Head title="Dashboard Monitoring" />
 
     <AuthenticatedLayout>
-        <template #header>
-            Dashboard Monitoring
-        </template>
-
         <div class="space-y-6">
+            <!-- Header Title -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-5">
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Dashboard Monitoring</h1>
+                    <p class="text-sm text-slate-500 mt-1">
+                        Ringkasan metrik status operasional jaringan dan aktivitas penanganan tiket.
+                    </p>
+                </div>
+            </div>
+
             <!-- OPD User Dashboard -->
             <template v-if="role === 'opd_user'">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -86,7 +92,7 @@ const formatDate = (dateStr: string) => {
                     <Card>
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle class="text-sm font-medium">Antrean Tiket Baru</CardTitle>
-                            <Ticket class="h-4 w-4 text-blue-500" />
+                            <Ticket class="h-4 w-4 text-kominfo-primary" />
                         </CardHeader>
                         <CardContent>
                             <div class="text-2xl font-bold">{{ stats.open_tickets || 0 }}</div>

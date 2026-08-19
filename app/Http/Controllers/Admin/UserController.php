@@ -67,7 +67,7 @@ class UserController extends Controller
 
         User::create($validated);
 
-        return redirect()->route('admin.users.index')
+        return redirect()->back()
             ->with('success', 'Pengguna berhasil didaftarkan.');
     }
 
@@ -92,7 +92,7 @@ class UserController extends Controller
 
         $user->update($validated);
 
-        return redirect()->route('admin.users.index')
+        return redirect()->back()
             ->with('success', 'Data pengguna berhasil diperbarui.');
     }
 
@@ -105,7 +105,7 @@ class UserController extends Controller
         
         $user->delete();
 
-        return redirect()->route('admin.users.index')
+        return redirect()->back()
             ->with('success', 'Akun pengguna berhasil dihapus.');
     }
 }

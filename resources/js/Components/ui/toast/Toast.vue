@@ -20,6 +20,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     v-bind="forwarded"
     :class="cn(toastVariants({ variant }), props.class)"
     @update:open="onOpenChange"
+    :duration="5000"
   >
     <slot />
   </ToastRoot>

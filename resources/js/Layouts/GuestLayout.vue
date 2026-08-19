@@ -3,26 +3,73 @@ import { Link } from '@inertiajs/vue3';
 </script>
 
 <template>
-    <div
-        class="flex min-h-screen flex-col items-center bg-slate-50 pt-12 sm:justify-center sm:pt-0"
-    >
-        <div class="mb-4 text-center">
-            <Link href="/" class="flex flex-col items-center justify-center gap-2">
-                <!-- Replace with Logo Kominfo later -->
-                <div class="h-16 w-16 bg-kominfo-primary rounded-full flex items-center justify-center shadow-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    <div class="min-h-screen flex flex-col lg:flex-row bg-slate-950 overflow-x-hidden">
+        <!-- Left Panel: Branding & Identity (Dark Theme - Visible on LG screens) -->
+        <div class="relative hidden lg:flex lg:w-1/2 flex-col justify-between p-12 lg:p-16 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-950 text-white overflow-hidden border-r border-slate-800/80">
+            <!-- Subtle Ambient Gradients & Grid Pattern -->
+            <div class="absolute -top-32 -left-32 w-80 h-80 bg-kominfo-primary/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-32 -right-32 w-80 h-80 bg-sky-500/15 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_40%,#000_60%,transparent_100%)] opacity-35 pointer-events-none"></div>
+
+            <!-- Top Brand & Headline Group (Dekat dan Terhubung) -->
+            <div class="relative z-10 space-y-8">
+                <!-- Brand Header (Direct Logo without Wrapper) -->
+                <div class="flex items-center gap-3.5 -ml-3">
+                    <img 
+                        src="/storage/logo.png" 
+                        alt="Logo Diskominfo Kota Palu" 
+                        class="w-36 sm:w-44 lg:w-52 max-w-none h-auto object-contain shrink-0 drop-shadow-md" 
+                    />
+                    <div class="-ml-2">
+                        <h1 class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight leading-tight">Pemerintah Kota Palu</h1>
+                        <p class="text-base text-sky-400 font-bold tracking-wide mt-0.5">Dinas Komunikasi dan Informatika</p>
+                        <p class="text-xs text-slate-400 mt-1 font-medium">Helpdesk Layanan Jaringan Intra Pemerintah</p>
+                    </div>
                 </div>
-            </Link>
+
+                <!-- Headline & Deskripsi -->
+                <div class="space-y-3 max-w-xl pt-2">
+                    <h2 class="text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
+                        Sistem Layanan Helpdesk Jaringan Intra Pemerintah
+                    </h2>
+                    <p class="text-sm lg:text-base text-slate-300 leading-relaxed font-normal">
+                        Pusat penanganan kendala infrastruktur jaringan teknologi informasi bagi seluruh Organisasi Perangkat Daerah (OPD) di lingkungan Pemerintah Kota Palu.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Bottom Footer Info -->
+            <div class="relative z-10 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/80 pt-6">
+                <span>&copy; {{ new Date().getFullYear() }} Diskominfo Kota Palu</span>
+                <span class="text-slate-400 font-medium">Palu Mantap Bergerak</span>
+            </div>
         </div>
 
-        <div
-            class="mt-6 w-full overflow-hidden bg-white px-8 py-8 shadow-xl border border-slate-100 sm:max-w-md sm:rounded-xl"
-        >
-            <slot />
-        </div>
-        
-        <div class="mt-8 text-center text-sm text-slate-500">
-            &copy; {{ new Date().getFullYear() }} Dinas Komunikasi dan Informatika.
+        <!-- Right Panel: Form Container (Always Visible) -->
+        <div class="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 lg:p-16 bg-slate-950 min-h-screen">
+            <!-- Mobile Brand Header (Visible only on small screens) -->
+            <div class="w-full max-w-md mb-8 text-left lg:hidden flex items-center gap-2 -ml-2">
+                <img 
+                    src="/storage/logo.png" 
+                    alt="Logo Diskominfo Kota Palu" 
+                    class="w-24 max-w-none h-auto object-contain shrink-0 drop-shadow-md" 
+                />
+                <div class="-ml-1">
+                    <h1 class="text-lg font-bold text-white leading-tight">Pemerintah Kota Palu</h1>
+                    <p class="text-xs font-bold text-sky-400 mt-0.5">Dinas Komunikasi dan Informatika</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5 font-medium">Helpdesk Layanan Jaringan Intra Pemerintah</p>
+                </div>
+            </div>
+
+            <!-- Main Form Card Wrapper (Dark Themed Card) -->
+            <div class="w-full max-w-md bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl backdrop-blur-sm p-6 sm:p-8 text-slate-100">
+                <slot />
+            </div>
+
+            <!-- Mobile Footer (Visible only on small screens) -->
+            <div class="mt-8 text-center text-xs text-slate-500 lg:hidden">
+                &copy; {{ new Date().getFullYear() }} Diskominfo Kota Palu. All rights reserved.
+            </div>
         </div>
     </div>
 </template>

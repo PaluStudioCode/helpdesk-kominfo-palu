@@ -7,6 +7,7 @@ use App\Http\Controllers\TicketActionController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\ReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,8 @@ Route::middleware('auth')->group(function () {
 
     // Admin Routes
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
+        Route::get('master-data', [MasterDataController::class, 'index'])->name('master-data.index');
+
         Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit']);
         Route::resource('categories', CategoryController::class)->except(['create', 'show', 'edit']);
         Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);

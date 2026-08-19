@@ -40,8 +40,10 @@ class TicketActionController extends Controller
                 return back()->with('error', 'Tiket sudah ditangani oleh teknisi lain.');
             }
 
-            // Assign logic
-            $assigneeId = $request->input('assigned_to', $user->id);
+            // Assign logic: If admin assigned someone specific, use that; otherwise default to current technician/user
+            $assigneeId = ($user->role === 'admin' && $request->filled('assigned_to'))
+                ? $request->input('assigned_to')
+                : $user->id;
 
             $lockedTicket->update([
                 'assigned_to' => $assigneeId,

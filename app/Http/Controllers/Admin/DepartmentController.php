@@ -51,7 +51,7 @@ class DepartmentController extends Controller
     {
         Department::create($request->validated());
 
-        return redirect()->route('admin.departments.index')
+        return redirect()->back()
             ->with('success', 'Data OPD / Instansi berhasil ditambahkan.');
     }
 
@@ -62,7 +62,7 @@ class DepartmentController extends Controller
     {
         $department->update($request->validated());
 
-        return redirect()->route('admin.departments.index')
+        return redirect()->back()
             ->with('success', 'Data OPD / Instansi berhasil diperbarui.');
     }
 
@@ -75,7 +75,7 @@ class DepartmentController extends Controller
         
         $department->delete();
 
-        return redirect()->route('admin.departments.index')
+        return redirect()->back()
             ->with('success', 'Data OPD / Instansi berhasil dihapus.');
     }
 }

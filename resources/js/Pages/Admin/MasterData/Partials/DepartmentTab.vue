@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { ref } from 'vue';
+import { router, useForm } from '@inertiajs/vue3';
 import DataTable from '@/Components/DataTable.vue';
 import { Button } from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
@@ -31,7 +30,7 @@ const props = defineProps<{
     filters: any;
 }>();
 
-const searchQuery = ref(props.filters?.search || '');
+const searchQuery = ref(props.filters?.tab === 'departments' ? (props.filters?.search || '') : '');
 
 const columns = [
     { key: 'code', label: 'Kode OPD', sortable: true },
@@ -45,25 +44,29 @@ const handleSort = (key: string) => {
     const currentDir = props.filters?.direction;
     const newDir = currentSort === key && currentDir === 'asc' ? 'desc' : 'asc';
     
-    router.get(route('admin.departments.index'), {
-        ...props.filters,
+    router.get(route('admin.master-data.index'), {
+        tab: 'departments',
+        search: searchQuery.value,
         sort: key,
         direction: newDir
     }, { preserveState: true });
 };
 
 const handlePage = (page: number) => {
-    router.get(route('admin.departments.index'), {
-        ...props.filters,
-        page
+    router.get(route('admin.master-data.index'), {
+        tab: 'departments',
+        search: searchQuery.value,
+        sort: props.filters?.sort,
+        direction: props.filters?.direction,
+        dept_page: page
     }, { preserveState: true });
 };
 
 const handleSearch = (value: string) => {
-    router.get(route('admin.departments.index'), {
-        ...props.filters,
+    router.get(route('admin.master-data.index'), {
+        tab: 'departments',
         search: value,
-        page: 1
+        dept_page: 1
     }, { preserveState: true, preserveScroll: true });
 };
 
@@ -138,55 +141,47 @@ const confirmDelete = () => {
 </script>
 
 <template>
-    <Head title="Master Data OPD" />
+    <div class="space-y-4">
+        <!-- DataTable Component -->
+        <DataTable 
+            :columns="columns" 
+            :data="departments"
+            :modelValue="searchQuery"
+            @update:modelValue="handleSearch"
+            @sort="handleSort"
+            @page="handlePage"
+            searchPlaceholder="Cari OPD atau kode singkatan..."
+        >
+            <template #actions>
+                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                    <Plus class="w-4 h-4 mr-2" /> Tambah OPD
+                </Button>
+            </template>
 
-    <AuthenticatedLayout>
-        <template #header>
-            Master Data OPD / Instansi
-        </template>
+            <!-- Custom Cell Rendering -->
+            <template #cell-status="{ item }">
+                <StatusBadge :status="item.status" />
+            </template>
 
-        <div class="space-y-6">
-            <!-- DataTable Component -->
-            <DataTable 
-                :columns="columns" 
-                :data="departments"
-                :modelValue="searchQuery"
-                @update:modelValue="handleSearch"
-                @sort="handleSort"
-                @page="handlePage"
-                searchPlaceholder="Cari OPD..."
-            >
-                <template #actions>
-                    <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                        <Plus class="w-4 h-4 mr-2" /> Tambah OPD
+            <template #cell-pic_name="{ item }">
+                <div v-if="item.pic_name">
+                    <div class="font-medium text-slate-900">{{ item.pic_name }}</div>
+                    <div class="text-xs text-slate-500">{{ item.pic_phone }}</div>
+                </div>
+                <span v-else class="text-slate-400 italic">-</span>
+            </template>
+
+            <template #actions-cell="{ item }">
+                <div class="flex items-center space-x-2">
+                    <Button variant="ghost" size="icon" @click="openEditModal(item)">
+                        <Edit2 class="w-4 h-4 text-slate-500" />
                     </Button>
-                </template>
-
-                <!-- Custom Cell Rendering -->
-                <template #cell-status="{ item }">
-                    <StatusBadge :status="item.status" />
-                </template>
-
-                <template #cell-pic_name="{ item }">
-                    <div v-if="item.pic_name">
-                        <div class="font-medium text-slate-900">{{ item.pic_name }}</div>
-                        <div class="text-xs text-slate-500">{{ item.pic_phone }}</div>
-                    </div>
-                    <span v-else class="text-slate-400 italic">-</span>
-                </template>
-
-                <template #actions-cell="{ item }">
-                    <div class="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" @click="openEditModal(item)">
-                            <Edit2 class="w-4 h-4 text-slate-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
-                            <Trash2 class="w-4 h-4 text-red-500" />
-                        </Button>
-                    </div>
-                </template>
-            </DataTable>
-        </div>
+                    <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
+                        <Trash2 class="w-4 h-4 text-red-500" />
+                    </Button>
+                </div>
+            </template>
+        </DataTable>
 
         <!-- Create/Edit Modal -->
         <Dialog v-model:open="isModalOpen">
@@ -272,5 +267,5 @@ const confirmDelete = () => {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    </AuthenticatedLayout>
+    </div>
 </template>

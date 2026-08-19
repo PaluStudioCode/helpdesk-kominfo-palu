@@ -13,7 +13,11 @@ class DashboardTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
 
     public function test_admin_dashboard_metrics(): void
     {

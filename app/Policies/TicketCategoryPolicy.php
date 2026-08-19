@@ -6,7 +6,7 @@ use App\Models\TicketCategory;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
 
-class CategoryPolicy
+class TicketCategoryPolicy
 {
     /**
      * Determine whether the user can view any models.

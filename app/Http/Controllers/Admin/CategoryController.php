@@ -48,7 +48,7 @@ class CategoryController extends Controller
     {
         TicketCategory::create($request->validated());
 
-        return redirect()->route('admin.categories.index')
+        return redirect()->back()
             ->with('success', 'Kategori Gangguan berhasil ditambahkan.');
     }
 
@@ -59,7 +59,7 @@ class CategoryController extends Controller
     {
         $category->update($request->validated());
 
-        return redirect()->route('admin.categories.index')
+        return redirect()->back()
             ->with('success', 'Kategori Gangguan berhasil diperbarui.');
     }
 
@@ -72,7 +72,7 @@ class CategoryController extends Controller
         
         $category->delete();
 
-        return redirect()->route('admin.categories.index')
+        return redirect()->back()
             ->with('success', 'Kategori Gangguan berhasil dihapus.');
     }
 }

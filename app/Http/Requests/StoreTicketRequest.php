@@ -22,13 +22,17 @@ class StoreTicketRequest extends FormRequest
      */
     public function rules(): array
     {
+        $priorityRule = $this->user()->role === 'admin' 
+            ? ['required', 'in:low,medium,high,emergency'] 
+            : ['required', 'in:low,medium,high'];
+
         $rules = [
             'network_type' => ['required', 'string', 'in:fiber_optic,lan,wifi'],
             'category_id' => ['required', 'exists:ticket_categories,id'],
             'title' => ['required', 'string', 'min:5', 'max:200'],
             'location_details' => ['required', 'string', 'min:3', 'max:255'],
             'description' => ['required', 'string', 'min:10'],
-            'priority' => ['required', 'in:low,medium,high,emergency'],
+            'priority' => $priorityRule,
             'attachments' => ['nullable', 'array', 'max:3'],
             'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'], // max 5MB
         ];

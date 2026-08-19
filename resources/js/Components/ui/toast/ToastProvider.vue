@@ -6,7 +6,7 @@ const props = defineProps<ToastProviderProps>()
 </script>
 
 <template>
-  <ToastProvider v-bind="props">
+  <ToastProvider :duration="5000" v-bind="props">
     <slot />
   </ToastProvider>
 </template>

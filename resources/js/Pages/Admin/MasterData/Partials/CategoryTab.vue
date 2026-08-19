@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { router, useForm } from '@inertiajs/vue3';
 import DataTable from '@/Components/DataTable.vue';
 import { Button } from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
@@ -30,7 +29,7 @@ const props = defineProps<{
     filters: any;
 }>();
 
-const searchQuery = ref(props.filters?.search || '');
+const searchQuery = ref(props.filters?.tab === 'categories' ? (props.filters?.search || '') : '');
 
 const columns = [
     { key: 'name', label: 'Nama Kategori', sortable: true },
@@ -44,25 +43,29 @@ const handleSort = (key: string) => {
     const currentDir = props.filters?.direction;
     const newDir = currentSort === key && currentDir === 'asc' ? 'desc' : 'asc';
     
-    router.get(route('admin.categories.index'), {
-        ...props.filters,
+    router.get(route('admin.master-data.index'), {
+        tab: 'categories',
+        search: searchQuery.value,
         sort: key,
         direction: newDir
     }, { preserveState: true });
 };
 
 const handlePage = (page: number) => {
-    router.get(route('admin.categories.index'), {
-        ...props.filters,
-        page
+    router.get(route('admin.master-data.index'), {
+        tab: 'categories',
+        search: searchQuery.value,
+        sort: props.filters?.sort,
+        direction: props.filters?.direction,
+        cat_page: page
     }, { preserveState: true });
 };
 
 const handleSearch = (value: string) => {
-    router.get(route('admin.categories.index'), {
-        ...props.filters,
+    router.get(route('admin.master-data.index'), {
+        tab: 'categories',
         search: value,
-        page: 1
+        cat_page: 1
     }, { preserveState: true, preserveScroll: true });
 };
 
@@ -84,6 +87,9 @@ const openCreateModal = () => {
     isEditMode.value = false;
     form.reset();
     form.clearErrors();
+    form.network_type = 'fiber_optic';
+    form.sla_hours = 24;
+    form.status = 'active';
     isModalOpen.value = true;
 };
 
@@ -133,53 +139,47 @@ const confirmDelete = () => {
 </script>
 
 <template>
-    <Head title="Master Data Kategori" />
+    <div class="space-y-4">
+        <!-- DataTable Component -->
+        <DataTable 
+            :columns="columns" 
+            :data="categories"
+            :modelValue="searchQuery"
+            @update:modelValue="handleSearch"
+            @sort="handleSort"
+            @page="handlePage"
+            searchPlaceholder="Cari nama kategori..."
+        >
+            <template #actions>
+                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                    <Plus class="w-4 h-4 mr-2" /> Tambah Kategori
+                </Button>
+            </template>
 
-    <AuthenticatedLayout>
-        <template #header>
-            Master Kategori Gangguan
-        </template>
+            <!-- Custom Cell Rendering -->
+            <template #cell-network_type="{ item }">
+                <StatusBadge type="network" :status="item.network_type" />
+            </template>
 
-        <div class="space-y-6">
-            <DataTable 
-                :columns="columns" 
-                :data="categories"
-                :modelValue="searchQuery"
-                @update:modelValue="handleSearch"
-                @sort="handleSort"
-                @page="handlePage"
-                searchPlaceholder="Cari kategori..."
-            >
-                <template #actions>
-                    <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                        <Plus class="w-4 h-4 mr-2" /> Tambah Kategori
+            <template #cell-sla_hours="{ item }">
+                <span class="font-medium">{{ item.sla_hours }} Jam</span>
+            </template>
+
+            <template #cell-status="{ item }">
+                <StatusBadge :status="item.status" />
+            </template>
+
+            <template #actions-cell="{ item }">
+                <div class="flex items-center space-x-2">
+                    <Button variant="ghost" size="icon" @click="openEditModal(item)">
+                        <Edit2 class="w-4 h-4 text-slate-500" />
                     </Button>
-                </template>
-
-                <template #cell-network_type="{ item }">
-                    <StatusBadge type="network" :status="item.network_type" />
-                </template>
-                
-                <template #cell-sla_hours="{ item }">
-                    <span class="font-medium text-slate-700">{{ item.sla_hours }} Jam</span>
-                </template>
-
-                <template #cell-status="{ item }">
-                    <StatusBadge :status="item.status" />
-                </template>
-
-                <template #actions-cell="{ item }">
-                    <div class="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" @click="openEditModal(item)">
-                            <Edit2 class="w-4 h-4 text-slate-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
-                            <Trash2 class="w-4 h-4 text-red-500" />
-                        </Button>
-                    </div>
-                </template>
-            </DataTable>
-        </div>
+                    <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
+                        <Trash2 class="w-4 h-4 text-red-500" />
+                    </Button>
+                </div>
+            </template>
+        </DataTable>
 
         <!-- Create/Edit Modal -->
         <Dialog v-model:open="isModalOpen">
@@ -187,41 +187,42 @@ const confirmDelete = () => {
                 <DialogHeader>
                     <DialogTitle>{{ isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru' }}</DialogTitle>
                     <DialogDescription>
-                        Konfigurasi kategori masalah beserta tipe jaringan dan target SLA-nya.
+                        Konfigurasi nama gangguan, jenis infrastruktur jaringan, dan estimasi waktu penanganan (SLA).
                     </DialogDescription>
                 </DialogHeader>
 
                 <form @submit.prevent="submitForm" class="space-y-4">
                     <div class="grid gap-4">
                         <div>
-                            <InputLabel for="name" value="Nama Kategori Gangguan" />
-                            <Input id="name" v-model="form.name" placeholder="Cth: Kabel Fiber Optic Putus" />
+                            <InputLabel for="name" value="Nama Gangguan / Kategori" />
+                            <Input id="name" v-model="form.name" placeholder="Cth: Kabel Fiber Optik Putus" />
                             <InputError :message="form.errors.name" />
                         </div>
                         
                         <div>
-                            <InputLabel for="network_type" value="Tipe Jaringan Utama" />
+                            <InputLabel for="network_type" value="Tipe Jaringan" />
                             <Select v-model="form.network_type">
                                 <SelectTrigger>
                                     <SelectValue placeholder="Pilih tipe jaringan" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="fiber_optic">Fiber Optic</SelectItem>
-                                    <SelectItem value="lan">Jaringan LAN</SelectItem>
-                                    <SelectItem value="wifi">Jaringan WiFi</SelectItem>
+                                    <SelectItem value="lan">Jaringan Lokal (LAN)</SelectItem>
+                                    <SelectItem value="wifi">Akses Nirkabel (WiFi)</SelectItem>
                                 </SelectContent>
                             </Select>
                             <InputError :message="form.errors.network_type" />
                         </div>
                         
                         <div>
-                            <InputLabel for="sla_hours" value="Target Waktu Penanganan / SLA (dalam Jam)" />
-                            <Input id="sla_hours" type="number" min="1" v-model="form.sla_hours" />
+                            <InputLabel for="sla_hours" value="Target SLA (dalam Jam)" />
+                            <Input id="sla_hours" type="number" min="1" max="720" v-model="form.sla_hours" placeholder="Cth: 24" />
                             <InputError :message="form.errors.sla_hours" />
+                            <p class="text-xs text-slate-500 mt-1">Batas waktu maksimal perbaikan sebelum tiket dianggap terlambat (overdue).</p>
                         </div>
 
                         <div>
-                            <InputLabel for="status" value="Status" />
+                            <InputLabel for="status" value="Status Kategori" />
                             <Select v-model="form.status">
                                 <SelectTrigger>
                                     <SelectValue placeholder="Pilih status" />
@@ -238,19 +239,20 @@ const confirmDelete = () => {
                     <DialogFooter class="mt-6">
                         <Button type="button" variant="outline" @click="isModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                            {{ isEditMode ? 'Simpan' : 'Tambah Kategori' }}
+                            {{ isEditMode ? 'Simpan Perubahan' : 'Tambah Kategori' }}
                         </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
 
+        <!-- Delete Confirmation Dialog -->
         <Dialog v-model:open="isDeleteDialogOpen">
             <DialogContent class="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Konfirmasi Hapus</DialogTitle>
                     <DialogDescription>
-                        Apakah Anda yakin ingin menghapus kategori ini? Data yang dihapus tidak akan ditampilkan lagi (namun tetap tersimpan sebagai arsip).
+                        Apakah Anda yakin ingin menghapus kategori gangguan ini? Data yang terhapus tidak bisa dipilih untuk tiket laporan baru.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter class="mt-4">
@@ -259,5 +261,5 @@ const confirmDelete = () => {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-    </AuthenticatedLayout>
+    </div>
 </template>

@@ -13,7 +13,11 @@ class RoleAndPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
 
     public function test_inactive_user_cannot_login(): void
     {
@@ -83,5 +87,17 @@ class RoleAndPolicyTest extends TestCase
 
         $this->assertFalse($opdUser->can('update', $department));
         $this->assertTrue($admin->can('update', $department));
+    }
+
+    public function test_ticket_category_policy(): void
+    {
+        $opdUser = User::where('role', 'opd_user')->first();
+        $admin = User::where('role', 'admin')->first();
+        $category = TicketCategory::first();
+
+        $this->assertFalse($opdUser->can('viewAny', TicketCategory::class));
+        $this->assertTrue($admin->can('viewAny', TicketCategory::class));
+        $this->assertFalse($opdUser->can('update', $category));
+        $this->assertTrue($admin->can('update', $category));
     }
 }

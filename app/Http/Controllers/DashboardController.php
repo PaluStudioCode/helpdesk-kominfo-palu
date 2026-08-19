@@ -50,7 +50,7 @@ class DashboardController extends Controller
                           ->orWhere('assigned_to', $user->id);
                 })
                 ->with(['department:id,name', 'category:id,name'])
-                ->orderByRaw("FIELD(status, 'open', 'in_progress')")
+                ->orderByRaw("CASE WHEN status = 'open' THEN 1 WHEN status = 'in_progress' THEN 2 ELSE 3 END")
                 ->latest()
                 ->take(5)
                 ->get();

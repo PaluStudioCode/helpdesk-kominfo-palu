@@ -75,8 +75,23 @@ class TicketController extends Controller
 
         $tickets = $query->paginate(10)->withQueryString();
 
+        $categories = TicketCategory::where('status', 'active')
+                        ->select('id', 'name', 'network_type')
+                        ->get()
+                        ->groupBy('network_type');
+
+        $departments = [];
+        if ($user->role === 'admin') {
+            $departments = Department::where('status', 'active')
+                            ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+        }
+
         return Inertia::render('Tickets/Index', [
             'tickets' => $tickets,
+            'categoriesMap' => $categories,
+            'departments' => $departments,
             'filters' => $request->only(['search', 'status', 'priority', 'network_type', 'sort', 'direction']),
             'canCreateOnBehalf' => $user->role === 'admin'
         ]);

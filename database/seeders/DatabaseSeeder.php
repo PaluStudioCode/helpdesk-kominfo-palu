@@ -68,7 +68,7 @@ class DatabaseSeeder extends Seeder
         User::create([
             'name' => 'Administrator Kominfo',
             'email' => 'admin@kominfo.palukota.go.id',
-            'password' => Hash::make('password123'),
+            'password' => Hash::make('password'),
             'role' => 'admin',
             'phone_number' => '6280011112222',
             'status' => 'active',
@@ -77,8 +77,8 @@ class DatabaseSeeder extends Seeder
         // Technician
         User::create([
             'name' => 'Ahmad Teknisi',
-            'email' => 'teknisi1@kominfo.palukota.go.id',
-            'password' => Hash::make('password123'),
+            'email' => 'teknisi@example.com',
+            'password' => Hash::make('password'),
             'role' => 'technician',
             'phone_number' => '6280033334444',
             'status' => 'active',
@@ -88,7 +88,7 @@ class DatabaseSeeder extends Seeder
         User::create([
             'name' => 'Operator Dinkes',
             'email' => 'operator@dinkes.palukota.go.id',
-            'password' => Hash::make('password123'),
+            'password' => Hash::make('password'),
             'department_id' => $dinkes->id,
             'role' => 'opd_user',
             'phone_number' => '6280055556666',
@@ -99,7 +99,7 @@ class DatabaseSeeder extends Seeder
         User::create([
             'name' => 'Operator Disdik',
             'email' => 'operator@disdik.palukota.go.id',
-            'password' => Hash::make('password123'),
+            'password' => Hash::make('password'),
             'department_id' => $disdik->id,
             'role' => 'opd_user',
             'phone_number' => '6280077778888',

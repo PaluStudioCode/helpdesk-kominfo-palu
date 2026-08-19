@@ -15,7 +15,11 @@ class TicketFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected $seed = true;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed();
+    }
 
     public function test_opd_user_can_create_ticket(): void
     {

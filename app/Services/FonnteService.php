@@ -31,7 +31,9 @@ class FonnteService
             $responsePayload = ['error' => 'Invalid phone number after normalization', 'raw' => $rawPhone];
         } else {
             try {
-                $response = Http::withHeaders([
+                $response = Http::withOptions([
+                    'verify' => app()->environment('production'),
+                ])->withHeaders([
                     'Authorization' => $token,
                 ])->asForm()->post($endpoint, [
                     'target' => $normalizedPhone,
