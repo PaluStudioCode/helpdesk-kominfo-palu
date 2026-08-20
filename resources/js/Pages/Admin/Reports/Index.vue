@@ -333,7 +333,7 @@ const tableColumns = [
                     </template>
 
                     <template #cell-created_at="{ item }">
-                        <span class="text-xs text-slate-500">{{ new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) }}</span>
+                        <span class="text-xs text-slate-500">{{ new Date(item.created_at).toLocaleDateString('id-ID', { timeZone: 'Asia/Makassar', day: '2-digit', month: 'short', year: 'numeric' }) }}</span>
                     </template>
                 </DataTable>
             </div>

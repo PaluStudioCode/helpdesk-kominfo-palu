@@ -59,6 +59,8 @@ class UpdateTicketStatusRequest extends FormRequest
     {
         return [
             'resolution_note.required' => 'Catatan solusi perbaikan wajib diisi saat menyelesaikan tiket.',
+            'resolution_proofs.*.max' => 'Ukuran gambar bukti perbaikan tidak boleh melebihi 5 MB.',
+            'resolution_proofs.*.mimes' => 'Format berkas tidak didukung. Harap unggah berkas gambar (JPG, JPEG, PNG).',
             'comment.required' => 'Alasan wajib diisi saat membatalkan tiket.',
         ];
     }

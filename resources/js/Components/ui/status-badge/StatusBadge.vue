@@ -23,6 +23,7 @@ const variant = computed(() => {
             case 'safe': return 'sla_safe';
             case 'warning': return 'sla_warning';
             case 'danger': return 'sla_danger';
+            case 'completed': return 'sla_completed';
         }
     }
     
@@ -56,6 +57,7 @@ const label = computed(() => {
         safe: 'Aman',
         warning: 'Mendekati SLA',
         danger: 'Overdue SLA',
+        completed: 'Selesai',
         low: 'Low',
         medium: 'Medium',
         high: 'High',

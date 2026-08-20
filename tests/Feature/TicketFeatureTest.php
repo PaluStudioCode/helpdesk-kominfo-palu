@@ -28,8 +28,8 @@ class TicketFeatureTest extends TestCase
         $user = User::where('email', 'operator@dinkes.palukota.go.id')->first();
         $category = TicketCategory::where('network_type', 'lan')->first();
 
-        // Create a fake PDF instead of image to bypass GD extension requirement on test server
-        $file = UploadedFile::fake()->create('error.pdf', 100, 'application/pdf');
+        // Create a fake JPG image
+        $file = UploadedFile::fake()->image('error.jpg');
 
         $response = $this->actingAs($user)->post('/tickets', [
             'network_type' => 'lan',

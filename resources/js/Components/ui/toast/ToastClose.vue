@@ -14,7 +14,7 @@ const delegatedProps = reactiveOmit(props, "class")
 </script>
 
 <template>
-  <ToastClose v-bind="delegatedProps" :class="cn('absolute right-2 top-2 rounded-md p-1 text-slate-500 opacity-70 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none group-hover:opacity-100', props.class)">
+  <ToastClose v-bind="delegatedProps" :class="cn('absolute right-2.5 top-2.5 rounded-md p-1 opacity-80 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none group-hover:opacity-100', props.class)">
     <X class="h-4 w-4" />
   </ToastClose>
 </template>

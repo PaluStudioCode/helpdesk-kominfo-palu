@@ -34,7 +34,7 @@ class StoreTicketRequest extends FormRequest
             'description' => ['required', 'string', 'min:10'],
             'priority' => $priorityRule,
             'attachments' => ['nullable', 'array', 'max:3'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'], // max 5MB
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'], // max 5MB image only
         ];
 
         // Jika admin membuat on-behalf, department_id wajib diisi
@@ -63,8 +63,8 @@ class StoreTicketRequest extends FormRequest
     public function messages()
     {
         return [
-            'attachments.*.max' => 'Ukuran berkas lampiran tidak boleh melebihi 5 MB.',
-            'attachments.*.mimes' => 'Format berkas tidak didukung. Harap unggah berkas gambar (JPG, PNG) atau dokumen PDF.',
+            'attachments.*.max' => 'Ukuran gambar lampiran tidak boleh melebihi 5 MB.',
+            'attachments.*.mimes' => 'Format berkas tidak didukung. Harap unggah berkas gambar (JPG, JPEG, PNG).',
         ];
     }
 }

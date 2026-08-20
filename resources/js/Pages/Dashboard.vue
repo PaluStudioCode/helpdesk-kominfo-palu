@@ -26,10 +26,11 @@ const role = computed(() => user.value?.role);
 // Tanggal format
 const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('id-ID', {
+    return new Date(dateStr).toLocaleString('id-ID', {
+        timeZone: 'Asia/Makassar',
         day: 'numeric', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
-    });
+    }) + ' WITA';
 };
 </script>
 
@@ -218,13 +219,17 @@ const formatDate = (dateStr: string) => {
                                     </div>
                                 </div>
                                 
-                                <div class="flex flex-col items-start sm:items-end text-sm">
-                                    <div class="text-slate-500 mb-1">
+                                <div class="flex flex-col items-start sm:items-end text-sm mt-2 sm:mt-0">
+                                    <div class="text-xs text-slate-500 mb-1">
                                         {{ formatDate(ticket.created_at) }}
                                     </div>
                                     <div class="text-xs">
-                                        <span v-if="ticket.assignee" class="text-slate-600">Teknisi: {{ ticket.assignee.name }}</span>
-                                        <span v-else class="text-amber-600 font-medium">Belum Ditugaskan</span>
+                                        <span v-if="ticket.assignee" class="inline-flex items-center gap-1 text-slate-700 font-medium bg-slate-200/60 px-2 py-0.5 rounded">
+                                            Teknisi: {{ ticket.assignee.name }}
+                                        </span>
+                                        <span v-else class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-medium">
+                                            Belum Ditugaskan
+                                        </span>
                                     </div>
                                 </div>
                             </div>

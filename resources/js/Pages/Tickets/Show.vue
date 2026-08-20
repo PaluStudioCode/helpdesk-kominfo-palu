@@ -4,6 +4,7 @@ import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import FileUpload from '@/Components/FileUpload.vue';
+import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -75,21 +76,55 @@ const canReply = computed(() => !['closed', 'cancelled'].includes(props.ticket.s
 const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('id-ID', {
+        timeZone: 'Asia/Makassar',
         day: 'numeric', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
-    });
+    }) + ' WITA';
 };
 
 const getSlaStatus = (ticket: any) => {
-    if (!ticket.due_at || ['resolved', 'closed', 'cancelled'].includes(ticket.status)) return null;
+    if (!ticket.due_at) return null;
+    
+    if (['resolved', 'closed'].includes(ticket.status)) {
+        return {
+            status: 'completed',
+            label: '✓ Kendala sudah selesai ditangani',
+            textColor: 'text-emerald-700 font-medium'
+        };
+    }
+
+    if (ticket.status === 'cancelled') {
+        return {
+            status: 'cancelled',
+            label: '• Tiket dibatalkan',
+            textColor: 'text-slate-500'
+        };
+    }
     
     const now = new Date();
     const dueAt = new Date(ticket.due_at);
     const diffHours = (dueAt.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (diffHours < 0) return { status: 'danger', label: 'Overdue SLA' };
-    if (diffHours <= 2) return { status: 'warning', label: 'Mendekati SLA' };
-    return { status: 'safe', label: 'SLA Aman' };
+    if (diffHours < 0) {
+        return { 
+            status: 'danger', 
+            label: '⚠️ Melewati batas target penanganan',
+            textColor: 'text-rose-600 font-medium'
+        };
+    }
+    if (diffHours <= 2) {
+        const remainingMinutes = Math.max(1, Math.round(diffHours * 60));
+        return { 
+            status: 'warning', 
+            label: `⏳ Waktu segera habis (sisa ${remainingMinutes} menit)`,
+            textColor: 'text-amber-600 font-medium'
+        };
+    }
+    return { 
+        status: 'safe', 
+        label: '✓ Masih dalam batas waktu target',
+        textColor: 'text-emerald-600'
+    };
 };
 
 // Modals State
@@ -102,6 +137,17 @@ const isDrawerOpen = ref(false);
 
 // Active Tab in Feed (Discussion vs Status History)
 const activeTab = ref<'discussion' | 'history'>('discussion');
+
+// Image Preview Gallery Lightbox State
+const previewModalOpen = ref(false);
+const previewImages = ref<Array<{ url: string; name: string }>>([]);
+const previewInitialIndex = ref(0);
+
+const openImagePreview = (imagesList: Array<{ url: string; name: string }>, index: number = 0) => {
+    previewImages.value = imagesList;
+    previewInitialIndex.value = index;
+    previewModalOpen.value = true;
+};
 
 // Forms
 const assignForm = useForm({
@@ -186,15 +232,36 @@ const handleReplyFileChange = (e: Event) => {
     const target = e.target as HTMLInputElement;
     if (!target.files) return;
 
+    replyForm.clearErrors('attachments');
     const selected = Array.from(target.files);
     const availableSlots = 3 - replyForm.attachments.length;
 
     if (selected.length > availableSlots) {
-        alert(`Maksimal hanya dapat melampirkan 3 file.`);
+        replyForm.setError('attachments', `Maksimal hanya dapat melampirkan 3 gambar. Tersisa ${availableSlots} slot.`);
     }
 
-    const filesToAdd = selected.slice(0, Math.max(0, availableSlots));
-    replyForm.attachments = [...replyForm.attachments, ...filesToAdd];
+    const validFiles: File[] = [];
+    const maxSizeBytes = 5 * 1024 * 1024;
+    const allowedExts = ['jpg', 'jpeg', 'png'];
+
+    for (const file of selected.slice(0, Math.max(0, availableSlots))) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (!file.type.startsWith('image/') && !allowedExts.includes(ext)) {
+            replyForm.setError('attachments', `File "${file.name}" bukan gambar! Hanya format JPG, JPEG, atau PNG yang diperbolehkan.`);
+            continue;
+        }
+
+        if (file.size > maxSizeBytes) {
+            replyForm.setError('attachments', `Ukuran gambar "${file.name}" melebihi batas maksimal 5 MB.`);
+            continue;
+        }
+
+        validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+        replyForm.attachments = [...replyForm.attachments, ...validFiles];
+    }
     
     // Reset file input value to allow selecting the same file again if needed
     target.value = '';
@@ -218,7 +285,7 @@ const submitReply = () => {
     <Head :title="`Tiket ${ticket.ticket_number}`" />
 
     <AuthenticatedLayout>
-        <div class="max-w-7xl mx-auto space-y-5">
+        <div class="max-w-6xl mx-auto space-y-5">
             <!-- Unified Sticky Action Header -->
             <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div class="flex flex-wrap items-center gap-3">
@@ -227,7 +294,6 @@ const submitReply = () => {
                     </Link>
                     <span class="text-lg font-bold text-slate-900 font-mono tracking-tight">{{ ticket.ticket_number }}</span>
                     <StatusBadge type="ticket" :status="ticket.status" />
-                    <StatusBadge v-if="getSlaStatus(ticket)" type="sla" :status="getSlaStatus(ticket).status" />
                 </div>
 
                 <!-- Action Buttons Container -->
@@ -262,157 +328,147 @@ const submitReply = () => {
                 </div>
             </div>
 
-            <!-- Two-Column Linear Workspace -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                
-                <!-- Main Feed: Incident Details (Col 1 & 2) -->
-                <div class="lg:col-span-2 space-y-5">
-                    
-                    <!-- Incident Header & Description Card -->
-                    <Card class="border-slate-200 shadow-sm bg-white overflow-hidden">
-                        <div class="p-5 border-b border-slate-100">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <h2 class="text-lg font-bold text-slate-900 leading-snug">{{ ticket.title }}</h2>
-                                    <div class="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-500">
-                                        <span class="inline-flex items-center gap-1 font-medium text-slate-700">
-                                            <User class="w-3.5 h-3.5 text-slate-400" />
-                                            {{ ticket.reporter.name }}
-                                        </span>
-                                        <span>•</span>
-                                        <span class="inline-flex items-center gap-1">
-                                            <Calendar class="w-3.5 h-3.5 text-slate-400" />
-                                            {{ formatDate(ticket.created_at) }}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1.5 shrink-0">
-                                    <StatusBadge type="network" :status="ticket.network_type" />
-                                    <StatusBadge type="priority" :status="ticket.priority" />
-                                </div>
+            <!-- Single Unified Information Card -->
+            <Card class="border-slate-200 shadow-sm bg-white overflow-hidden">
+                <!-- Header: Title & Main Statuses -->
+                <div class="p-5 sm:p-6 border-b border-slate-100 bg-slate-50/40">
+                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div class="space-y-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <StatusBadge type="priority" :status="ticket.priority" />
+                                <StatusBadge type="network" :status="ticket.network_type" />
+                                <span class="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 font-medium text-slate-700">
+                                    {{ ticket.category.name }}
+                                </span>
+                            </div>
+                            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+                                {{ ticket.title }}
+                            </h1>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Grid: OPD, Reporter, Dates, Technician, SLA -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-200/80 text-xs">
+                        <!-- OPD & Location -->
+                        <div class="flex items-start gap-2.5">
+                            <Building2 class="w-4 h-4 text-kominfo-primary shrink-0 mt-0.5" />
+                            <div>
+                                <p class="text-slate-400 text-[10px] uppercase font-bold">Instansi & Lokasi</p>
+                                <p class="font-semibold text-slate-800">{{ ticket.department.name }}</p>
+                                <p class="text-slate-500 text-[11px] mt-0.5">{{ ticket.location_details }}</p>
                             </div>
                         </div>
 
-                        <CardContent class="p-5 space-y-4 text-sm">
+                        <!-- Reporter & Report Date -->
+                        <div class="flex items-start gap-2.5">
+                            <User class="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                             <div>
-                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Deskripsi Gangguan</h4>
-                                <div class="text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50/70 p-3.5 rounded-lg border border-slate-100">
-                                    {{ ticket.description }}
-                                </div>
+                                <p class="text-slate-400 text-[10px] uppercase font-bold">Pelapor & Tanggal</p>
+                                <p class="font-semibold text-slate-800">{{ ticket.reporter.name }}</p>
+                                <p class="text-slate-500 text-[11px] mt-0.5">{{ formatDate(ticket.created_at) }}</p>
                             </div>
+                        </div>
 
-                            <!-- Initial Problem Proof Attachments -->
-                            <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0">
-                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Foto / Berkas Lampiran</h4>
-                                <div class="flex flex-wrap gap-2.5">
-                                    <a 
-                                        v-for="att in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
-                                        :key="att.id"
-                                        :href="`/storage/${att.file_path}`" 
-                                        target="_blank"
-                                        class="flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg hover:border-kominfo-primary bg-white text-xs text-slate-700 transition-colors shadow-sm group"
-                                    >
-                                        <Paperclip class="w-3.5 h-3.5 text-slate-400 group-hover:text-kominfo-primary" />
-                                        <span class="truncate max-w-[160px] font-medium">{{ att.file_name }}</span>
-                                    </a>
-                                </div>
-                            </div>
-
-                            <!-- Technician Resolution Card Banner (If Resolved or Closed) -->
-                            <div v-if="ticket.resolution_note" class="mt-4 p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                                        <CheckCircle2 class="w-4 h-4 text-emerald-600" />
-                                        Catatan Solusi Perbaikan Teknisi
-                                    </h4>
-                                    <span v-if="ticket.resolved_at" class="text-[11px] text-emerald-700">
-                                        Diselesaikan: {{ formatDate(ticket.resolved_at) }}
-                                    </span>
-                                </div>
-                                <p class="text-xs text-emerald-900 leading-relaxed whitespace-pre-wrap font-medium">
-                                    {{ ticket.resolution_note }}
+                        <!-- SLA Deadline -->
+                        <div class="flex items-start gap-2.5">
+                            <Clock class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                                <p class="text-slate-400 text-[10px] uppercase font-bold">Target Penyelesaian</p>
+                                <p class="font-semibold text-slate-800">{{ ticket.due_at ? formatDate(ticket.due_at) : '-' }}</p>
+                                <p 
+                                    v-if="getSlaStatus(ticket)" 
+                                    class="text-[11px] mt-0.5 flex items-center gap-1"
+                                    :class="getSlaStatus(ticket)?.textColor"
+                                >
+                                    {{ getSlaStatus(ticket)?.label }}
                                 </p>
-                                <!-- Resolution Proof Photos -->
-                                <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0" class="pt-2 flex flex-wrap gap-2">
-                                    <a 
-                                        v-for="att in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
-                                        :key="att.id"
-                                        :href="`/storage/${att.file_path}`" 
-                                        target="_blank"
-                                        class="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-emerald-300 rounded-md text-[11px] text-emerald-800 hover:bg-emerald-50 transition-colors"
-                                    >
-                                        <Paperclip class="w-3 h-3 text-emerald-600" />
-                                        <span class="truncate max-w-[140px]">{{ att.file_name }}</span>
-                                    </a>
-                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+
+                        <!-- Assigned Technician -->
+                        <div class="flex items-start gap-2.5">
+                            <UserCheck class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div>
+                                <p class="text-slate-400 text-[10px] uppercase font-bold">Petugas Teknisi</p>
+                                <div v-if="assignedTechnician" class="flex items-center gap-1.5 mt-0.5">
+                                    <span class="font-semibold text-slate-800">{{ assignedTechnician.name }}</span>
+                                </div>
+                                <span v-else class="inline-block mt-0.5 text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-medium border border-amber-200">
+                                    Belum diambil
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Sidebar Metadata & Status Tracking (Col 3) -->
-                <div class="space-y-5">
-                    
-                    <!-- Metadata Info Card -->
-                    <Card class="border-slate-200 shadow-sm bg-white">
-                        <CardHeader class="p-4 border-b border-slate-100 flex flex-row items-center justify-between">
-                            <CardTitle class="text-xs font-bold uppercase tracking-wider text-slate-500">
-                                Rincian Insiden & Lokasi
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent class="p-4 space-y-3.5 text-xs">
-                            <div class="flex items-start gap-2.5">
-                                <Building2 class="w-4 h-4 text-kominfo-primary shrink-0 mt-0.5" />
-                                <div>
-                                    <p class="text-slate-400 text-[10px] uppercase font-bold">Instansi / OPD</p>
-                                    <p class="font-semibold text-slate-800">{{ ticket.department.name }}</p>
-                                </div>
-                            </div>
+                <!-- Main Content Body -->
+                <CardContent class="p-5 sm:p-6 space-y-6 text-sm">
+                    <!-- Issue Description -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Deskripsi Gangguan</h3>
+                        <div class="text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50/70 p-4 rounded-xl border border-slate-100">
+                            {{ ticket.description }}
+                        </div>
+                    </div>
 
-                            <div class="flex items-start gap-2.5">
-                                <MapPin class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                                <div>
-                                    <p class="text-slate-400 text-[10px] uppercase font-bold">Lokasi Detail</p>
-                                    <p class="font-semibold text-slate-800">{{ ticket.location_details }}</p>
+                    <!-- Initial Problem Proof Attachments -->
+                    <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Foto Bukti Gangguan</h3>
+                        <div class="flex flex-wrap gap-3">
+                            <button 
+                                type="button"
+                                v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
+                                :key="att.id"
+                                @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
+                                class="flex items-center gap-2.5 px-3.5 py-2.5 border border-slate-200 rounded-xl hover:border-kominfo-primary hover:bg-blue-50/40 bg-white text-xs text-slate-700 transition-all shadow-xs group cursor-pointer"
+                            >
+                                <div class="w-7 h-7 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
+                                    <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
                                 </div>
-                            </div>
+                                <span class="truncate max-w-[180px] font-medium group-hover:text-kominfo-primary">{{ att.file_name }}</span>
+                            </button>
+                        </div>
+                    </div>
 
-                            <div class="flex items-start gap-2.5">
-                                <Layers class="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                                <div>
-                                    <p class="text-slate-400 text-[10px] uppercase font-bold">Kategori Gangguan</p>
-                                    <p class="font-semibold text-slate-800">{{ ticket.category.name }}</p>
-                                </div>
-                            </div>
+                    <!-- Technician Resolution Card Banner (If Resolved or Closed) -->
+                    <div v-if="ticket.resolution_note" class="p-5 sm:p-6 bg-emerald-50/70 border border-emerald-200/90 rounded-2xl space-y-4 shadow-xs">
+                        <div class="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-emerald-200/60">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-2">
+                                <span class="p-1 rounded-md bg-emerald-100 text-emerald-700">
+                                    <CheckCircle2 class="w-4 h-4" />
+                                </span>
+                                Catatan Solusi Perbaikan Teknisi
+                            </h3>
+                            <span v-if="ticket.resolved_at" class="text-xs text-emerald-800/80 font-medium bg-emerald-100/60 px-2.5 py-1 rounded-md">
+                                Diselesaikan: {{ formatDate(ticket.resolved_at) }}
+                            </span>
+                        </div>
 
-                            <div v-if="ticket.due_at" class="flex items-start gap-2.5 pt-1 border-t border-slate-100">
-                                <Clock class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                                <div>
-                                    <p class="text-slate-400 text-[10px] uppercase font-bold">Batas Waktu SLA</p>
-                                    <p class="font-semibold text-slate-800">{{ formatDate(ticket.due_at) }}</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Assigned Technician Inline -->
-                            <div class="pt-3 border-t border-slate-100">
-                                <p class="text-slate-400 text-[10px] uppercase font-bold mb-2">Petugas Penanganan</p>
-                                <div v-if="assignedTechnician" class="flex items-center gap-2">
-                                    <div class="w-7 h-7 rounded-full bg-kominfo-primary/10 flex items-center justify-center text-kominfo-primary font-bold text-[10px] border border-kominfo-primary/20 shrink-0">
-                                        {{ assignedTechnician.name.substring(0, 2).toUpperCase() }}
+                        <div class="text-sm text-emerald-950 leading-relaxed whitespace-pre-wrap font-normal">
+                            {{ ticket.resolution_note }}
+                        </div>
+
+                        <!-- Resolution Proof Photos -->
+                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0" class="pt-2 border-t border-emerald-200/50">
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-800/70 mb-2.5">Foto Bukti Perbaikan</p>
+                            <div class="flex flex-wrap gap-3">
+                                <button 
+                                    type="button"
+                                    v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
+                                    :key="att.id"
+                                    @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
+                                    class="flex items-center gap-2.5 px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl text-xs text-emerald-900 hover:bg-emerald-50 hover:border-emerald-400 transition-all cursor-pointer shadow-xs group"
+                                >
+                                    <div class="w-7 h-7 rounded-lg bg-emerald-100 overflow-hidden shrink-0 flex items-center justify-center border border-emerald-200">
+                                        <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-bold text-slate-900 truncate">{{ assignedTechnician.name }}</p>
-                                    </div>
-                                </div>
-                                <div v-else class="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 flex items-center gap-1.5">
-                                    <AlertCircle class="w-3 h-3 shrink-0 text-amber-500" />
-                                    <span>Belum diambil oleh teknisi</span>
-                                </div>
+                                    <span class="truncate max-w-[160px] font-medium group-hover:text-emerald-700">{{ att.file_name }}</span>
+                                </button>
                             </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
 
         <!-- Assign Modal Dialog -->
@@ -703,16 +759,18 @@ const submitReply = () => {
 
                                 <!-- Reply Attachments -->
                                 <div v-if="reply.attachments && reply.attachments.length > 0" class="pt-1 flex flex-wrap gap-1.5">
-                                    <a 
-                                        v-for="att in reply.attachments" 
+                                    <button 
+                                        type="button"
+                                        v-for="(att, attIdx) in reply.attachments" 
                                         :key="att.id" 
-                                        :href="`/storage/${att.file_path}`" 
-                                        target="_blank" 
-                                        class="text-[10px] bg-white border border-slate-200 rounded px-2 py-1 flex items-center gap-1 hover:border-kominfo-primary transition-colors text-slate-700 font-medium"
+                                        @click="openImagePreview(reply.attachments.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), attIdx)"
+                                        class="text-[10px] bg-white border border-slate-200 rounded px-2 py-1 flex items-center gap-1.5 hover:border-kominfo-primary hover:bg-slate-50 transition-colors text-slate-700 font-medium cursor-pointer shadow-xs"
                                     >
-                                        <Paperclip class="w-3 h-3 text-slate-400" />
+                                        <div class="w-3.5 h-3.5 rounded bg-slate-100 overflow-hidden shrink-0">
+                                            <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
+                                        </div>
                                         <span class="truncate max-w-[120px]">{{ att.file_name }}</span>
-                                    </a>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -726,6 +784,7 @@ const submitReply = () => {
                                     class="min-h-[70px] text-xs resize-y bg-white border-slate-200"
                                 />
                                 <InputError :message="replyForm.errors.message" class="text-xs" />
+                                <InputError :message="replyForm.errors.attachments" class="text-xs" />
 
                                 <!-- Selected Attachments Chips -->
                                 <div v-if="replyForm.attachments.length > 0" class="flex flex-wrap gap-1.5">
@@ -750,7 +809,7 @@ const submitReply = () => {
                                     ref="replyFileInput" 
                                     type="file" 
                                     multiple 
-                                    accept="image/jpeg,image/png,application/pdf"
+                                    accept="image/jpeg,image/png"
                                     class="hidden" 
                                     @change="handleReplyFileChange" 
                                 />
@@ -809,5 +868,12 @@ const submitReply = () => {
                 </div>
             </Transition>
         </Teleport>
+
+        <!-- Top Layer Image Lightbox Preview Modal with Gallery Support -->
+        <ImagePreviewModal 
+            v-model:open="previewModalOpen" 
+            :images="previewImages" 
+            :initialIndex="previewInitialIndex" 
+        />
     </AuthenticatedLayout>
 </template>

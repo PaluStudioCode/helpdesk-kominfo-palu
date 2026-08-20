@@ -32,7 +32,15 @@ class StoreTicketReplyRequest extends FormRequest
             'message' => ['required', 'string', 'min:2'],
             'is_internal' => ['required', 'boolean'],
             'attachments' => ['nullable', 'array', 'max:3'],
-            'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'], // max 5MB
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'], // max 5MB
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'attachments.*.max' => 'Ukuran gambar lampiran tidak boleh melebihi 5 MB.',
+            'attachments.*.mimes' => 'Format berkas tidak didukung. Harap unggah berkas gambar (JPG, JPEG, PNG).',
         ];
     }
 }

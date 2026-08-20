@@ -139,7 +139,11 @@ const columns = [
 ];
 
 const getSlaStatus = (ticket: any) => {
-    if (!ticket.due_at || ['resolved', 'closed', 'cancelled'].includes(ticket.status)) return null;
+    if (['resolved', 'closed'].includes(ticket.status)) {
+        return { status: 'completed', label: 'Selesai' };
+    }
+
+    if (!ticket.due_at || ticket.status === 'cancelled') return null;
     
     const now = new Date();
     const dueAt = new Date(ticket.due_at);
@@ -152,6 +156,7 @@ const getSlaStatus = (ticket: any) => {
 
 const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Makassar',
         day: 'numeric', month: 'short', year: 'numeric'
     });
 };
@@ -187,9 +192,9 @@ const formatDate = (dateStr: string) => {
             >
                 <!-- Filter Dropdown Options -->
                 <template #filters>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
                         <Select :modelValue="statusFilter" @update:modelValue="handleStatusFilter">
-                            <SelectTrigger class="w-[160px] bg-white">
+                            <SelectTrigger class="w-full sm:w-[150px] bg-white text-xs h-9">
                                 <SelectValue placeholder="Status Tiket" />
                             </SelectTrigger>
                             <SelectContent>
@@ -204,7 +209,7 @@ const formatDate = (dateStr: string) => {
                         </Select>
 
                         <Select :modelValue="networkFilter" @update:modelValue="handleNetworkFilter">
-                            <SelectTrigger class="w-[150px] bg-white">
+                            <SelectTrigger class="w-full sm:w-[140px] bg-white text-xs h-9">
                                 <SelectValue placeholder="Tipe Jaringan" />
                             </SelectTrigger>
                             <SelectContent>
@@ -218,26 +223,26 @@ const formatDate = (dateStr: string) => {
                 </template>
 
                 <template #actions>
-                    <Button v-if="canCreateTicket" @click="openCreateTicketModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                        <Plus class="w-4 h-4 mr-2" /> {{ canCreateOnBehalf ? 'Buat Tiket (On-Behalf)' : 'Buat Tiket Baru' }}
+                    <Button v-if="canCreateTicket" @click="openCreateTicketModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark w-full sm:w-auto text-xs sm:text-sm h-9">
+                        <Plus class="w-4 h-4 mr-1.5" /> {{ canCreateOnBehalf ? 'Buat Tiket (On-Behalf)' : 'Buat Tiket Baru' }}
                     </Button>
                 </template>
 
                 <template #cell-ticket_number="{ item }">
-                    <div class="font-medium text-slate-900">{{ item.ticket_number }}</div>
-                    <div class="text-xs text-slate-500">{{ formatDate(item.created_at) }}</div>
+                    <div class="font-medium text-slate-900 font-mono text-xs sm:text-sm">{{ item.ticket_number }}</div>
+                    <div class="text-[11px] text-slate-500">{{ formatDate(item.created_at) }}</div>
                 </template>
 
                 <template #cell-title="{ item }">
-                    <div class="font-medium text-slate-900 truncate max-w-xs" :title="item.title">{{ item.title }}</div>
-                    <div class="flex items-center gap-2 mt-1">
+                    <div class="font-medium text-slate-900 text-xs sm:text-sm truncate max-w-[180px] sm:max-w-xs" :title="item.title">{{ item.title }}</div>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
                         <StatusBadge type="network" :status="item.network_type" />
                         <StatusBadge type="priority" :status="item.priority" />
                     </div>
                 </template>
 
                 <template #cell-department="{ item }">
-                    <span class="text-sm">{{ item.department.name }}</span>
+                    <span class="text-xs sm:text-sm text-slate-700 font-medium">{{ item.department.name }}</span>
                 </template>
 
                 <template #cell-status="{ item }">
@@ -251,8 +256,8 @@ const formatDate = (dateStr: string) => {
 
                 <template #actions-cell="{ item }">
                     <Link :href="route('tickets.show', item.id)">
-                        <Button variant="ghost" size="sm" class="h-8 border border-slate-200">
-                            <Eye class="w-4 h-4 mr-2" /> Detail
+                        <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-kominfo-primary hover:bg-blue-50/50">
+                            <Eye class="w-3.5 h-3.5 mr-1" /> Detail
                         </Button>
                     </Link>
                 </template>
@@ -407,9 +412,11 @@ const formatDate = (dateStr: string) => {
                         <InputLabel value="Lampiran Bukti Foto / Dokumen Pendukung" />
                         <FileUpload 
                             v-model="form.attachments"
+                            :multiple="true"
                             :maxFiles="3"
                             :maxSizeMB="5"
                             class="mt-1"
+                            @error="(msg) => form.errors.attachments = msg"
                         />
                         <InputError :message="form.errors.attachments" />
                     </div>

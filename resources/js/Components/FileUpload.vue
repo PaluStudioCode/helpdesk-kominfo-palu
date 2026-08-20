@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { UploadCloud, X, File as FileIcon } from 'lucide-vue-next';
+import { UploadCloud, X, File as FileIcon, Plus } from 'lucide-vue-next';
 import { Button } from '@/components/ui/button';
 
 const props = defineProps<{
@@ -21,7 +21,7 @@ const isDragging = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
 
 const maxFilesAllowed = computed(() => props.multiple ? (props.maxFiles || 3) : 1);
-const acceptTypes = computed(() => props.accept || 'image/jpeg,image/png,application/pdf');
+const acceptTypes = computed(() => props.accept || 'image/jpeg,image/png');
 
 const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
@@ -39,23 +39,28 @@ const validateFiles = (files: FileList | File[]): File[] => {
     
     // Check max files limit
     if (currentCount + files.length > maxFilesAllowed.value) {
-        emit('error', `Maksimal hanya diperbolehkan unggah ${maxFilesAllowed.value} berkas.`);
+        emit('error', `Maksimal hanya dapat mengunggah ${maxFilesAllowed.value} gambar.`);
         return validFiles;
     }
 
     const maxSizeBytes = (props.maxSizeMB || 5) * 1024 * 1024;
+    const allowedMimeTypes = acceptTypes.value.split(',').map(t => t.trim().toLowerCase());
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
-        if (file.size > maxSizeBytes) {
-            emit('error', `Ukuran berkas ${file.name} melebihi batas maksimal ${props.maxSizeMB || 5}MB.`);
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+        const isImageMime = allowedMimeTypes.some(mime => mime.includes('image/') ? file.type.startsWith('image/') : file.type === mime);
+        const isImageExt = ['jpg', 'jpeg', 'png'].includes(fileExt);
+
+        // Format validation with clear error message
+        if (!isImageMime && !isImageExt) {
+            emit('error', `File "${file.name}" ditolak! Format tidak didukung. Hanya file gambar (.jpg, .jpeg, .png) yang diperbolehkan.`);
             continue;
         }
 
-        // Basic accept validation (can be more robust if needed)
-        if (props.accept && !props.accept.includes(file.type)) {
-            emit('error', `Format berkas ${file.name} tidak didukung.`);
+        // File size validation with clear error message
+        if (file.size > maxSizeBytes) {
+            emit('error', `Ukuran gambar "${file.name}" terlalu besar (${formatSize(file.size)}). Batas maksimal adalah ${props.maxSizeMB || 5}MB.`);
             continue;
         }
 
@@ -111,8 +116,21 @@ const createPreviewUrl = (file: File) => URL.createObjectURL(file);
 </script>
 
 <template>
-    <div class="space-y-4">
+    <div class="space-y-3">
+        <!-- Hidden file input -->
+        <input 
+            type="file" 
+            ref="fileInput" 
+            class="hidden" 
+            :multiple="multiple" 
+            :accept="acceptTypes"
+            :disabled="disabled"
+            @change="handleFileSelect"
+        />
+
+        <!-- Big Dropzone: Only shown when no files uploaded yet -->
         <div 
+            v-if="modelValue.length === 0"
             class="relative rounded-lg border-2 border-dashed p-6 transition-colors"
             :class="[
                 isDragging ? 'border-kominfo-primary bg-kominfo-primary/5' : 'border-slate-300 bg-white',
@@ -123,16 +141,6 @@ const createPreviewUrl = (file: File) => URL.createObjectURL(file);
             @drop="handleDrop"
             @click="!disabled && fileInput?.click()"
         >
-            <input 
-                type="file" 
-                ref="fileInput" 
-                class="hidden" 
-                :multiple="multiple" 
-                :accept="acceptTypes"
-                :disabled="disabled"
-                @change="handleFileSelect"
-            />
-            
             <div class="flex flex-col items-center justify-center space-y-2 text-center">
                 <div class="rounded-full bg-slate-100 p-3">
                     <UploadCloud class="h-6 w-6 text-slate-500" />
@@ -141,44 +149,63 @@ const createPreviewUrl = (file: File) => URL.createObjectURL(file);
                     <span class="font-semibold text-kominfo-primary">Klik untuk unggah</span> atau seret dan lepas
                 </div>
                 <p class="text-xs text-slate-500">
-                    JPG, PNG atau PDF (Maks. {{ maxSizeMB || 5 }}MB)
-                    <span v-if="multiple">- Maksimal {{ maxFilesAllowed }} berkas</span>
+                    Format JPG, JPEG, atau PNG (Maks. {{ maxSizeMB || 5 }}MB)
+                    <span v-if="multiple">- Maksimal {{ maxFilesAllowed }} gambar</span>
                 </p>
             </div>
         </div>
 
-        <!-- Preview Grid -->
-        <div v-if="modelValue.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div 
-                v-for="(file, index) in modelValue" 
-                :key="index"
-                class="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-2 flex items-center gap-3 pr-8"
-            >
-                <div class="h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 flex items-center justify-center">
-                    <img 
-                        v-if="isImage(file)" 
-                        :src="createPreviewUrl(file)" 
-                        alt="preview" 
-                        class="h-full w-full object-cover"
-                    />
-                    <FileIcon v-else class="h-6 w-6 text-slate-400" />
-                </div>
-                
-                <div class="flex-1 overflow-hidden">
-                    <p class="truncate text-sm font-medium text-slate-700" :title="file.name">
-                        {{ file.name }}
-                    </p>
-                    <p class="text-xs text-slate-500">{{ formatSize(file.size) }}</p>
-                </div>
-                
-                <button 
-                    type="button"
-                    @click.stop="removeFile(index)"
-                    class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 opacity-0 hover:bg-slate-100 hover:text-red-500 transition-all group-hover:opacity-100"
-                    :disabled="disabled"
+        <!-- Preview Grid & Compact Add More Action -->
+        <div v-else class="space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div 
+                    v-for="(file, index) in modelValue" 
+                    :key="index"
+                    class="group relative overflow-hidden rounded-lg border border-slate-200 bg-white p-2.5 flex items-center gap-3 pr-8 shadow-sm"
                 >
-                    <X class="h-4 w-4" />
-                </button>
+                    <div class="h-11 w-11 shrink-0 overflow-hidden rounded bg-slate-100 flex items-center justify-center">
+                        <img 
+                            v-if="isImage(file)" 
+                            :src="createPreviewUrl(file)" 
+                            alt="preview" 
+                            class="h-full w-full object-cover"
+                        />
+                        <FileIcon v-else class="h-5 w-5 text-slate-400" />
+                    </div>
+                    
+                    <div class="flex-1 overflow-hidden">
+                        <p class="truncate text-xs font-medium text-slate-800" :title="file.name">
+                            {{ file.name }}
+                        </p>
+                        <p class="text-[11px] text-slate-500">{{ formatSize(file.size) }}</p>
+                    </div>
+                    
+                    <button 
+                        type="button"
+                        @click.stop="removeFile(index)"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-all"
+                        title="Hapus berkas"
+                        :disabled="disabled"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+            </div>
+
+            <!-- Compact Add Button when limit not reached -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+                <span>{{ modelValue.length }} dari {{ maxFilesAllowed }} berkas terpilih</span>
+                <Button 
+                    v-if="multiple && modelValue.length < maxFilesAllowed" 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    class="h-7 text-xs gap-1 border-slate-300"
+                    :disabled="disabled"
+                    @click="fileInput?.click()"
+                >
+                    <Plus class="h-3.5 w-3.5" /> Tambah Berkas
+                </Button>
             </div>
         </div>
     </div>

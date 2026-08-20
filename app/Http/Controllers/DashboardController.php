@@ -29,7 +29,7 @@ class DashboardController extends Controller
             ];
 
             $recentTickets = Ticket::where('department_id', $departmentId)
-                ->with('category:id,name')
+                ->with(['category:id,name', 'assignee:id,name'])
                 ->latest()
                 ->take(5)
                 ->get();
@@ -49,7 +49,7 @@ class DashboardController extends Controller
                     $query->whereNull('assigned_to')
                           ->orWhere('assigned_to', $user->id);
                 })
-                ->with(['department:id,name', 'category:id,name'])
+                ->with(['department:id,name', 'category:id,name', 'assignee:id,name'])
                 ->orderByRaw("CASE WHEN status = 'open' THEN 1 WHEN status = 'in_progress' THEN 2 ELSE 3 END")
                 ->latest()
                 ->take(5)

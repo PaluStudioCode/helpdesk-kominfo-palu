@@ -15,24 +15,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Seed Departments
-        $dinkes = Department::create([
-            'code' => 'DINKES',
-            'name' => 'Dinas Kesehatan Kota Palu',
-            'address' => 'Jl. Kesehatan No. 1, Kota Palu',
-            'pic_name' => 'Budi Santoso',
-            'pic_phone' => '6281122334455',
-            'status' => 'active',
-        ]);
-
-        $disdik = Department::create([
-            'code' => 'DISDIK',
-            'name' => 'Dinas Pendidikan Kota Palu',
-            'address' => 'Jl. Pendidikan No. 2, Kota Palu',
-            'pic_name' => 'Siti Aminah',
-            'pic_phone' => '6285566778899',
-            'status' => 'active',
-        ]);
 
         // 2. Seed Ticket Categories
         TicketCategory::create([
@@ -72,38 +54,7 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
             'phone_number' => '6280011112222',
             'status' => 'active',
-        ]);
-
-        // Technician
-        User::create([
-            'name' => 'Ahmad Teknisi',
-            'email' => 'teknisi@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'technician',
-            'phone_number' => '6280033334444',
-            'status' => 'active',
-        ]);
-
-        // OPD User (Dinas Kesehatan)
-        User::create([
-            'name' => 'Operator Dinkes',
-            'email' => 'operator@dinkes.palukota.go.id',
-            'password' => Hash::make('password'),
-            'department_id' => $dinkes->id,
-            'role' => 'opd_user',
-            'phone_number' => '6280055556666',
-            'status' => 'active',
-        ]);
-        
-        // OPD User (Dinas Pendidikan)
-        User::create([
-            'name' => 'Operator Disdik',
-            'email' => 'operator@disdik.palukota.go.id',
-            'password' => Hash::make('password'),
-            'department_id' => $disdik->id,
-            'role' => 'opd_user',
-            'phone_number' => '6280077778888',
-            'status' => 'active',
-        ]);
+        ]);     
+               
     }
 }

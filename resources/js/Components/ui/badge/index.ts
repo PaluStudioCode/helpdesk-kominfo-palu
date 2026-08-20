@@ -25,6 +25,7 @@ export const badgeVariants = cva(
         sla_safe: "bg-emerald-50 text-emerald-700 border-emerald-200",
         sla_warning: "bg-amber-50 text-amber-700 border-amber-200",
         sla_danger: "bg-red-100 text-red-800 animate-pulse border-red-200",
+        sla_completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
         // Networks
         fiber_optic: "border-transparent bg-purple-100 text-purple-800",
         lan: "border-transparent bg-cyan-100 text-cyan-800",
