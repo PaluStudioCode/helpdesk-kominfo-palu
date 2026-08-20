@@ -16,7 +16,6 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
 
-        // 2. Seed Ticket Categories
         TicketCategory::create([
             'name' => 'Kabel Fiber Optic Putus',
             'network_type' => 'fiber_optic',
@@ -45,8 +44,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
-        // 3. Seed Users
-        // Admin
         User::create([
             'name' => 'Administrator Kominfo',
             'email' => 'admin@kominfo.palukota.go.id',
@@ -54,6 +51,10 @@ class DatabaseSeeder extends Seeder
             'role' => 'admin',
             'phone_number' => '6280011112222',
             'status' => 'active',
+        ]);
+
+        $this->call([
+            DepartmentSeeder::class,
         ]);     
                
     }
