@@ -46,7 +46,7 @@ class DatabaseSeeder extends Seeder
 
         User::create([
             'name' => 'Administrator Kominfo',
-            'email' => 'admin@kominfo.palukota.go.id',
+            'email' => 'admin@kominfo.go.id',
             'password' => Hash::make('password'),
             'role' => 'admin',
             'phone_number' => '6280011112222',
@@ -57,5 +57,16 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
         ]);     
                
+        // Technician
+        User::firstOrCreate(
+            ['email' => 'teknisi@example.com'],
+            [
+                'name' => 'Ahmad Teknisi',
+                'password' => Hash::make('password'),
+                'role' => 'technician',
+                'phone_number' => '6280033334444',
+                'status' => 'active',
+            ]
+        );
     }
 }

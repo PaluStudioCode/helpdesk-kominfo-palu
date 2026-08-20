@@ -3,7 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Department;
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DepartmentSeeder extends Seeder
 {
@@ -116,14 +119,35 @@ class DepartmentSeeder extends Seeder
             ['code' => 'KEL-BIROBULI-UTARA', 'name' => 'Kelurahan Birobuli Utara'],
         ];
 
-        foreach ($departments as $dept) {
-            Department::updateOrCreate(
+        $defaultPassword = Hash::make('password');
+
+        foreach ($departments as $index => $dept) {
+            $department = Department::updateOrCreate(
                 ['code' => $dept['code']],
                 [
                     'name' => $dept['name'],
                     'address' => 'Kota Palu',
-                    'pic_name' => null,
-                    'pic_phone' => null,
+                    'status' => 'active',
+                ]
+            );
+
+            // Format slug code untuk email prefix
+            $slugCode = strtolower(str_replace('-', '.', $dept['code']));
+            $email = $dept['code'] === 'DINKES' 
+                ? 'operator@dinkes.palukota.go.id' 
+                : ($dept['code'] === 'DISDIK' ? 'operator@disdik.palukota.go.id' : "operator.{$slugCode}@palukota.go.id");
+            
+            $phoneSuffix = str_pad((string)($index + 1), 4, '0', STR_PAD_LEFT);
+            $phoneNumber = "08123456{$phoneSuffix}";
+
+            User::updateOrCreate(
+                ['email' => $email],
+                [
+                    'name' => "Operator {$dept['name']}",
+                    'password' => $defaultPassword,
+                    'department_id' => $department->id,
+                    'role' => 'opd_user',
+                    'phone_number' => $phoneNumber,
                     'status' => 'active',
                 ]
             );

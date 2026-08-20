@@ -50,9 +50,9 @@ const handleTabChange = (val: string) => {
                 </div>
             </div>
 
-            <!-- Top Underline Navigation Tabs (Opsi 1) -->
-            <div>
-                <nav class="flex space-x-8 border-b border-slate-200" aria-label="Tabs">
+            <!-- Top Underline Navigation Tabs -->
+            <div class="border-b border-slate-200">
+                <nav class="flex space-x-4 sm:space-x-8 overflow-x-auto no-scrollbar" aria-label="Tabs">
                     <!-- Tab: Departments -->
                     <button
                         type="button"
@@ -61,13 +61,13 @@ const handleTabChange = (val: string) => {
                             currentTab === 'departments'
                                 ? 'border-kominfo-primary text-kominfo-primary'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
-                            'group inline-flex items-center py-3.5 px-1 border-b-2 font-medium text-sm transition-all focus:outline-none'
+                            'group inline-flex items-center py-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-all focus:outline-none shrink-0'
                         ]"
                     >
                         <Building2 
                             :class="[
                                 currentTab === 'departments' ? 'text-kominfo-primary' : 'text-slate-400 group-hover:text-slate-500',
-                                '-ml-0.5 mr-2.5 h-5 w-5'
+                                '-ml-0.5 mr-2 h-4 w-4 sm:h-5 sm:w-5'
                             ]" 
                         />
                         <span>Data OPD / Instansi</span>
@@ -76,7 +76,7 @@ const handleTabChange = (val: string) => {
                                 currentTab === 'departments' 
                                     ? 'bg-blue-50 text-kominfo-primary font-bold' 
                                     : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200',
-                                'ml-2.5 py-0.5 px-2 rounded-full text-xs transition-colors'
+                                'ml-2 py-0.5 px-2 rounded-full text-xs transition-colors'
                             ]"
                         >
                             {{ counts.departments }}
@@ -91,13 +91,13 @@ const handleTabChange = (val: string) => {
                             currentTab === 'categories'
                                 ? 'border-kominfo-primary text-kominfo-primary'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
-                            'group inline-flex items-center py-3.5 px-1 border-b-2 font-medium text-sm transition-all focus:outline-none'
+                            'group inline-flex items-center py-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-all focus:outline-none shrink-0'
                         ]"
                     >
                         <Layers 
                             :class="[
                                 currentTab === 'categories' ? 'text-kominfo-primary' : 'text-slate-400 group-hover:text-slate-500',
-                                '-ml-0.5 mr-2.5 h-5 w-5'
+                                '-ml-0.5 mr-2 h-4 w-4 sm:h-5 sm:w-5'
                             ]" 
                         />
                         <span>Kategori Gangguan & SLA</span>
@@ -106,7 +106,7 @@ const handleTabChange = (val: string) => {
                                 currentTab === 'categories' 
                                     ? 'bg-blue-50 text-kominfo-primary font-bold' 
                                     : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200',
-                                'ml-2.5 py-0.5 px-2 rounded-full text-xs transition-colors'
+                                'ml-2 py-0.5 px-2 rounded-full text-xs transition-colors'
                             ]"
                         >
                             {{ counts.categories }}
@@ -121,13 +121,13 @@ const handleTabChange = (val: string) => {
                             currentTab === 'users'
                                 ? 'border-kominfo-primary text-kominfo-primary'
                                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300',
-                            'group inline-flex items-center py-3.5 px-1 border-b-2 font-medium text-sm transition-all focus:outline-none'
+                            'group inline-flex items-center py-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-all focus:outline-none shrink-0'
                         ]"
                     >
                         <Users 
                             :class="[
                                 currentTab === 'users' ? 'text-kominfo-primary' : 'text-slate-400 group-hover:text-slate-500',
-                                '-ml-0.5 mr-2.5 h-5 w-5'
+                                '-ml-0.5 mr-2 h-4 w-4 sm:h-5 sm:w-5'
                             ]" 
                         />
                         <span>Manajemen Pengguna</span>
@@ -136,7 +136,7 @@ const handleTabChange = (val: string) => {
                                 currentTab === 'users' 
                                     ? 'bg-blue-50 text-kominfo-primary font-bold' 
                                     : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200',
-                                'ml-2.5 py-0.5 px-2 rounded-full text-xs transition-colors'
+                                'ml-2 py-0.5 px-2 rounded-full text-xs transition-colors'
                             ]"
                         >
                             {{ counts.users }}

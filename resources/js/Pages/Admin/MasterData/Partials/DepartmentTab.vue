@@ -35,7 +35,7 @@ const searchQuery = ref(props.filters?.tab === 'departments' ? (props.filters?.s
 const columns = [
     { key: 'code', label: 'Kode OPD', sortable: true },
     { key: 'name', label: 'Nama Instansi', sortable: true },
-    { key: 'pic_name', label: 'PIC', sortable: true },
+    { key: 'operator', label: 'Operator / PIC', sortable: false },
     { key: 'status', label: 'Status', sortable: true },
 ];
 
@@ -81,8 +81,6 @@ const form = useForm({
     code: '',
     name: '',
     address: '',
-    pic_name: '',
-    pic_phone: '',
     status: 'active'
 });
 
@@ -101,8 +99,6 @@ const openEditModal = (department: any) => {
     form.code = department.code;
     form.name = department.name;
     form.address = department.address;
-    form.pic_name = department.pic_name || '';
-    form.pic_phone = department.pic_phone || '';
     form.status = department.status;
     isModalOpen.value = true;
 };
@@ -163,12 +159,12 @@ const confirmDelete = () => {
                 <StatusBadge :status="item.status" />
             </template>
 
-            <template #cell-pic_name="{ item }">
-                <div v-if="item.pic_name">
-                    <div class="font-medium text-slate-900">{{ item.pic_name }}</div>
-                    <div class="text-xs text-slate-500">{{ item.pic_phone }}</div>
+            <template #cell-operator="{ item }">
+                <div v-if="item.operator">
+                    <div class="font-medium text-slate-900">{{ item.operator.name }}</div>
+                    <div class="text-xs text-slate-500">{{ item.operator.phone_number || '-' }}</div>
                 </div>
-                <span v-else class="text-slate-400 italic">-</span>
+                <span v-else class="text-slate-400 italic">Belum ada operator</span>
             </template>
 
             <template #actions-cell="{ item }">
@@ -185,52 +181,38 @@ const confirmDelete = () => {
 
         <!-- Create/Edit Modal -->
         <Dialog v-model:open="isModalOpen">
-            <DialogContent class="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle>{{ isEditMode ? 'Edit Data OPD' : 'Tambah OPD Baru' }}</DialogTitle>
-                    <DialogDescription>
+            <DialogContent class="w-[95vw] sm:max-w-[500px]">
+                <DialogHeader class="pb-1">
+                    <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEditMode ? 'Edit Data OPD' : 'Tambah OPD Baru' }}</DialogTitle>
+                    <DialogDescription class="text-xs text-slate-500">
                         Isi form di bawah ini untuk mengelola data instansi/OPD yang terdaftar di Kominfo.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitForm" class="space-y-4">
-                    <div class="grid gap-4">
-                        <div>
-                            <InputLabel for="code" value="Kode Singkatan OPD" />
-                            <Input id="code" v-model="form.code" placeholder="Cth: DINKES" :disabled="isEditMode" />
+                <form @submit.prevent="submitForm" class="space-y-3">
+                    <div class="grid gap-3">
+                        <div class="space-y-1">
+                            <InputLabel for="code" value="Kode Singkatan OPD" class="text-xs" />
+                            <Input id="code" v-model="form.code" placeholder="Cth: DINKES" :disabled="isEditMode" class="h-9 text-sm" />
                             <InputError :message="form.errors.code" />
                         </div>
                         
-                        <div>
-                            <InputLabel for="name" value="Nama Instansi Lengkap" />
-                            <Input id="name" v-model="form.name" placeholder="Cth: Dinas Kesehatan Kota Palu" />
+                        <div class="space-y-1">
+                            <InputLabel for="name" value="Nama Instansi Lengkap" class="text-xs" />
+                            <Input id="name" v-model="form.name" placeholder="Cth: Dinas Kesehatan Kota Palu" class="h-9 text-sm" />
                             <InputError :message="form.errors.name" />
                         </div>
                         
-                        <div>
-                            <InputLabel for="address" value="Alamat Lengkap" />
-                            <Textarea id="address" v-model="form.address" placeholder="Masukkan alamat instansi" />
+                        <div class="space-y-1">
+                            <InputLabel for="address" value="Alamat Lengkap" class="text-xs" />
+                            <Textarea id="address" v-model="form.address" placeholder="Masukkan alamat instansi" class="text-sm min-h-[70px] max-h-[100px]" />
                             <InputError :message="form.errors.address" />
                         </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <InputLabel for="pic_name" value="Nama PIC (Opsional)" />
-                                <Input id="pic_name" v-model="form.pic_name" placeholder="Nama pengurus IT" />
-                                <InputError :message="form.errors.pic_name" />
-                            </div>
-                            
-                            <div>
-                                <InputLabel for="pic_phone" value="No. WhatsApp PIC" />
-                                <Input id="pic_phone" v-model="form.pic_phone" placeholder="Cth: 08123456789" />
-                                <InputError :message="form.errors.pic_phone" />
-                            </div>
-                        </div>
 
-                        <div>
-                            <InputLabel for="status" value="Status Instansi" />
+                        <div class="space-y-1">
+                            <InputLabel for="status" value="Status Instansi" class="text-xs" />
                             <Select v-model="form.status">
-                                <SelectTrigger>
+                                <SelectTrigger class="h-9 text-sm">
                                     <SelectValue placeholder="Pilih status" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -242,9 +224,9 @@ const confirmDelete = () => {
                         </div>
                     </div>
 
-                    <DialogFooter class="mt-6">
-                        <Button type="button" variant="outline" @click="isModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                    <DialogFooter class="pt-2">
+                        <Button type="button" variant="outline" size="sm" @click="isModalOpen = false">Batal</Button>
+                        <Button type="submit" size="sm" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                             {{ isEditMode ? 'Simpan Perubahan' : 'Tambah OPD' }}
                         </Button>
                     </DialogFooter>

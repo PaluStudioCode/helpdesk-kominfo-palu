@@ -22,12 +22,16 @@ class MasterDataController extends Controller
         $activeTab = $request->input('tab', 'departments');
 
         // 1. Departments Query
-        $deptQuery = Department::query();
+        $deptQuery = Department::with('operator');
         if ($activeTab === 'departments' && $request->has('search')) {
             $search = $request->input('search');
             $deptQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhereHas('operator', function ($uq) use ($search) {
+                      $uq->where('name', 'like', "%{$search}%")
+                         ->orWhere('phone_number', 'like', "%{$search}%");
+                  });
             });
         }
         if ($activeTab === 'departments' && $request->has('sort')) {

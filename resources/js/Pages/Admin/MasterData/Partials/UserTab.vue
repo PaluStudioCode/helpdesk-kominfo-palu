@@ -239,79 +239,76 @@ const confirmDelete = () => {
 
         <!-- Create/Edit Modal -->
         <Dialog v-model:open="isModalOpen">
-            <DialogContent class="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle>{{ isEditMode ? 'Edit Pengguna' : 'Tambah Pengguna Baru' }}</DialogTitle>
-                    <DialogDescription>
-                        Kelola akun pengguna, hak akses peran sistem, dan instansi tempat pengguna bertugas.
+            <DialogContent class="w-[95vw] sm:max-w-[620px]">
+                <DialogHeader class="pb-1">
+                    <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEditMode ? 'Edit Pengguna' : 'Tambah Pengguna Baru' }}</DialogTitle>
+                    <DialogDescription class="text-xs text-slate-500">
+                        Kelola akun pengguna, hak akses peran sistem, dan instansi penempatan.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitForm" class="space-y-4">
-                    <div class="grid gap-4">
-                        <div>
-                            <InputLabel for="name" value="Nama Lengkap" />
-                            <Input id="name" v-model="form.name" placeholder="Cth: Budi Pratama" />
+                <form @submit.prevent="submitForm" class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        <div class="space-y-1">
+                            <InputLabel for="name" value="Nama Lengkap" class="text-xs" />
+                            <Input id="name" v-model="form.name" placeholder="Cth: Budi Pratama" class="h-9 text-sm" />
                             <InputError :message="form.errors.name" />
                         </div>
 
-                        <div>
-                            <InputLabel for="email" value="Alamat Email" />
-                            <Input id="email" type="email" v-model="form.email" placeholder="Cth: budi@palukota.go.id" />
+                        <div class="space-y-1">
+                            <InputLabel for="email" value="Alamat Email" class="text-xs" />
+                            <Input id="email" type="email" v-model="form.email" placeholder="Cth: budi@palukota.go.id" class="h-9 text-sm" />
                             <InputError :message="form.errors.email" />
                         </div>
 
-                        <div>
-                            <InputLabel for="phone_number" value="No. Handphone / WhatsApp" />
-                            <Input id="phone_number" v-model="form.phone_number" placeholder="Cth: 081234567890" />
+                        <div class="space-y-1">
+                            <InputLabel for="phone_number" value="No. WhatsApp" class="text-xs" />
+                            <Input id="phone_number" v-model="form.phone_number" placeholder="Cth: 081234567890" class="h-9 text-sm" />
                             <InputError :message="form.errors.phone_number" />
-                            <p class="text-xs text-slate-500 mt-1">Digunakan untuk menerima notifikasi WhatsApp.</p>
                         </div>
 
-                        <div>
-                            <InputLabel for="password" :value="isEditMode ? 'Password Baru (Kosongkan jika tidak diubah)' : 'Kata Sandi'" />
-                            <Input id="password" type="password" v-model="form.password" placeholder="Minimal 8 karakter" />
+                        <div class="space-y-1">
+                            <InputLabel for="password" :value="isEditMode ? 'Password Baru (Opsional)' : 'Kata Sandi'" class="text-xs" />
+                            <Input id="password" type="password" v-model="form.password" placeholder="Minimal 8 karakter" class="h-9 text-sm" />
                             <InputError :message="form.errors.password" />
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <InputLabel for="role" value="Peran / Role" />
-                                <Select v-model="form.role">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Pilih Role" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="opd_user">Operator OPD</SelectItem>
-                                        <SelectItem value="technician">Teknisi Jaringan</SelectItem>
-                                        <SelectItem value="admin">Administrator</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="form.errors.role" />
-                            </div>
-
-                            <div>
-                                <InputLabel for="status" value="Status Akun" />
-                                <Select v-model="form.status">
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Pilih Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="active">Aktif</SelectItem>
-                                        <SelectItem value="inactive">Nonaktif</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="form.errors.status" />
-                            </div>
+                        <div class="space-y-1">
+                            <InputLabel for="role" value="Peran / Role" class="text-xs" />
+                            <Select v-model="form.role">
+                                <SelectTrigger class="h-9 text-sm">
+                                    <SelectValue placeholder="Pilih Role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="opd_user">Operator OPD</SelectItem>
+                                    <SelectItem value="technician">Teknisi Jaringan</SelectItem>
+                                    <SelectItem value="admin">Administrator</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.role" />
                         </div>
 
-                        <div v-if="form.role === 'opd_user'">
-                            <InputLabel for="department_id" value="Instansi / OPD Asal" />
+                        <div class="space-y-1">
+                            <InputLabel for="status" value="Status Akun" class="text-xs" />
+                            <Select v-model="form.status">
+                                <SelectTrigger class="h-9 text-sm">
+                                    <SelectValue placeholder="Pilih Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active">Aktif</SelectItem>
+                                    <SelectItem value="inactive">Nonaktif</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.status" />
+                        </div>
+
+                        <div v-if="form.role === 'opd_user'" class="col-span-1 sm:col-span-2 space-y-1">
+                            <InputLabel for="department_id" value="Instansi / OPD Asal" class="text-xs" />
                             <Select v-model="form.department_id">
-                                <SelectTrigger>
+                                <SelectTrigger class="h-9 text-sm">
                                     <SelectValue placeholder="Pilih OPD Terdaftar" />
                                 </SelectTrigger>
-                                <SelectContent class="max-h-56">
+                                <SelectContent class="max-h-52">
                                     <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id">
                                         {{ dept.name }}
                                     </SelectItem>
@@ -321,9 +318,9 @@ const confirmDelete = () => {
                         </div>
                     </div>
 
-                    <DialogFooter class="mt-6">
-                        <Button type="button" variant="outline" @click="isModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                    <DialogFooter class="pt-2">
+                        <Button type="button" variant="outline" size="sm" @click="isModalOpen = false">Batal</Button>
+                        <Button type="submit" size="sm" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                             {{ isEditMode ? 'Simpan Perubahan' : 'Daftarkan Pengguna' }}
                         </Button>
                     </DialogFooter>

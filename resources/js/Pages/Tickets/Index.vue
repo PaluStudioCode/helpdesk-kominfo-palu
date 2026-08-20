@@ -264,17 +264,17 @@ const formatDate = (dateStr: string) => {
             </DataTable>
         </div>
 
-        <!-- Create Ticket Modal Dialog -->
+        <!-- Create Ticket Modal Dialog (Fullscreen on Mobile) -->
         <Dialog v-model:open="isCreateModalOpen">
-            <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Buat Laporan Tiket Gangguan</DialogTitle>
-                    <DialogDescription>
+            <DialogContent class="w-full h-full max-w-full max-h-full rounded-none top-0 left-0 translate-x-0 translate-y-0 p-4 sm:p-6 overflow-y-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-[700px] sm:max-h-[90vh] sm:h-auto sm:rounded-xl">
+                <DialogHeader class="pb-2 border-b border-slate-100 sm:border-none">
+                    <DialogTitle class="text-lg sm:text-xl font-bold text-slate-900">Buat Laporan Tiket Gangguan</DialogTitle>
+                    <DialogDescription class="text-xs sm:text-sm text-slate-500">
                         Lengkapi detail permasalahan jaringan berikut ini untuk diteruskan ke tim teknisi Kominfo.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-2">
+                <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-1 sm:pt-2">
                     <!-- On-Behalf Selection (Admin Only) -->
                     <div v-if="canCreateOnBehalf && departments && departments.length > 0">
                         <InputLabel for="department_id" value="Instansi / OPD Pelapor (On-Behalf)" />
@@ -294,54 +294,54 @@ const formatDate = (dateStr: string) => {
                     <!-- Network Type Card Selector -->
                     <div>
                         <InputLabel value="Tipe Infrastruktur Jaringan" />
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1.5">
+                        <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-1.5">
                             <button
                                 type="button"
                                 @click="handleNetworkChange('fiber_optic')"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-3 rounded-lg border-2 text-center transition-all',
+                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
                                     form.network_type === 'fiber_optic' 
                                         ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
                                         : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
                                 ]"
                             >
-                                <Cable class="w-6 h-6 mb-1.5" />
-                                <span class="text-xs">Fiber Optic</span>
+                                <Cable class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
+                                <span class="text-[11px] sm:text-xs">Fiber Optic</span>
                             </button>
 
                             <button
                                 type="button"
                                 @click="handleNetworkChange('lan')"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-3 rounded-lg border-2 text-center transition-all',
+                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
                                     form.network_type === 'lan' 
                                         ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
                                         : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
                                 ]"
                             >
-                                <Network class="w-6 h-6 mb-1.5" />
-                                <span class="text-xs">Jaringan LAN</span>
+                                <Network class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
+                                <span class="text-[11px] sm:text-xs">LAN</span>
                             </button>
 
                             <button
                                 type="button"
                                 @click="handleNetworkChange('wifi')"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-3 rounded-lg border-2 text-center transition-all',
+                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
                                     form.network_type === 'wifi' 
                                         ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
                                         : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
                                 ]"
                             >
-                                <Wifi class="w-6 h-6 mb-1.5" />
-                                <span class="text-xs">WiFi / Nirkabel</span>
+                                <Wifi class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
+                                <span class="text-[11px] sm:text-xs">WiFi</span>
                             </button>
                         </div>
                         <InputError :message="form.errors.network_type" />
                     </div>
 
                     <!-- Category & Priority Row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
                             <InputLabel for="category_id" value="Kategori Gangguan" />
                             <Select 
@@ -421,7 +421,7 @@ const formatDate = (dateStr: string) => {
                         <InputError :message="form.errors.attachments" />
                     </div>
 
-                    <DialogFooter class="pt-4 border-t border-slate-100">
+                    <DialogFooter class="pt-3 pb-2 border-t border-slate-100 sticky bottom-0 bg-white sm:static">
                         <Button type="button" variant="outline" @click="isCreateModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                             {{ form.processing ? 'Mengirim Laporan...' : 'Kirim Laporan Tiket' }}

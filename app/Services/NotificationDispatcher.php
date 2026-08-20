@@ -22,7 +22,7 @@ class NotificationDispatcher
         $department = $ticket->department;
 
         // 1. Notify OPD Reporter / PIC
-        $opdPhone = !empty($reporter->phone_number) ? $reporter->phone_number : ($department?->pic_phone ?? '');
+        $opdPhone = !empty($reporter->phone_number) ? $reporter->phone_number : ($department?->operator?->phone_number ?? '');
         $waReporterMessage = "*[Helpdesk Kominfo Palu]*\n\n"
             . "Tiket laporan gangguan Anda telah berhasil didaftarkan ke sistem.\n\n"
             . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
@@ -127,7 +127,7 @@ class NotificationDispatcher
                 ticket: $ticket,
                 recipient: $reporter,
                 eventType: 'status_in_progress',
-                targetPhone: $reporter->phone_number ?? ($ticket->department?->pic_phone ?? ''),
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
                 waMessage: $waOpdMessage,
                 emailSubject: "Pembaruan Status Tiket ({$ticket->ticket_number})",
                 emailHeadline: "Tiket Anda sedang ditangani oleh teknisi ({$techName}).",
@@ -157,7 +157,7 @@ class NotificationDispatcher
                 ticket: $ticket,
                 recipient: $reporter,
                 eventType: 'status_resolved',
-                targetPhone: $reporter->phone_number ?? ($ticket->department?->pic_phone ?? ''),
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
                 waMessage: $waMessage,
                 emailSubject: "Perbaikan Tiket Telah Selesai ({$ticket->ticket_number})",
                 emailHeadline: "Teknisi telah menyelesaikan perbaikan pada laporan Anda.",
@@ -186,7 +186,7 @@ class NotificationDispatcher
                 ticket: $ticket,
                 recipient: $reporter,
                 eventType: 'status_closed',
-                targetPhone: $reporter->phone_number ?? ($ticket->department?->pic_phone ?? ''),
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
                 waMessage: $waMessage,
                 emailSubject: "Tiket Resmi Ditutup ({$ticket->ticket_number})",
                 emailHeadline: "Tiket telah resmi ditutup.",
@@ -244,7 +244,7 @@ class NotificationDispatcher
                 ticket: $ticket,
                 recipient: $reporter,
                 eventType: 'ticket_cancelled',
-                targetPhone: $reporter->phone_number ?? ($ticket->department?->pic_phone ?? ''),
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
                 waMessage: $waMessage,
                 emailSubject: "Tiket Dibatalkan ({$ticket->ticket_number})",
                 emailHeadline: "Tiket telah dibatalkan dengan alasan tertentu.",

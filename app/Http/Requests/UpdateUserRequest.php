@@ -35,7 +35,15 @@ class UpdateUserRequest extends FormRequest
             'phone_number' => ['required', 'string', 'max:30', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'role' => ['required', 'in:admin,technician,opd_user'],
             'status' => ['required', 'in:active,inactive'],
-            'department_id' => ['required_if:role,opd_user', 'nullable', 'exists:departments,id'],
+            'department_id' => [
+                'required_if:role,opd_user', 
+                'nullable', 
+                'exists:departments,id',
+                Rule::unique('users', 'department_id')
+                    ->ignore($this->route('user'))
+                    ->where(fn ($query) => $query->where('role', 'opd_user')->whereNull('deleted_at'))
+                    ->when($this->input('role') === 'opd_user', fn ($rule) => $rule, fn () => null)
+            ],
         ];
     }
 }

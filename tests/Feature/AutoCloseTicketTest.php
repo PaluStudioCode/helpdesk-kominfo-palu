@@ -28,8 +28,6 @@ class AutoCloseTicketTest extends TestCase
             'name' => 'Dinas Perhubungan',
             'code' => 'DISHUB',
             'address' => 'Jl. Dishub No. 1, Kota Palu',
-            'pic_name' => 'Ahmad Yani',
-            'pic_phone' => '081234567899',
             'status' => 'active',
         ]);
 

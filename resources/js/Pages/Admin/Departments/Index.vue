@@ -36,7 +36,7 @@ const searchQuery = ref(props.filters?.search || '');
 const columns = [
     { key: 'code', label: 'Kode OPD', sortable: true },
     { key: 'name', label: 'Nama Instansi', sortable: true },
-    { key: 'pic_name', label: 'PIC', sortable: true },
+    { key: 'operator', label: 'Operator / PIC', sortable: false },
     { key: 'status', label: 'Status', sortable: true },
 ];
 
@@ -78,8 +78,6 @@ const form = useForm({
     code: '',
     name: '',
     address: '',
-    pic_name: '',
-    pic_phone: '',
     status: 'active'
 });
 
@@ -98,8 +96,6 @@ const openEditModal = (department: any) => {
     form.code = department.code;
     form.name = department.name;
     form.address = department.address;
-    form.pic_name = department.pic_name || '';
-    form.pic_phone = department.pic_phone || '';
     form.status = department.status;
     isModalOpen.value = true;
 };
@@ -167,12 +163,12 @@ const confirmDelete = () => {
                     <StatusBadge :status="item.status" />
                 </template>
 
-                <template #cell-pic_name="{ item }">
-                    <div v-if="item.pic_name">
-                        <div class="font-medium text-slate-900">{{ item.pic_name }}</div>
-                        <div class="text-xs text-slate-500">{{ item.pic_phone }}</div>
+                <template #cell-operator="{ item }">
+                    <div v-if="item.operator">
+                        <div class="font-medium text-slate-900">{{ item.operator.name }}</div>
+                        <div class="text-xs text-slate-500">{{ item.operator.phone_number || '-' }}</div>
                     </div>
-                    <span v-else class="text-slate-400 italic">-</span>
+                    <span v-else class="text-slate-400 italic">Belum ada operator</span>
                 </template>
 
                 <template #actions-cell="{ item }">
@@ -216,20 +212,6 @@ const confirmDelete = () => {
                             <InputLabel for="address" value="Alamat Lengkap" />
                             <Textarea id="address" v-model="form.address" placeholder="Masukkan alamat instansi" />
                             <InputError :message="form.errors.address" />
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <InputLabel for="pic_name" value="Nama PIC (Opsional)" />
-                                <Input id="pic_name" v-model="form.pic_name" placeholder="Nama pengurus IT" />
-                                <InputError :message="form.errors.pic_name" />
-                            </div>
-                            
-                            <div>
-                                <InputLabel for="pic_phone" value="No. WhatsApp PIC" />
-                                <Input id="pic_phone" v-model="form.pic_phone" placeholder="Cth: 08123456789" />
-                                <InputError :message="form.errors.pic_phone" />
-                            </div>
                         </div>
 
                         <div>

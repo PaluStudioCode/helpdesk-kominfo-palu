@@ -183,26 +183,26 @@ const confirmDelete = () => {
 
         <!-- Create/Edit Modal -->
         <Dialog v-model:open="isModalOpen">
-            <DialogContent class="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>{{ isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru' }}</DialogTitle>
-                    <DialogDescription>
+            <DialogContent class="w-[95vw] sm:max-w-[425px]">
+                <DialogHeader class="pb-1">
+                    <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru' }}</DialogTitle>
+                    <DialogDescription class="text-xs text-slate-500">
                         Konfigurasi nama gangguan, jenis infrastruktur jaringan, dan estimasi waktu penanganan (SLA).
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitForm" class="space-y-4">
-                    <div class="grid gap-4">
-                        <div>
-                            <InputLabel for="name" value="Nama Gangguan / Kategori" />
-                            <Input id="name" v-model="form.name" placeholder="Cth: Kabel Fiber Optik Putus" />
+                <form @submit.prevent="submitForm" class="space-y-3">
+                    <div class="grid gap-3">
+                        <div class="space-y-1">
+                            <InputLabel for="name" value="Nama Gangguan / Kategori" class="text-xs" />
+                            <Input id="name" v-model="form.name" placeholder="Cth: Kabel Fiber Optik Putus" class="h-9 text-sm" />
                             <InputError :message="form.errors.name" />
                         </div>
                         
-                        <div>
-                            <InputLabel for="network_type" value="Tipe Jaringan" />
+                        <div class="space-y-1">
+                            <InputLabel for="network_type" value="Tipe Jaringan" class="text-xs" />
                             <Select v-model="form.network_type">
-                                <SelectTrigger>
+                                <SelectTrigger class="h-9 text-sm">
                                     <SelectValue placeholder="Pilih tipe jaringan" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -214,17 +214,17 @@ const confirmDelete = () => {
                             <InputError :message="form.errors.network_type" />
                         </div>
                         
-                        <div>
-                            <InputLabel for="sla_hours" value="Target SLA (dalam Jam)" />
-                            <Input id="sla_hours" type="number" min="1" max="720" v-model="form.sla_hours" placeholder="Cth: 24" />
+                        <div class="space-y-1">
+                            <InputLabel for="sla_hours" value="Target SLA (dalam Jam)" class="text-xs" />
+                            <Input id="sla_hours" type="number" min="1" max="720" v-model="form.sla_hours" placeholder="Cth: 24" class="h-9 text-sm" />
                             <InputError :message="form.errors.sla_hours" />
-                            <p class="text-xs text-slate-500 mt-1">Batas waktu maksimal perbaikan sebelum tiket dianggap terlambat (overdue).</p>
+                            <p class="text-[11px] text-slate-500">Batas waktu perbaikan sebelum tiket dianggap overdue.</p>
                         </div>
 
-                        <div>
-                            <InputLabel for="status" value="Status Kategori" />
+                        <div class="space-y-1">
+                            <InputLabel for="status" value="Status Kategori" class="text-xs" />
                             <Select v-model="form.status">
-                                <SelectTrigger>
+                                <SelectTrigger class="h-9 text-sm">
                                     <SelectValue placeholder="Pilih status" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -236,9 +236,9 @@ const confirmDelete = () => {
                         </div>
                     </div>
 
-                    <DialogFooter class="mt-6">
-                        <Button type="button" variant="outline" @click="isModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                    <DialogFooter class="pt-2">
+                        <Button type="button" variant="outline" size="sm" @click="isModalOpen = false">Batal</Button>
+                        <Button type="submit" size="sm" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                             {{ isEditMode ? 'Simpan Perubahan' : 'Tambah Kategori' }}
                         </Button>
                     </DialogFooter>

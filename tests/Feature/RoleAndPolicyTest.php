@@ -54,7 +54,7 @@ class RoleAndPolicyTest extends TestCase
         
         $opdDinkes = User::where('email', 'operator@dinkes.palukota.go.id')->first();
         $opdDisdik = User::where('email', 'operator@disdik.palukota.go.id')->first();
-        $admin = User::where('email', 'admin@kominfo.palukota.go.id')->first();
+        $admin = User::where('role', 'admin')->first();
 
         $category = TicketCategory::first();
 

@@ -27,8 +27,6 @@ class ReportExportTest extends TestCase
             'name' => 'Badan Pendapatan Daerah',
             'code' => 'BAPENDA',
             'address' => 'Jl. Bapenda No. 1, Kota Palu',
-            'pic_name' => 'Rahmat Hidayat',
-            'pic_phone' => '081234567111',
             'status' => 'active',
         ]);
 

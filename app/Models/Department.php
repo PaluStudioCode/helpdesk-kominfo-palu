@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Department extends Model
 {
@@ -15,10 +16,13 @@ class Department extends Model
         'code',
         'name',
         'address',
-        'pic_name',
-        'pic_phone',
         'status',
     ];
+
+    public function operator(): HasOne
+    {
+        return $this->hasOne(User::class)->where('role', 'opd_user');
+    }
 
     public function users(): HasMany
     {

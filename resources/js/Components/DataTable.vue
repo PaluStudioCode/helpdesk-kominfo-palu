@@ -53,14 +53,14 @@ watch(searchQuery, (val) => {
                         v-model="searchQuery"
                         type="text" 
                         :placeholder="searchPlaceholder || 'Cari...'" 
-                        class="pl-9 bg-white"
+                        class="pl-9 bg-white w-full"
                     />
                 </div>
                 <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                     <slot name="filters" />
                 </div>
             </div>
-            <div class="flex items-center justify-end gap-2 shrink-0">
+            <div class="flex items-center justify-start sm:justify-end gap-2 shrink-0">
                 <slot name="actions" />
             </div>
         </div>

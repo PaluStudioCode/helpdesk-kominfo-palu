@@ -35,8 +35,6 @@ class NotificationAndLogTest extends TestCase
             'name' => 'Dinas Pendidikan',
             'code' => 'DISDIK',
             'address' => 'Jl. Pendidikan No. 1, Kota Palu',
-            'pic_name' => 'Budi Santoso',
-            'pic_phone' => '081234567890',
             'status' => 'active',
         ]);
 

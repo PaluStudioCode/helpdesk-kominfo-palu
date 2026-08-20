@@ -32,8 +32,6 @@ class UpdateDepartmentRequest extends FormRequest
             ],
             'name' => ['required', 'string', 'max:200'],
             'address' => ['required', 'string'],
-            'pic_name' => ['nullable', 'string', 'max:150'],
-            'pic_phone' => ['nullable', 'string', 'max:30', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'status' => ['required', 'in:active,inactive'],
         ];
     }
