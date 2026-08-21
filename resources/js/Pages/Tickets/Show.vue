@@ -816,7 +816,7 @@ onUnmounted(() => {
                                 :class="Number(reply.user_id) === Number(currentUser.id) ? 'justify-end' : 'justify-start'"
                             >
                                 <div 
-                                    class="rounded-xl border transition-all shadow-xs overflow-hidden w-fit max-w-[85%] sm:max-w-[75%]"
+                                    class="rounded-xl border transition-all shadow-xs overflow-hidden w-fit min-w-[200px] max-w-[92%] sm:max-w-[85%] md:max-w-[80%] lg:max-w-[72%]"
                                     :class="[
                                         reply.is_internal 
                                             ? 'bg-amber-50/70 border-amber-300' 
@@ -827,23 +827,23 @@ onUnmounted(() => {
                                 >
                                     <!-- Internal Note Header Banner (If Internal) -->
                                     <div v-if="reply.is_internal" class="bg-amber-100/70 px-4 py-1.5 border-b border-amber-200/80 flex items-center justify-between gap-3 text-amber-900 text-xs font-semibold">
-                                        <div class="flex items-center gap-1.5">
+                                        <div class="flex items-center gap-1.5 shrink-0">
                                             <Lock class="w-3.5 h-3.5 text-amber-700" />
                                             <span>Catatan Internal</span>
                                         </div>
-                                        <span class="text-[11px] font-normal text-amber-800">Hanya Admin & Teknisi</span>
+                                        <span class="text-[11px] font-normal text-amber-800 shrink-0">Hanya Admin & Teknisi</span>
                                     </div>
 
                                     <div class="p-3.5 space-y-2.5">
                                         <!-- Sender Info & Timestamp Stack (Compact without avatar) -->
                                         <div>
                                             <div class="flex flex-wrap items-center gap-1.5 leading-tight">
-                                                <span class="font-bold text-sm text-slate-900 truncate">
+                                                <span class="font-bold text-sm text-slate-900 break-words">
                                                     {{ reply.user.name }}
                                                 </span>
 
                                                 <span 
-                                                    class="inline-flex items-center text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border shadow-2xs"
+                                                    class="inline-flex items-center text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border shadow-2xs shrink-0"
                                                     :class="getRoleBadgeInfo(reply.user.role).badgeClass"
                                                 >
                                                     {{ getRoleBadgeInfo(reply.user.role).label }}
@@ -851,7 +851,7 @@ onUnmounted(() => {
 
                                                 <span 
                                                     v-if="Number(reply.user_id) === Number(currentUser.id)" 
-                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-kominfo-primary border border-blue-200"
+                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-kominfo-primary border border-blue-200 shrink-0"
                                                 >
                                                     Anda
                                                 </span>
@@ -859,14 +859,14 @@ onUnmounted(() => {
 
                                             <!-- Timestamp placed neatly right below the sender info -->
                                             <div class="flex items-center gap-1 text-xs text-slate-400 font-mono mt-1">
-                                                <Clock class="w-3 h-3 text-slate-400" />
-                                                <span>{{ formatDate(reply.created_at) }}</span>
+                                                <Clock class="w-3 h-3 text-slate-400 shrink-0" />
+                                                <span class="truncate">{{ formatDate(reply.created_at) }}</span>
                                             </div>
                                         </div>
 
-                                        <!-- Message Body Content -->
+                                        <!-- Message Body Content (Responsive with word wrapping) -->
                                         <div 
-                                            class="text-sm leading-relaxed whitespace-pre-wrap"
+                                            class="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]"
                                             :class="reply.is_internal ? 'text-amber-950' : 'text-slate-800'"
                                         >
                                             {{ reply.message }}
@@ -874,19 +874,19 @@ onUnmounted(() => {
 
                                         <!-- Reply Attachments Cards -->
                                         <div v-if="reply.attachments && reply.attachments.length > 0" class="pt-0.5">
-                                            <div class="flex flex-wrap gap-2.5">
+                                            <div class="flex flex-wrap gap-2">
                                                 <button 
                                                     type="button"
                                                     v-for="(att, attIdx) in reply.attachments" 
                                                     :key="att.id" 
                                                     @click="openImagePreview(reply.attachments.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), attIdx)"
-                                                    class="group flex items-center gap-2.5 bg-white border border-slate-200 hover:border-kominfo-primary/60 hover:bg-blue-50/40 rounded-lg p-1.5 pr-3 text-xs transition-all shadow-2xs cursor-pointer max-w-full"
+                                                    class="group flex items-center gap-2 bg-white border border-slate-200 hover:border-kominfo-primary/60 hover:bg-blue-50/40 rounded-lg p-1.5 pr-2.5 text-xs transition-all shadow-2xs cursor-pointer max-w-full"
                                                 >
                                                     <div class="w-8 h-8 rounded-md bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
                                                         <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                                                     </div>
                                                     <div class="text-left min-w-0">
-                                                        <p class="truncate max-w-[150px] font-semibold text-slate-700 group-hover:text-kominfo-primary">{{ att.file_name }}</p>
+                                                        <p class="truncate max-w-[130px] font-semibold text-slate-700 group-hover:text-kominfo-primary">{{ att.file_name }}</p>
                                                         <span class="text-[10px] text-slate-400 group-hover:text-kominfo-primary/80">Lihat Lampiran</span>
                                                     </div>
                                                 </button>
