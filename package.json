@@ -30,7 +30,9 @@
         "@vueuse/core": "^14.4.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
+        "laravel-echo": "^2.4.0",
         "lucide-vue-next": "^1.0.0",
+        "pusher-js": "^8.6.0",
         "reka-ui": "^2.10.3",
         "tailwind-merge": "^3.6.0"
     }

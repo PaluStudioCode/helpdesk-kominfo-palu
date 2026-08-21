@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
@@ -27,6 +27,7 @@ import {
     Send,
     ArrowLeft,
     Shield,
+    Lock,
     Activity,
     Calendar,
     Layers,
@@ -80,6 +81,31 @@ const formatDate = (dateStr: string) => {
         day: 'numeric', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
     }) + ' WITA';
+};
+
+const getRoleBadgeInfo = (userRole: string) => {
+    switch (userRole) {
+        case 'admin':
+            return {
+                label: 'Administrator',
+                badgeClass: 'bg-blue-100 text-kominfo-primary border-blue-200'
+            };
+        case 'technician':
+            return {
+                label: 'Teknisi',
+                badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+            };
+        case 'opd_user':
+            return {
+                label: 'Pelapor OPD',
+                badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
+            };
+        default:
+            return {
+                label: userRole || 'User',
+                badgeClass: 'bg-slate-100 text-slate-700 border-slate-200'
+            };
+    }
 };
 
 const getSlaStatus = (ticket: any) => {
@@ -279,6 +305,44 @@ const submitReply = () => {
         }
     });
 };
+
+const ticketReplies = ref<any[]>([...props.ticket.replies]);
+const discussionScrollContainer = ref<HTMLElement | null>(null);
+
+watch(() => props.ticket.replies, (newReplies) => {
+    ticketReplies.value = [...newReplies];
+}, { deep: true });
+
+const scrollToBottom = () => {
+    nextTick(() => {
+        if (discussionScrollContainer.value) {
+            discussionScrollContainer.value.scrollTop = discussionScrollContainer.value.scrollHeight;
+        }
+    });
+};
+
+let echoChannel: any = null;
+
+onMounted(() => {
+    if (typeof window !== 'undefined' && (window as any).Echo) {
+        echoChannel = (window as any).Echo.private(`ticket.${props.ticket.id}`);
+        echoChannel.listen('.reply.created', (event: any) => {
+            const newReply = event.reply;
+            const exists = ticketReplies.value.some((r: any) => r.id === newReply.id);
+            if (!exists) {
+                ticketReplies.value.push(newReply);
+                scrollToBottom();
+            }
+        });
+    }
+});
+
+onUnmounted(() => {
+    if (typeof window !== 'undefined' && (window as any).Echo) {
+        (window as any).Echo.leave(`ticket.${props.ticket.id}`);
+    }
+    echoChannel = null;
+});
 </script>
 
 <template>
@@ -301,8 +365,8 @@ const submitReply = () => {
                     <Button @click="isDrawerOpen = true" size="default" variant="outline" class="border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium relative">
                         <MessageSquare class="w-4 h-4 mr-2 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
-                        <span v-if="ticket.replies.length > 0" class="ml-2 px-2 py-0.5 bg-blue-100 text-kominfo-primary font-bold text-xs rounded-full">
-                            {{ ticket.replies.length }}
+                        <span v-if="ticketReplies.length > 0" class="ml-2 px-2 py-0.5 bg-blue-100 text-kominfo-primary font-bold text-xs rounded-full">
+                            {{ ticketReplies.length }}
                         </span>
                     </Button>
 
@@ -703,7 +767,7 @@ const submitReply = () => {
                                         'py-0.5 px-2 rounded-full text-xs font-semibold'
                                     ]"
                                 >
-                                    {{ ticket.replies.length }}
+                                    {{ ticketReplies.length }}
                                 </span>
                             </button>
 
@@ -734,77 +798,122 @@ const submitReply = () => {
                     </div>
 
                     <!-- Drawer Content: Discussion -->
-                    <div v-show="activeTab === 'discussion'" class="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+                    <div v-show="activeTab === 'discussion'" class="flex-1 flex flex-col min-h-0 bg-slate-50/60">
                         <!-- Messages List -->
-                        <div class="flex-1 overflow-y-auto p-5 space-y-3.5">
-                            <div v-if="ticket.replies.length === 0" class="text-center py-14 text-sm text-slate-400">
-                                Belum ada aktivitas atau balasan diskusi pada tiket ini.
+                        <div ref="discussionScrollContainer" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                            <div v-if="ticketReplies.length === 0" class="flex flex-col items-center justify-center py-16 text-center px-4">
+                                <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 border border-slate-200">
+                                    <MessageSquare class="w-6 h-6" />
+                                </div>
+                                <p class="text-sm font-semibold text-slate-700">Belum Ada Diskusi</p>
+                                <p class="text-xs text-slate-400 mt-1 max-w-xs">Gunakan kotak di bawah untuk berdiskusi, memberikan instruksi, atau memperbarui informasi tiket ini.</p>
                             </div>
 
                             <div 
-                                v-for="reply in ticket.replies" 
+                                v-for="reply in ticketReplies" 
                                 :key="reply.id" 
-                                class="p-3.5 rounded-xl border text-sm space-y-2 transition-all shadow-xs"
+                                class="rounded-xl border transition-all shadow-xs overflow-hidden"
                                 :class="[
                                     reply.is_internal 
-                                        ? 'bg-amber-50 border-amber-200 text-amber-950' 
+                                        ? [
+                                            'bg-amber-50/70 border-amber-300',
+                                            Number(reply.user_id) === Number(currentUser.id) ? 'ml-6 sm:ml-10 mr-0' : 'mr-6 sm:mr-10 ml-0'
+                                          ]
                                         : Number(reply.user_id) === Number(currentUser.id)
-                                            ? 'bg-blue-50/80 border-blue-200 text-slate-900 ml-4' 
-                                            : 'bg-white border-slate-200 text-slate-900 mr-4'
+                                            ? 'bg-blue-50/70 border-blue-200/90 ml-6 sm:ml-10 mr-0 shadow-2xs' 
+                                            : 'bg-white border-slate-200 mr-6 sm:mr-10 ml-0'
                                  ]"
                             >
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="flex items-center gap-2 font-bold text-sm">
-                                        <span :class="reply.is_internal ? 'text-amber-950' : 'text-slate-900'">
-                                            {{ reply.user.name }}
-                                        </span>
-                                        <span v-if="reply.is_internal" class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-200 text-amber-900">
-                                            Catatan Internal
-                                        </span>
-                                        <span v-else class="text-xs capitalize text-slate-500 font-normal">
-                                            ({{ reply.user.role.replace('_', ' ') }})
-                                        </span>
+                                <!-- Internal Note Header Banner (If Internal) -->
+                                <div v-if="reply.is_internal" class="bg-amber-100/70 px-4 py-1.5 border-b border-amber-200/80 flex items-center justify-between text-amber-900 text-xs font-semibold">
+                                    <div class="flex items-center gap-1.5">
+                                        <Lock class="w-3.5 h-3.5 text-amber-700" />
+                                        <span>Catatan Internal</span>
                                     </div>
-                                    <span class="text-xs text-slate-400 font-mono">{{ formatDate(reply.created_at) }}</span>
+                                    <span class="text-[11px] font-normal text-amber-800">Hanya Admin & Teknisi</span>
                                 </div>
-                                
-                                <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ reply.message }}</p>
 
-                                <!-- Reply Attachments -->
-                                <div v-if="reply.attachments && reply.attachments.length > 0" class="pt-1.5 flex flex-wrap gap-2">
-                                    <button 
-                                        type="button"
-                                        v-for="(att, attIdx) in reply.attachments" 
-                                        :key="att.id" 
-                                        @click="openImagePreview(reply.attachments.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), attIdx)"
-                                        class="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 flex items-center gap-2 hover:border-kominfo-primary hover:bg-slate-50 transition-colors text-slate-700 font-medium cursor-pointer shadow-xs"
-                                    >
-                                        <div class="w-4 h-4 rounded bg-slate-100 overflow-hidden shrink-0">
-                                            <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
+                                <div class="p-3.5 space-y-2.5">
+                                    <!-- Sender Info & Timestamp Stack (Compact without avatar) -->
+                                    <div>
+                                        <div class="flex flex-wrap items-center gap-1.5 leading-tight">
+                                            <span class="font-bold text-sm text-slate-900 truncate">
+                                                {{ reply.user.name }}
+                                            </span>
+
+                                            <span 
+                                                class="inline-flex items-center text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border shadow-2xs"
+                                                :class="getRoleBadgeInfo(reply.user.role).badgeClass"
+                                            >
+                                                {{ getRoleBadgeInfo(reply.user.role).label }}
+                                            </span>
+
+                                            <span 
+                                                v-if="Number(reply.user_id) === Number(currentUser.id)" 
+                                                class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-kominfo-primary border border-blue-200"
+                                            >
+                                                Anda
+                                            </span>
                                         </div>
-                                        <span class="truncate max-w-[140px]">{{ att.file_name }}</span>
-                                    </button>
+
+                                        <!-- Timestamp placed neatly right below the sender info -->
+                                        <div class="flex items-center gap-1 text-xs text-slate-400 font-mono mt-1">
+                                            <Clock class="w-3 h-3 text-slate-400" />
+                                            <span>{{ formatDate(reply.created_at) }}</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Message Body Content -->
+                                    <div 
+                                        class="text-sm leading-relaxed whitespace-pre-wrap"
+                                        :class="reply.is_internal ? 'text-amber-950' : 'text-slate-800'"
+                                    >
+                                        {{ reply.message }}
+                                    </div>
+
+                                    <!-- Reply Attachments Cards -->
+                                    <div v-if="reply.attachments && reply.attachments.length > 0" class="pt-0.5">
+                                        <div class="flex flex-wrap gap-2.5">
+                                            <button 
+                                                type="button"
+                                                v-for="(att, attIdx) in reply.attachments" 
+                                                :key="att.id" 
+                                                @click="openImagePreview(reply.attachments.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), attIdx)"
+                                                class="group flex items-center gap-2.5 bg-white border border-slate-200 hover:border-kominfo-primary/60 hover:bg-blue-50/40 rounded-lg p-1.5 pr-3 text-xs transition-all shadow-2xs cursor-pointer max-w-full"
+                                            >
+                                                <div class="w-8 h-8 rounded-md bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                                                    <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                                                </div>
+                                                <div class="text-left min-w-0">
+                                                    <p class="truncate max-w-[150px] font-semibold text-slate-700 group-hover:text-kominfo-primary">{{ att.file_name }}</p>
+                                                    <span class="text-[10px] text-slate-400 group-hover:text-kominfo-primary/80">Lihat Lampiran</span>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Sticky Reply Form at the Bottom of Drawer -->
-                        <div v-if="canReply" class="p-5 bg-white border-t border-slate-200 shrink-0">
+                        <div v-if="canReply" class="p-4 bg-white border-t border-slate-200 shrink-0 shadow-sm">
                             <form @submit.prevent="submitReply" class="space-y-3">
-                                <Textarea 
-                                    v-model="replyForm.message" 
-                                    placeholder="Tulis pesan atau update progres..." 
-                                    class="min-h-[80px] text-sm resize-y bg-white border-slate-200"
-                                />
+                                <div class="relative">
+                                    <Textarea 
+                                        v-model="replyForm.message" 
+                                        placeholder="Tulis pesan atau update progres..." 
+                                        class="min-h-[85px] text-sm resize-y bg-slate-50/50 hover:bg-white focus:bg-white border-slate-200 transition-colors"
+                                    />
+                                </div>
                                 <InputError :message="replyForm.errors.message" class="text-xs" />
                                 <InputError :message="replyForm.errors.attachments" class="text-xs" />
 
                                 <!-- Selected Attachments Chips -->
-                                <div v-if="replyForm.attachments.length > 0" class="flex flex-wrap gap-2">
+                                <div v-if="replyForm.attachments.length > 0" class="flex flex-wrap gap-2 pt-0.5">
                                     <div 
                                         v-for="(file, idx) in replyForm.attachments" 
                                         :key="idx"
-                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs shadow-2xs"
                                     >
                                         <Paperclip class="w-3.5 h-3.5 text-slate-400" />
                                         <span class="max-w-[140px] truncate font-medium">{{ file.name }}</span>
@@ -827,7 +936,7 @@ const submitReply = () => {
                                     @change="handleReplyFileChange" 
                                 />
 
-                                <div class="flex items-center justify-between gap-2 pt-1">
+                                <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
                                     <div class="flex items-center gap-3">
                                         <button 
                                             type="button" 
@@ -840,10 +949,11 @@ const submitReply = () => {
                                             <span class="text-[11px] text-slate-400">({{ replyForm.attachments.length }}/3)</span>
                                         </button>
 
-                                        <div v-if="['admin', 'technician'].includes(role)" class="flex items-center space-x-2">
+                                        <div v-if="['admin', 'technician'].includes(role)" class="flex items-center space-x-1.5">
                                             <Checkbox id="drawer_is_internal" v-model:checked="replyForm.is_internal" />
-                                            <label for="drawer_is_internal" class="text-xs font-semibold text-amber-800 cursor-pointer select-none">
-                                                Internal
+                                            <label for="drawer_is_internal" class="text-xs font-semibold text-amber-800 cursor-pointer select-none flex items-center gap-1">
+                                                <Lock class="w-3 h-3 text-amber-700" />
+                                                <span>Catatan Internal</span>
                                             </label>
                                         </div>
                                     </div>

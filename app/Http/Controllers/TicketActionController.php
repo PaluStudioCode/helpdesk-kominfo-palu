@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ticket;
 use App\Models\User;
+use App\Events\TicketReplyCreated;
 use App\Services\ActivityLogger;
 use App\Services\NotificationDispatcher;
 use App\Http\Requests\StoreTicketReplyRequest;
@@ -116,7 +117,10 @@ class TicketActionController extends Controller
             ], $user->id);
 
             DB::commit();
-            return back()->with('success', 'Tanggapan berhasil dikirim.');
+
+            broadcast(new TicketReplyCreated($reply, $ticket->id));
+
+            return back();
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan.')->withInput();
