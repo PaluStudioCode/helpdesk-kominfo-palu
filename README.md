@@ -1,59 +1,107 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="public/storage/logo.png" width="120" alt="Logo Kominfo">
 </p>
 
-## About Laravel
+# Helpdesk Kominfo Kota Palu
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Sistem Informasi Helpdesk Terpadu Dinas Komunikasi, Informatika, Persandian dan Statistik (Diskominfo) Kota Palu. Aplikasi ini digunakan untuk melaporkan, memonitor, dan merekapitulasi penanganan gangguan jaringan intra-pemerintah (Fiber Optic, LAN, WiFi) di seluruh lingkungan Organisasi Perangkat Daerah (OPD) Kota Palu.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+🌟 **Live Deployment URL:** [http://202.155.13.65:8080/](http://202.155.13.65:8080/)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Fitur Utama
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### 🏢 Untuk OPD (Pelapor)
+* **Lapor Gangguan Mandiri**: Pembuatan tiket gangguan secara terstruktur berdasarkan tipe infrastruktur jaringan.
+* **Isolasi Data Aman**: Masing-masing instansi hanya dapat melihat data laporannya sendiri.
+* **Tracking Real-time**: Memonitor proses penanganan dari berstatus *Open* hingga *Resolved*.
+* **Diskusi Langsung**: Fitur pesan dan unggah foto kondisi lapangan secara langsung tanpa perlu reload halaman (WebSockets).
+* **Konfirmasi Selesai & Buka Ulang (Reopen)**: Hak penuh untuk menyetujui hasil kerja teknisi atau komplain ulang jika kendala masih terjadi.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 🛠️ Untuk Teknisi Jaringan
+* **Klaim Tiket Mandiri**: Fitur *Assign to me* untuk mengerjakan laporan gangguan yang masuk.
+* **Catatan Internal**: Kolom diskusi rahasia antar teknisi dan admin yang tidak dapat dilihat oleh pihak OPD pelapor.
+* **Manajemen Penyelesaian**: Input solusi perbaikan dan unggah foto dokumentasi penyelesaian (*resolution proofs*).
 
-## Laravel Sponsors
+### 👑 Untuk Administrator
+* **Dashboard Analitik**: Pantau KPI kinerja penanganan, jumlah tiket terbuka, pelanggaran batas target penyelesaian (SLA), dan aktivitas terbaru.
+* **On-Behalf Ticketing**: Bantuan pelaporan tiket mewakili OPD tertentu untuk kasus gawat darurat (prioritas *Emergency*).
+* **Master Data Management**: Kelola data dinas/OPD, klasifikasi kategori gangguan, target batas waktu penyelesaian (SLA), dan manajemen pengguna.
+* **Export & Rekapitulasi**: Ekspor riwayat data gangguan ke dalam format cetak **PDF** atau **Excel/CSV**.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+---
 
-### Premium Partners
+## Panduan Pengujian (Manual Testing)
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Kami menyediakan panduan skenario uji (*User Acceptance Testing*) interaktif untuk memastikan fitur-fitur pada antarmuka berjalan baik:
+- 📖 [Panduan Pengujian Admin & Teknisi](TESTING_ADMIN_TEKNISI.md)
+- 📖 [Panduan Pengujian Pelapor / OPD](TESTING_PELAPOR.md)
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Tech Stack
 
-## Code of Conduct
+Sistem Helpdesk Kominfo dibangun menggunakan kombinasi arsitektur modern (VILT Stack) untuk memastikan performa yang cepat dan interaktif:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- **Framework Backend**: Laravel 11.x (PHP 8.2+)
+- **Frontend / UI**: Vue.js 3 + Inertia.js
+- **Styling**: Tailwind CSS 3
+- **Komponen UI**: shadcn-vue / Radix UI
+- **Database**: MySQL / MariaDB
+- **WebSockets / Realtime**: Laravel Reverb + Laravel Echo
+- **Export Data**: barryvdh/laravel-dompdf (PDF) & maatwebsite/excel (Spreadsheet)
+- **Background Jobs**: Laravel Queues (Database Driver)
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Panduan Instalasi (Development)
 
-## License
+Untuk menjalankan proyek ini di lingkungan lokal Anda (*Localhost*):
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. **Kloning Repositori**
+```bash
+git clone https://github.com/PaluStudioCode/helpdesk-kominfo-palu.git
+cd helpdesk-kominfo-palu
+```
+
+2. **Instalasi Dependensi**
+```bash
+composer install
+npm install
+```
+
+3. **Konfigurasi Environment**
+Salin file `.env.example` ke `.env` (Jika belum ada, buat manual). Pastikan pengaturan database Anda sudah benar.
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+4. **Jalankan Migrasi Database dan Seeder**
+*(Menyiapkan tabel dan mengisi akun pengguna awal serta Master Data)*
+```bash
+php artisan migrate:fresh --seed
+```
+
+5. **Kompilasi Frontend Assets**
+```bash
+npm run build
+```
+
+6. **Menjalankan Server Lokal**
+Gunakan terminal / tab yang berbeda untuk menjalankan perintah di bawah ini secara bersamaan:
+- Menjalankan Web Server: `php artisan serve`
+- Menjalankan WebSocket Reverb: `php artisan reverb:start`
+- Menjalankan Queue Worker (Notifikasi): `php artisan queue:listen`
+- *(Opsional)* Vite Hot Reload: `npm run dev`
+
+### Kredensial Login Default (Development)
+- **Admin**: `admin@kominfo.go.id` | Password: `password`
+- **Teknisi**: `teknisi@example.com` | Password: `password`
+- **Operator Dinas Kesehatan**: `operator@dinkes.palukota.go.id` | Password: `password`
+
+---
+
+## Lisensi
+Sistem ini merupakan perangkat lunak tertutup (Properti Pemerintah Kota Palu). 
