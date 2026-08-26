@@ -590,7 +590,11 @@ onUnmounted(() => {
                     </div>
 
                     <div class="space-y-1">
-                        <InputLabel value="Foto Bukti Perbaikan (Opsional, Maks 3)" />
+                        <div class="flex items-center justify-between">
+                            <InputLabel value="Foto Bukti Perbaikan" />
+                            <span class="text-xs text-slate-400 font-normal italic">(Opsional)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-1.5">Unggah foto hasil perbaikan jika diperlukan (maksimal 3 foto).</p>
                         <FileUpload 
                             v-model="resolveForm.resolution_proofs"
                             :multiple="true"

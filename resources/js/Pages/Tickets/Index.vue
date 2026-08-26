@@ -409,13 +409,16 @@ const formatDate = (dateStr: string) => {
 
                     <!-- Attachments -->
                     <div>
-                        <InputLabel value="Lampiran Bukti Foto / Dokumen Pendukung" />
+                        <div class="flex items-center justify-between">
+                            <InputLabel value="Lampiran Bukti Foto" />
+                            <span class="text-xs text-slate-400 font-normal italic">(Opsional / Tidak Wajib)</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mb-2 mt-0.5">Unggah foto kendala atau perangkat jika ada untuk mempercepat proses identifikasi.</p>
                         <FileUpload 
                             v-model="form.attachments"
                             :multiple="true"
                             :maxFiles="3"
                             :maxSizeMB="5"
-                            class="mt-1"
                             @error="(msg) => form.errors.attachments = msg"
                         />
                         <InputError :message="form.errors.attachments" />
