@@ -13,13 +13,9 @@ Dokumen ini berisi panduan skenario pengujian manual (*end-to-end user interacti
 
 ---
 
-### Prasyarat Menjalankan Sistem
-Pastikan Anda sudah memiliki URL sistem yang di-deploy atau menjalankan layanan-layanan berikut jika di server lokal:
-- **Live URL Sistem**: `http://202.155.13.65:8080/`
-- (Local) **Web Server**: `php artisan serve` (http://localhost:8000)
-- (Local) **WebSocket Reverb**: `php artisan reverb:start --debug`
-- (Local) **Frontend Assets**: `npm run dev`
-- (Local) **Queue Worker**: `php artisan queue:listen --tries=1 --timeout=0`
+### Prasyarat Menjalankan Pengujian
+- **URL Sistem**: `http://202.155.13.65:8080/`
+- Pastikan perangkat penguji terhubung ke jaringan internet/intranet yang dapat mengakses alamat IP publik di atas.
 
 ---
 
