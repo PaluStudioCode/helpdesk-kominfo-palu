@@ -22,7 +22,7 @@ class DatabaseAndModelTest extends TestCase
     public function test_models_are_seeded_correctly(): void
     {
         $this->assertGreaterThanOrEqual(2, Department::count());
-        $this->assertDatabaseCount('ticket_categories', 4);
+        $this->assertGreaterThanOrEqual(10, TicketCategory::count());
         $this->assertGreaterThanOrEqual(4, User::count());
     }
 

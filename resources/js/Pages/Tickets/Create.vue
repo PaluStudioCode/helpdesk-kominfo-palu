@@ -193,7 +193,11 @@ const submitForm = () => {
                             </div>
 
                             <div class="md:col-span-2">
-                                <InputLabel value="Lampiran Bukti (Opsional)" />
+                                <div class="flex items-center justify-between">
+                                    <InputLabel value="Lampiran Bukti Foto" />
+                                    <span class="text-xs text-slate-400 font-normal italic">(Opsional / Tidak Wajib)</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-2 mt-0.5">Unggah foto kendala atau perangkat jika ada untuk mempercepat proses identifikasi.</p>
                                 <FileUpload 
                                     v-model="form.attachments" 
                                     :multiple="true" 
