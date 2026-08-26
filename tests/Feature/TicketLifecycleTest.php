@@ -133,4 +133,26 @@ class TicketLifecycleTest extends TestCase
         $responseOpd = $this->actingAs($opdUser)->get("/tickets/{$ticket->id}");
         $responseOpd->assertDontSee('Catatan ini hanya untuk tim internal.');
     }
+
+    public function test_ticket_reply_broadcasts_event()
+    {
+        \Illuminate\Support\Facades\Event::fake([
+            \App\Events\TicketReplyCreated::class,
+        ]);
+
+        $ticket = $this->createMockTicket();
+        $technician = User::where('role', 'technician')->first();
+
+        $this->actingAs($technician)->post("/tickets/{$ticket->id}/replies", [
+            'message' => 'Halo, ini pesan siaran realtime via Reverb.',
+            'is_internal' => false,
+        ]);
+
+        \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\TicketReplyCreated::class, function ($event) use ($ticket) {
+            return $event->ticketId === $ticket->id
+                && $event->reply['message'] === 'Halo, ini pesan siaran realtime via Reverb.'
+                && $event->broadcastOn()[0]->name === "private-ticket.{$ticket->id}"
+                && $event->broadcastAs() === 'reply.created';
+        });
+    }
 }
