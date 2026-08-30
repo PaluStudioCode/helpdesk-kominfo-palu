@@ -4,6 +4,7 @@ import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Button } from '@/Components/ui/button';
+import { Badge } from '@/Components/ui/badge';
 import { Input } from '@/Components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import StatusBadge from '@/Components/ui/status-badge/StatusBadge.vue';
@@ -33,6 +34,9 @@ interface Ticket {
     priority: string;
     status: string;
     created_at: string;
+    due_at: string | null;
+    resolved_at: string | null;
+    closed_at: string | null;
 }
 
 const props = defineProps<{
@@ -154,7 +158,97 @@ const tableColumns = [
     { key: 'status', label: 'Status' },
     { key: 'assignee', label: 'Teknisi' },
     { key: 'created_at', label: 'Waktu Dibuat' },
+    { key: 'due_at', label: 'Target SLA' },
+    { key: 'resolved_at', label: 'Waktu Selesai' },
+    { key: 'duration', label: 'Lama Penanganan' },
+    { key: 'sla_status', label: 'Status SLA' },
 ];
+
+const getSlaReportStatus = (ticket: Ticket) => {
+    if (ticket.status === 'cancelled') {
+        return { variant: 'cancelled' as const, label: 'Dibatalkan' };
+    }
+
+    if (!ticket.due_at) {
+        return { variant: 'outline' as const, label: '-' };
+    }
+
+    const dueAt = new Date(ticket.due_at).getTime();
+
+    // Jika sudah ada waktu selesai (resolved_at atau closed_at)
+    const completionTime = ticket.resolved_at 
+        ? new Date(ticket.resolved_at).getTime() 
+        : (ticket.closed_at ? new Date(ticket.closed_at).getTime() : null);
+
+    if (['resolved', 'closed'].includes(ticket.status) && completionTime) {
+        if (completionTime <= dueAt) {
+            return { variant: 'sla_safe' as const, label: 'Tepat Waktu' };
+        } else {
+            return { variant: 'sla_danger' as const, label: 'Terlambat' };
+        }
+    }
+
+    // Jika tiket masih aktif/berjalan (open, in_progress)
+    const now = new Date().getTime();
+    const diffHours = (dueAt - now) / (1000 * 60 * 60);
+
+    if (diffHours < 0) {
+        return { variant: 'sla_danger' as const, label: 'Overdue SLA' };
+    } else if (diffHours <= 2) {
+        return { variant: 'sla_warning' as const, label: 'Mendekati SLA' };
+    } else {
+        return { variant: 'sla_safe' as const, label: 'Dalam Target' };
+    }
+};
+
+const getHandlingDuration = (ticket: Ticket): string => {
+    if (!ticket.created_at || ticket.status === 'cancelled') return '-';
+
+    const start = new Date(ticket.created_at).getTime();
+    let end: number;
+
+    if (['resolved', 'closed'].includes(ticket.status)) {
+        if (ticket.resolved_at) {
+            end = new Date(ticket.resolved_at).getTime();
+        } else if (ticket.closed_at) {
+            end = new Date(ticket.closed_at).getTime();
+        } else {
+            return '-';
+        }
+    } else {
+        end = new Date().getTime();
+    }
+
+    const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+    const days = Math.floor(diffMinutes / (60 * 24));
+    const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
+    const minutes = diffMinutes % 60;
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}h`);
+    if (hours > 0) parts.push(`${hours}j`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+    const formattedDuration = parts.join(' ');
+
+    if (!['resolved', 'closed'].includes(ticket.status)) {
+        return `${formattedDuration} (berjalan)`;
+    }
+
+    return formattedDuration;
+};
+
+const formatDateTime = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Makassar',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
 </script>
 
 <template>
@@ -333,7 +427,33 @@ const tableColumns = [
                     </template>
 
                     <template #cell-created_at="{ item }">
-                        <span class="text-xs text-slate-500">{{ new Date(item.created_at).toLocaleDateString('id-ID', { timeZone: 'Asia/Makassar', day: '2-digit', month: 'short', year: 'numeric' }) }}</span>
+                        <span class="text-xs text-slate-500">{{ formatDateTime(item.created_at) }}</span>
+                    </template>
+
+                    <template #cell-due_at="{ item }">
+                        <span class="text-xs font-medium text-slate-700">{{ formatDateTime(item.due_at) }}</span>
+                    </template>
+
+                    <template #cell-resolved_at="{ item }">
+                        <span v-if="item.resolved_at || item.closed_at" class="text-xs text-emerald-700 font-medium">
+                            {{ formatDateTime(item.resolved_at || item.closed_at) }}
+                        </span>
+                        <span v-else class="text-xs text-slate-400 italic">-</span>
+                    </template>
+
+                    <template #cell-duration="{ item }">
+                        <span class="text-xs font-mono font-medium text-slate-700">
+                            {{ getHandlingDuration(item) }}
+                        </span>
+                    </template>
+
+                    <template #cell-sla_status="{ item }">
+                        <Badge 
+                            :variant="getSlaReportStatus(item).variant"
+                            class="text-[11px] font-semibold"
+                        >
+                            {{ getSlaReportStatus(item).label }}
+                        </Badge>
                     </template>
                 </DataTable>
             </div>

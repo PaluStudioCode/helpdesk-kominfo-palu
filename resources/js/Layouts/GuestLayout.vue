@@ -22,7 +22,7 @@ import { Link } from '@inertiajs/vue3';
                     />
                     <div class="-ml-2">
                         <h1 class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight leading-tight">Pemerintah Kota Palu</h1>
-                        <p class="text-base text-sky-400 font-bold tracking-wide mt-0.5">Dinas Komunikasi dan Informatika</p>
+                        <p class="text-base text-sky-400 font-bold tracking-wide mt-0.5">Dinas Komunikasi, Informatika, Persandian dan statistik</p>
                         <p class="text-xs text-slate-400 mt-1 font-medium">Helpdesk Layanan Jaringan Intra Pemerintah</p>
                     </div>
                 </div>
@@ -56,7 +56,7 @@ import { Link } from '@inertiajs/vue3';
                 />
                 <div class="-ml-1">
                     <h1 class="text-lg font-bold text-white leading-tight">Pemerintah Kota Palu</h1>
-                    <p class="text-xs font-bold text-sky-400 mt-0.5">Dinas Komunikasi dan Informatika</p>
+                    <p class="text-xs font-bold text-sky-400 mt-0.5">Dinas Komunikasi, Informatika, Persandian dan statistik</p>
                     <p class="text-[11px] text-slate-400 mt-0.5 font-medium">Helpdesk Layanan Jaringan Intra Pemerintah</p>
                 </div>
             </div>

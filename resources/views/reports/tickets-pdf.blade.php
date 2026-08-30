@@ -86,7 +86,7 @@
         <tr>
             <td class="header-title">
                 <h2>Pemerintah Kota Palu</h2>
-                <h3>Dinas Komunikasi dan Informatika</h3>
+                <h3>Dinas Komunikasi, Informatika, Persandian dan statistik</h3>
                 <p>Laporan Rekapitulasi Pelayanan & Penanganan Gangguan Jaringan</p>
             </td>
         </tr>
@@ -108,19 +108,80 @@
     <table class="report-table">
         <thead>
             <tr>
-                <th style="width: 25px; text-align: center;">No</th>
-                <th style="width: 105px;">No. Tiket</th>
+                <th style="width: 20px; text-align: center;">No</th>
+                <th style="width: 95px;">No. Tiket</th>
                 <th>OPD / Instansi</th>
-                <th style="width: 50px;">Jaringan</th>
+                <th style="width: 45px;">Jaringan</th>
                 <th>Judul Gangguan & Lokasi</th>
-                <th style="width: 55px;">Prioritas</th>
-                <th style="width: 65px;">Status</th>
-                <th style="width: 85px;">Teknisi</th>
-                <th style="width: 80px;">Waktu Dibuat</th>
+                <th style="width: 45px;">Prioritas</th>
+                <th style="width: 55px;">Status</th>
+                <th style="width: 75px;">Teknisi</th>
+                <th style="width: 65px;">Waktu Dibuat</th>
+                <th style="width: 65px;">Target SLA</th>
+                <th style="width: 65px;">Waktu Selesai</th>
+                <th style="width: 55px;">Lama</th>
+                <th style="width: 65px;">Status SLA</th>
             </tr>
         </thead>
         <tbody>
             @forelse($tickets as $index => $ticket)
+                @php
+                    $duration = '-';
+                    $slaStatus = '-';
+                    $slaColor = '#64748b';
+
+                    $endTime = $ticket->resolved_at ?? $ticket->closed_at;
+
+                    if ($ticket->created_at && $ticket->status !== 'cancelled') {
+                        $start = \Carbon\Carbon::parse($ticket->created_at);
+                        $end = in_array($ticket->status, ['resolved', 'closed']) && $endTime
+                            ? \Carbon\Carbon::parse($endTime)
+                            : now();
+
+                        $diffMinutes = max(0, $start->diffInMinutes($end));
+                        $days = floor($diffMinutes / (60 * 24));
+                        $hours = floor(($diffMinutes % (60 * 24)) / 60);
+                        $minutes = $diffMinutes % 60;
+
+                        $durParts = [];
+                        if ($days > 0) $durParts[] = "{$days}h";
+                        if ($hours > 0) $durParts[] = "{$hours}j";
+                        if ($minutes > 0 || empty($durParts)) $durParts[] = "{$minutes}m";
+
+                        $duration = implode(' ', $durParts);
+                        if (!in_array($ticket->status, ['resolved', 'closed'])) {
+                            $duration .= ' *';
+                        }
+                    }
+
+                    if ($ticket->status === 'cancelled') {
+                        $slaStatus = 'Dibatalkan';
+                        $slaColor = '#64748b';
+                    } elseif ($ticket->due_at) {
+                        $due = \Carbon\Carbon::parse($ticket->due_at);
+                        if (in_array($ticket->status, ['resolved', 'closed']) && $endTime) {
+                            $end = \Carbon\Carbon::parse($endTime);
+                            if ($end->lte($due)) {
+                                $slaStatus = 'Tepat Waktu';
+                                $slaColor = '#16a34a';
+                            } else {
+                                $slaStatus = 'Terlambat';
+                                $slaColor = '#dc2626';
+                            }
+                        } else {
+                            if (now()->gt($due)) {
+                                $slaStatus = 'Overdue';
+                                $slaColor = '#dc2626';
+                            } elseif (now()->diffInHours($due, false) <= 2) {
+                                $slaStatus = 'Mendekati';
+                                $slaColor = '#d97706';
+                            } else {
+                                $slaStatus = 'Dalam Target';
+                                $slaColor = '#0284c7';
+                            }
+                        }
+                    }
+                @endphp
                 <tr>
                     <td style="text-align: center;">{{ $index + 1 }}</td>
                     <td><strong>{{ $ticket->ticket_number }}</strong></td>
@@ -128,16 +189,20 @@
                     <td>{{ strtoupper($ticket->network_type) }}</td>
                     <td>
                         <strong>{{ $ticket->title }}</strong><br>
-                        <span style="color: #64748b; font-size: 9px;">Lokasi: {{ $ticket->location_details }}</span>
+                        <span style="color: #64748b; font-size: 8px;">Lokasi: {{ $ticket->location_details }}</span>
                     </td>
                     <td>{{ ucfirst($ticket->priority) }}</td>
                     <td>{{ strtoupper(str_replace('_', ' ', $ticket->status)) }}</td>
                     <td>{{ $ticket->assignee?->name ?? '-' }}</td>
-                    <td>{{ $ticket->created_at ? $ticket->created_at->format('d/m/Y H:i') : '-' }}</td>
+                    <td>{{ $ticket->created_at ? $ticket->created_at->format('d/m/y H:i') : '-' }}</td>
+                    <td>{{ $ticket->due_at ? $ticket->due_at->format('d/m/y H:i') : '-' }}</td>
+                    <td>{{ $endTime ? \Carbon\Carbon::parse($endTime)->format('d/m/y H:i') : '-' }}</td>
+                    <td style="text-align: center;">{{ $duration }}</td>
+                    <td style="text-align: center; color: {{ $slaColor }}; font-weight: bold; font-size: 8px;">{{ $slaStatus }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" style="text-align: center; color: #94a3b8; padding: 20px;">
+                    <td colspan="13" style="text-align: center; color: #94a3b8; padding: 20px;">
                         Tidak ada data tiket laporan pada filter yang dipilih.
                     </td>
                 </tr>
@@ -148,7 +213,7 @@
     <div class="footer">
         <div class="signature-box">
             <p>Kota Palu, {{ date('d F Y') }}</p>
-            <p>Kepala Dinas Komunikasi dan Informatika<br>Kota Palu</p>
+            <p>Kepala Dinas Komunikasi, Informatika,<br>Persandian dan statistik Kota Palu</p>
             <br><br><br>
             <p><strong>( ____________________________ )</strong><br>NIP. .................................................</p>
         </div>

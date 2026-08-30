@@ -41,12 +41,62 @@ class SimpleExcelExport
                 'Teknisi Penanggung Jawab',
                 'Waktu Pelaporan',
                 'Target SLA',
-                'Waktu Selesai (Resolved)',
+                'Waktu Selesai',
+                'Lama Penanganan',
+                'Status SLA',
                 'Catatan Solusi Perbaikan'
             ], ';');
 
             // Data rows
             foreach ($tickets as $index => $ticket) {
+                $duration = '-';
+                $slaStatus = '-';
+                $endTime = $ticket->resolved_at ?? $ticket->closed_at;
+
+                if ($ticket->created_at && $ticket->status !== 'cancelled') {
+                    $start = \Carbon\Carbon::parse($ticket->created_at);
+                    $end = in_array($ticket->status, ['resolved', 'closed']) && $endTime
+                        ? \Carbon\Carbon::parse($endTime)
+                        : now();
+
+                    $diffMinutes = max(0, $start->diffInMinutes($end));
+                    $days = floor($diffMinutes / (60 * 24));
+                    $hours = floor(($diffMinutes % (60 * 24)) / 60);
+                    $minutes = $diffMinutes % 60;
+
+                    $durParts = [];
+                    if ($days > 0) $durParts[] = "{$days} hari";
+                    if ($hours > 0) $durParts[] = "{$hours} jam";
+                    if ($minutes > 0 || empty($durParts)) $durParts[] = "{$minutes} menit";
+
+                    $duration = implode(' ', $durParts);
+                    if (!in_array($ticket->status, ['resolved', 'closed'])) {
+                        $duration .= ' (berjalan)';
+                    }
+                }
+
+                if ($ticket->status === 'cancelled') {
+                    $slaStatus = 'Dibatalkan';
+                } elseif ($ticket->due_at) {
+                    $due = \Carbon\Carbon::parse($ticket->due_at);
+                    if (in_array($ticket->status, ['resolved', 'closed']) && $endTime) {
+                        $end = \Carbon\Carbon::parse($endTime);
+                        if ($end->lte($due)) {
+                            $slaStatus = 'Tepat Waktu (Sesuai SLA)';
+                        } else {
+                            $slaStatus = 'Terlambat (Overdue SLA)';
+                        }
+                    } else {
+                        if (now()->gt($due)) {
+                            $slaStatus = 'Overdue SLA';
+                        } elseif (now()->diffInHours($due, false) <= 2) {
+                            $slaStatus = 'Mendekati Batas SLA';
+                        } else {
+                            $slaStatus = 'Dalam Target SLA';
+                        }
+                    }
+                }
+
                 fputcsv($handle, [
                     $index + 1,
                     $ticket->ticket_number,
@@ -60,7 +110,9 @@ class SimpleExcelExport
                     $ticket->assignee?->name ?? '-',
                     $ticket->created_at ? $ticket->created_at->format('d/m/Y H:i') : '-',
                     $ticket->due_at ? $ticket->due_at->format('d/m/Y H:i') : '-',
-                    $ticket->resolved_at ? $ticket->resolved_at->format('d/m/Y H:i') : '-',
+                    $endTime ? \Carbon\Carbon::parse($endTime)->format('d/m/Y H:i') : '-',
+                    $duration,
+                    $slaStatus,
                     $ticket->resolution_note ?? '-'
                 ], ';');
             }

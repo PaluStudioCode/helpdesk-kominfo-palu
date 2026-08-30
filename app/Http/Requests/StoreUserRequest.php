@@ -33,9 +33,10 @@ class StoreUserRequest extends FormRequest
                 'required_if:role,opd_user', 
                 'nullable', 
                 'exists:departments,id',
-                Rule::unique('users', 'department_id')
-                    ->where(fn ($query) => $query->where('role', 'opd_user')->whereNull('deleted_at'))
-                    ->when($this->input('role') === 'opd_user', fn ($rule) => $rule, fn () => null)
+                Rule::when(
+                    $this->input('role') === 'opd_user',
+                    Rule::unique('users', 'department_id')->where(fn ($query) => $query->where('role', 'opd_user')->whereNull('deleted_at'))
+                ),
             ],
         ];
     }
