@@ -373,11 +373,22 @@ const ticketReplies = ref<any[]>([...props.ticket.replies]);
 const discussionScrollContainer = ref<HTMLElement | null>(null);
 const unreadRepliesCount = ref(0);
 
+// Filtered Replies: OPD User never sees internal notes
+const visibleReplies = computed(() => {
+    if (role.value === 'opd_user') {
+        return ticketReplies.value.filter(r => !r.is_internal);
+    }
+    return ticketReplies.value;
+});
+
 // Typing Indicator State
-const typingUsers = ref<Record<number, { name: string; role: string; timeout: any }>>({});
+const typingUsers = ref<Record<number, { name: string; role: string; is_internal?: boolean; timeout: any }>>({});
 
 const activeTypingText = computed(() => {
-    const list = Object.values(typingUsers.value);
+    const list = Object.values(typingUsers.value).filter(u => {
+        if (role.value === 'opd_user' && u.is_internal) return false;
+        return true;
+    });
     if (list.length === 0) return '';
     if (list.length === 1) {
         const u = list[0];
@@ -395,7 +406,7 @@ const handleTyping = () => {
             id: currentUser.value?.id,
             name: currentUser.value?.name,
             role: currentUser.value?.role,
-            is_internal: replyForm.is_internal,
+            is_internal: Boolean(replyForm.is_internal),
         };
 
         if (replyForm.is_internal && echoInternalChannel) {
@@ -412,6 +423,8 @@ const handleTyping = () => {
 
 const onUserTyping = (data: any) => {
     if (!data || Number(data.id) === Number(currentUser.value?.id)) return;
+    // OPD user never sees typing indicator for internal notes
+    if (role.value === 'opd_user' && data.is_internal) return;
     
     if (typingUsers.value[data.id]?.timeout) {
         clearTimeout(typingUsers.value[data.id].timeout);
@@ -424,6 +437,7 @@ const onUserTyping = (data: any) => {
     typingUsers.value[data.id] = {
         name: data.name,
         role: data.role,
+        is_internal: Boolean(data.is_internal),
         timeout
     };
 };
@@ -458,6 +472,10 @@ onMounted(() => {
         // Listen for new public replies
         echoChannel.listen('.reply.created', (event: any) => {
             const newReply = event.reply;
+            // Strict security gate: Ignore internal replies if received on public channel for OPD
+            if (role.value === 'opd_user' && newReply.is_internal) {
+                return;
+            }
             const exists = ticketReplies.value.some((r: any) => r.id === newReply.id);
             if (!exists) {
                 ticketReplies.value.push(newReply);
@@ -542,8 +560,8 @@ onUnmounted(() => {
                     <Button @click="isDrawerOpen = true" size="default" variant="outline" class="border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium relative">
                         <MessageSquare class="w-4 h-4 mr-2 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
-                        <span v-if="ticketReplies.length > 0" class="ml-2 px-2 py-0.5 bg-blue-100 text-kominfo-primary font-bold text-xs rounded-full">
-                            {{ ticketReplies.length }}
+                        <span v-if="visibleReplies.length > 0" class="ml-2 px-2 py-0.5 bg-blue-100 text-kominfo-primary font-bold text-xs rounded-full">
+                            {{ visibleReplies.length }}
                         </span>
                         <span v-if="unreadRepliesCount > 0" class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs animate-bounce">
                             {{ unreadRepliesCount }}
@@ -1324,7 +1342,7 @@ onUnmounted(() => {
                     <div v-show="activeTab === 'discussion'" class="flex-1 flex flex-col min-h-0 bg-slate-50/60">
                         <!-- Messages List -->
                         <div ref="discussionScrollContainer" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-                            <div v-if="ticketReplies.length === 0" class="flex flex-col items-center justify-center py-16 text-center px-4">
+                            <div v-if="visibleReplies.length === 0" class="flex flex-col items-center justify-center py-16 text-center px-4">
                                 <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 border border-slate-200">
                                     <MessageSquare class="w-6 h-6" />
                                 </div>
@@ -1333,7 +1351,7 @@ onUnmounted(() => {
                             </div>
 
                             <div 
-                                v-for="reply in ticketReplies" 
+                                v-for="reply in visibleReplies" 
                                 :key="reply.id" 
                                 class="flex w-full"
                                 :class="Number(reply.user_id) === Number(currentUser.id) ? 'justify-end' : 'justify-start'"
@@ -1396,7 +1414,7 @@ onUnmounted(() => {
                                         <div v-if="reply.attachments && reply.attachments.length > 0" class="pt-0.5">
                                             <div class="flex flex-wrap gap-2">
                                                 <button 
-                                                    type="button"
+                                                    type="button" 
                                                     v-for="(att, attIdx) in reply.attachments" 
                                                     :key="att.id" 
                                                     @click="openImagePreview(reply.attachments.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), attIdx)"
@@ -1428,14 +1446,21 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Sticky Reply Form -->
-                        <div v-if="canReply" class="p-4 bg-white border-t border-slate-200 shrink-0 shadow-sm">
+                        <div v-if="canReply" class="p-4 bg-white border-t border-slate-200 shrink-0 shadow-sm space-y-3">
+                            <!-- Internal Note Active Visual Banner -->
+                            <div v-if="replyForm.is_internal" class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs flex items-center gap-2 animate-fade-in">
+                                <Lock class="w-4 h-4 text-amber-700 shrink-0" />
+                                <span class="font-semibold">Mode Catatan Internal: Pesan ini hanya dapat dibaca oleh Admin & Tim Teknisi.</span>
+                            </div>
+
                             <form @submit.prevent="submitReply" class="space-y-3">
                                 <div class="relative">
                                     <Textarea 
                                         v-model="replyForm.message" 
                                         @input="handleTyping"
-                                        placeholder="Tulis pesan tanggapan atau instruksi..." 
-                                        class="min-h-[85px] text-sm resize-y bg-slate-50/50 hover:bg-white focus:bg-white border-slate-200 transition-colors"
+                                        :placeholder="replyForm.is_internal ? 'Tulis catatan internal untuk koordinasi tim teknis...' : 'Tulis pesan tanggapan atau koordinasi penanganan...'" 
+                                        class="min-h-[85px] text-sm resize-y transition-colors"
+                                        :class="replyForm.is_internal ? 'bg-amber-50/40 border-amber-300 focus:border-amber-500 focus:ring-amber-500 text-amber-950 placeholder:text-amber-700/60' : 'bg-slate-50/50 hover:bg-white focus:bg-white border-slate-200'"
                                     />
                                 </div>
                                 <InputError :message="replyForm.errors.message" class="text-xs" />
@@ -1483,7 +1508,7 @@ onUnmounted(() => {
                                         </button>
 
                                         <div v-if="['admin', 'technician'].includes(role)" class="flex items-center space-x-1.5">
-                                            <Checkbox id="drawer_is_internal" v-model:checked="replyForm.is_internal" />
+                                            <Checkbox id="drawer_is_internal" v-model="replyForm.is_internal" />
                                             <label for="drawer_is_internal" class="text-xs font-semibold text-amber-800 cursor-pointer select-none flex items-center gap-1">
                                                 <Lock class="w-3 h-3 text-amber-700" />
                                                 <span>Catatan Internal</span>
@@ -1491,8 +1516,16 @@ onUnmounted(() => {
                                         </div>
                                     </div>
 
-                                    <Button type="submit" size="default" :disabled="replyForm.processing || (!replyForm.message && replyForm.attachments.length === 0)" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white px-4 h-9 text-xs sm:text-sm font-semibold">
-                                        <Send class="w-3.5 h-3.5 mr-1.5" /> Kirim
+                                    <Button 
+                                        type="submit" 
+                                        size="default" 
+                                        :disabled="replyForm.processing || (!replyForm.message && replyForm.attachments.length === 0)" 
+                                        :class="replyForm.is_internal ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-kominfo-primary hover:bg-kominfo-primary-dark text-white'"
+                                        class="px-4 h-9 text-xs sm:text-sm font-semibold transition-colors"
+                                    >
+                                        <Lock v-if="replyForm.is_internal" class="w-3.5 h-3.5 mr-1.5" />
+                                        <Send v-else class="w-3.5 h-3.5 mr-1.5" />
+                                        {{ replyForm.is_internal ? 'Kirim Catatan Internal' : 'Kirim' }}
                                     </Button>
                                 </div>
                             </form>
