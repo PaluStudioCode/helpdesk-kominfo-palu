@@ -28,18 +28,26 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
             ->component('Dashboard')
+            ->has('stats.total_tickets')
             ->has('stats.pending_admin')
             ->has('stats.pending_approval')
             ->has('stats.in_progress')
             ->has('stats.closed_tickets')
-            ->has('stats.total_departments')
-            ->has('stats.fiber_optic')
-            ->has('recentTickets')
+            ->has('stats.rejected_tickets')
+            ->has('monthlyReports')
+            ->has('availableYears')
+            ->has('selectedYear')
+            ->has('statusDistribution')
+            ->has('networkTypeDistribution')
+            ->has('priorityDistribution')
+            ->has('ticketTrend')
         );
     }
 
     public function test_opd_user_dashboard_isolates_data(): void
     {
+        Ticket::query()->forceDelete();
+
         $dinkes = Department::where('code', 'DINKES')->first();
         $disdik = Department::where('code', 'DISDIK')->first();
         
@@ -92,7 +100,6 @@ class DashboardTest extends TestCase
             ->where('stats.in_process', 1) // Only TKT-001 is in_process for Dinkes
             ->where('stats.closed_tickets', 1) // Only TKT-002 is closed for Dinkes
             ->where('stats.total_reports', 2) // Dinkes has 2 total tickets
-            ->has('recentTickets', 2) // Should only see 2 tickets, not the 3rd one from Disdik
         );
     }
 }

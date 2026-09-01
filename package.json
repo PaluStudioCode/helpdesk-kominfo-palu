@@ -28,12 +28,14 @@
         "@vitejs/plugin-vue": "^6.0.8",
         "@vue/compiler-sfc": "^3.5.41",
         "@vueuse/core": "^14.4.0",
+        "chart.js": "^4.5.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "laravel-echo": "^2.4.0",
         "lucide-vue-next": "^1.0.0",
         "pusher-js": "^8.6.0",
         "reka-ui": "^2.10.3",
-        "tailwind-merge": "^3.6.0"
+        "tailwind-merge": "^3.6.0",
+        "vue-chartjs": "^5.3.4"
     }
 }
