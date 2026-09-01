@@ -167,4 +167,56 @@ class RealtimeChatAndBroadcastingTest extends TestCase
                 && $event->newHistoryData['new_status'] === 'in_progress';
         });
     }
+
+    public function test_unread_replies_count_is_calculated_and_persisted_across_page_views(): void
+    {
+        // 1. Initially 0 unread replies
+        $response = $this->actingAs($this->opdUserDinkes)->get(route('tickets.show', $this->ticket->id));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('initialUnreadCount', 0));
+
+        // 2. Admin sends a message
+        TicketReply::create([
+            'ticket_id' => $this->ticket->id,
+            'user_id' => $this->admin->id,
+            'message' => 'Halo Dinkes, tim teknisi sedang menuju ke lokasi.',
+            'is_internal' => false,
+        ]);
+
+        // 3. When OPD refreshes/opens the ticket detail page, initialUnreadCount should be 1
+        $response = $this->actingAs($this->opdUserDinkes)->get(route('tickets.show', $this->ticket->id));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('initialUnreadCount', 1));
+
+        // 4. OPD marks ticket as read
+        $markReadResponse = $this->actingAs($this->opdUserDinkes)->post(route('tickets.mark-read', $this->ticket->id));
+        $markReadResponse->assertOk();
+        $markReadResponse->assertJson(['success' => true]);
+
+        // 5. When OPD refreshes page again, initialUnreadCount should be 0
+        $response = $this->actingAs($this->opdUserDinkes)->get(route('tickets.show', $this->ticket->id));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('initialUnreadCount', 0));
+    }
+
+    public function test_opd_does_not_count_internal_notes_as_unread(): void
+    {
+        // Admin creates an internal note
+        TicketReply::create([
+            'ticket_id' => $this->ticket->id,
+            'user_id' => $this->admin->id,
+            'message' => 'Catatan internal rahasia teknisi.',
+            'is_internal' => true,
+        ]);
+
+        // OPD should still see 0 unread replies
+        $response = $this->actingAs($this->opdUserDinkes)->get(route('tickets.show', $this->ticket->id));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->where('initialUnreadCount', 0));
+
+        // Technician should see 1 unread reply
+        $responseTech = $this->actingAs($this->technician)->get(route('tickets.show', $this->ticket->id));
+        $responseTech->assertOk();
+        $responseTech->assertInertia(fn ($page) => $page->where('initialUnreadCount', 1));
+    }
 }

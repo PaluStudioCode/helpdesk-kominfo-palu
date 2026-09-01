@@ -528,6 +528,15 @@ class TicketActionController extends Controller
                 'is_internal' => $reply->is_internal,
             ], $user->id);
 
+            // Mark this ticket as read for the sender
+            \App\Models\TicketRead::updateOrCreate(
+                ['ticket_id' => $ticket->id, 'user_id' => $user->id],
+                [
+                    'last_read_reply_id' => $reply->id,
+                    'last_read_at' => now(),
+                ]
+            );
+
             DB::commit();
 
             broadcast(new TicketReplyCreated($reply, $ticket->id));
@@ -537,5 +546,33 @@ class TicketActionController extends Controller
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan.')->withInput();
         }
+    }
+
+    /**
+     * Asynchronously mark discussion thread as read for current user.
+     */
+    public function markAsRead(Request $request, Ticket $ticket)
+    {
+        $this->authorize('view', $ticket);
+        $user = $request->user();
+
+        $latestReplyQuery = $ticket->replies();
+        if ($user->role === 'opd_user') {
+            $latestReplyQuery->where('is_internal', false);
+        }
+        $latestReplyId = $latestReplyQuery->max('id');
+
+        \App\Models\TicketRead::updateOrCreate(
+            ['ticket_id' => $ticket->id, 'user_id' => $user->id],
+            [
+                'last_read_reply_id' => $latestReplyId,
+                'last_read_at' => now(),
+            ]
+        );
+
+        return response()->json([
+            'success' => true, 
+            'last_read_reply_id' => $latestReplyId
+        ]);
     }
 }

@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     Route::post('tickets/{ticket}/request-revision', [TicketActionController::class, 'requestRevision'])->name('tickets.request-revision');
     Route::post('tickets/{ticket}/rate', [TicketActionController::class, 'rate'])->name('tickets.rate');
     Route::post('tickets/{ticket}/replies', [TicketActionController::class, 'storeReply'])->name('tickets.replies.store');
+    Route::post('tickets/{ticket}/mark-read', [TicketActionController::class, 'markAsRead'])->name('tickets.mark-read');
 
     // Admin Routes
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {

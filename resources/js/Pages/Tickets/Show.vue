@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import FileUpload from '@/Components/FileUpload.vue';
@@ -57,6 +58,7 @@ const props = defineProps<{
     ticket: any;
     categoriesMap?: Record<string, Array<{id: number, name: string, network_type: string}>>;
     technicians?: Array<{id: number, name: string, phone_number?: string}>;
+    initialUnreadCount?: number;
 }>();
 
 const currentUser = computed(() => usePage().props.auth.user as any);
@@ -371,7 +373,16 @@ const submitReply = () => {
 
 const ticketReplies = ref<any[]>([...props.ticket.replies]);
 const discussionScrollContainer = ref<HTMLElement | null>(null);
-const unreadRepliesCount = ref(0);
+const unreadRepliesCount = ref(props.initialUnreadCount ?? 0);
+
+watch(() => props.initialUnreadCount, (newVal) => {
+    unreadRepliesCount.value = newVal ?? 0;
+});
+
+const markThreadAsRead = () => {
+    unreadRepliesCount.value = 0;
+    axios.post(route('tickets.mark-read', props.ticket.id)).catch(() => {});
+};
 
 // Filtered Replies: OPD User never sees internal notes
 const visibleReplies = computed(() => {
@@ -456,7 +467,7 @@ const scrollToBottom = () => {
 
 watch([isDrawerOpen, activeTab], ([drawerOpen, tab]) => {
     if (drawerOpen && tab === 'discussion') {
-        unreadRepliesCount.value = 0;
+        markThreadAsRead();
         scrollToBottom();
     }
 });
@@ -482,6 +493,8 @@ onMounted(() => {
                 scrollToBottom();
                 if (!isDrawerOpen.value || activeTab.value !== 'discussion') {
                     unreadRepliesCount.value++;
+                } else {
+                    markThreadAsRead();
                 }
             }
         });
@@ -514,6 +527,8 @@ onMounted(() => {
                     scrollToBottom();
                     if (!isDrawerOpen.value || activeTab.value !== 'discussion') {
                         unreadRepliesCount.value++;
+                    } else {
+                        markThreadAsRead();
                     }
                 }
             });
@@ -560,9 +575,6 @@ onUnmounted(() => {
                     <Button @click="isDrawerOpen = true" size="default" variant="outline" class="border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium relative">
                         <MessageSquare class="w-4 h-4 mr-2 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
-                        <span v-if="visibleReplies.length > 0" class="ml-2 px-2 py-0.5 bg-blue-100 text-kominfo-primary font-bold text-xs rounded-full">
-                            {{ visibleReplies.length }}
-                        </span>
                         <span v-if="unreadRepliesCount > 0" class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs animate-bounce">
                             {{ unreadRepliesCount }}
                         </span>
@@ -1308,7 +1320,7 @@ onUnmounted(() => {
                                         'py-0.5 px-2 rounded-full text-xs font-semibold'
                                     ]"
                                 >
-                                    {{ ticketReplies.length }}
+                                    {{ visibleReplies.length }}
                                 </span>
                             </button>
 

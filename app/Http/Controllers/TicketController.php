@@ -314,10 +314,29 @@ class TicketController extends Controller
                 ->get();
         }
 
+        // Calculate initial unread replies count based on database ticket_reads
+        $lastReadReplyId = \App\Models\TicketRead::where('ticket_id', $ticket->id)
+            ->where('user_id', $user->id)
+            ->value('last_read_reply_id') ?? 0;
+
+        $unreadRepliesQuery = $ticket->replies()
+            ->where('user_id', '!=', $user->id);
+
+        if ($user->role === 'opd_user') {
+            $unreadRepliesQuery->where('is_internal', false);
+        }
+
+        if ($lastReadReplyId > 0) {
+            $unreadRepliesQuery->where('id', '>', $lastReadReplyId);
+        }
+
+        $unreadRepliesCount = $unreadRepliesQuery->count();
+
         return Inertia::render('Tickets/Show', [
             'ticket' => $ticket,
             'categoriesMap' => $categories,
             'technicians' => $technicians,
+            'initialUnreadCount' => $unreadRepliesCount,
         ]);
     }
 

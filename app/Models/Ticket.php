@@ -94,6 +94,11 @@ class Ticket extends Model
         return $this->hasMany(WhatsappNotification::class);
     }
 
+    public function reads(): HasMany
+    {
+        return $this->hasMany(TicketRead::class);
+    }
+
     // Status Helper Methods
     public function isPendingAdmin(): bool
     {
