@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Ticket extends Model
@@ -25,17 +26,26 @@ class Ticket extends Model
         'priority',
         'status',
         'resolution_note',
+        'assigned_at',
+        'cancelled_at',
         'due_at',
         'resolved_at',
         'closed_at',
+        'rating',
+        'feedback_comment',
+        'rated_at',
     ];
 
     protected function casts(): array
     {
         return [
+            'assigned_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'due_at' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
+            'rated_at' => 'datetime',
+            'rating' => 'integer',
         ];
     }
 
@@ -52,6 +62,11 @@ class Ticket extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function technicians(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'ticket_technicians')->withTimestamps();
     }
 
     public function category(): BelongsTo
@@ -77,5 +92,46 @@ class Ticket extends Model
     public function whatsappNotifications(): HasMany
     {
         return $this->hasMany(WhatsappNotification::class);
+    }
+
+    // Status Helper Methods
+    public function isPendingAdmin(): bool
+    {
+        return $this->status === 'pending_admin';
+    }
+
+    public function isInProgress(): bool
+    {
+        return $this->status === 'in_progress';
+    }
+
+    public function isPendingApproval(): bool
+    {
+        return $this->status === 'pending_approval';
+    }
+
+    public function isClosed(): bool
+    {
+        return $this->status === 'closed';
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === 'cancelled';
+    }
+
+    public function canBeResubmitted(): bool
+    {
+        if (!$this->isCancelled()) {
+            return false;
+        }
+
+        $cancelledTime = $this->cancelled_at ?? $this->updated_at;
+        if (!$cancelledTime) {
+            return false;
+        }
+
+        $diffHours = (now()->getTimestamp() - $cancelledTime->getTimestamp()) / 3600;
+        return $diffHours >= 0 && $diffHours < 72;
     }
 }

@@ -356,11 +356,11 @@ const formatDateTime = (dateStr: string | null) => {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Status</SelectItem>
-                                    <SelectItem value="open">Open (Baru)</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="resolved">Resolved (Selesai)</SelectItem>
-                                    <SelectItem value="closed">Closed (Ditutup)</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="pending_admin">Menunggu Verifikasi</SelectItem>
+                                    <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
+                                    <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
+                                    <SelectItem value="closed">Selesai</SelectItem>
+                                    <SelectItem value="cancelled">Ditolak</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -423,7 +423,19 @@ const formatDateTime = (dateStr: string | null) => {
                     </template>
 
                     <template #cell-assignee="{ item }">
-                        <span class="text-xs text-slate-600">{{ item.assignee?.name || '-' }}</span>
+                        <div v-if="item.technicians && item.technicians.length > 0" class="flex flex-wrap gap-1 max-w-[140px]">
+                            <span 
+                                v-for="tech in item.technicians" 
+                                :key="tech.id"
+                                class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                            >
+                                {{ tech.name }}
+                            </span>
+                        </div>
+                        <span v-else-if="item.assignee" class="text-xs text-slate-600 font-medium">
+                            {{ item.assignee.name }}
+                        </span>
+                        <span v-else class="text-xs text-slate-400 italic">-</span>
                     </template>
 
                     <template #cell-created_at="{ item }">

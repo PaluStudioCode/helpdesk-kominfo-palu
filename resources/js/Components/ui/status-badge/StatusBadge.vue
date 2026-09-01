@@ -10,11 +10,14 @@ const props = defineProps<{
 const variant = computed(() => {
     if (props.type === 'ticket') {
         switch (props.status) {
-            case 'open': return 'open';
+            case 'pending_admin': return 'pending_admin';
             case 'in_progress': return 'in_progress';
-            case 'resolved': return 'resolved';
+            case 'pending_approval': return 'pending_approval';
             case 'closed': return 'closed';
             case 'cancelled': return 'cancelled';
+            // Legacy fallbacks
+            case 'open': return 'pending_admin';
+            case 'resolved': return 'pending_approval';
         }
     }
     
@@ -49,19 +52,25 @@ const variant = computed(() => {
 
 const label = computed(() => {
     const labels: Record<string, string> = {
-        open: 'Open',
-        in_progress: 'In Progress',
-        resolved: 'Resolved',
-        closed: 'Closed',
-        cancelled: 'Cancelled',
+        pending_admin: 'Menunggu Verifikasi',
+        in_progress: 'Sedang Dikerjakan',
+        pending_approval: 'Menunggu Review Admin',
+        closed: 'Selesai',
+        cancelled: 'Ditolak',
+        // Legacy fallbacks
+        open: 'Menunggu Verifikasi',
+        resolved: 'Menunggu Review Admin',
+        // SLA Statuses
         safe: 'Aman',
         warning: 'Mendekati SLA',
         danger: 'Overdue SLA',
         completed: 'Selesai',
-        low: 'Low',
-        medium: 'Medium',
-        high: 'High',
-        emergency: 'Emergency',
+        // Priorities
+        low: 'Rendah',
+        medium: 'Sedang',
+        high: 'Tinggi',
+        emergency: 'Darurat',
+        // Networks
         fiber_optic: 'Fiber Optic',
         lan: 'LAN',
         wifi: 'WiFi',

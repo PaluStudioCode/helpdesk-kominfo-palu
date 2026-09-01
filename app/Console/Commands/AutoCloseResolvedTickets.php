@@ -22,7 +22,7 @@ class AutoCloseResolvedTickets extends Command
      *
      * @var string
      */
-    protected $description = 'Automatically close tickets that have been in resolved status for more than 72 hours (3x24h) without OPD dispute';
+    protected $description = 'Automatically approve and close tickets that have been in pending_approval status for more than 72 hours (3x24h)';
 
     /**
      * Execute the console command.
@@ -31,7 +31,7 @@ class AutoCloseResolvedTickets extends Command
     {
         $thresholdTime = now()->subHours(72);
 
-        $ticketsToClose = Ticket::where('status', 'resolved')
+        $ticketsToClose = Ticket::where('status', 'pending_approval')
             ->whereNotNull('resolved_at')
             ->where('resolved_at', '<=', $thresholdTime)
             ->get();
@@ -42,7 +42,7 @@ class AutoCloseResolvedTickets extends Command
             DB::beginTransaction();
             try {
                 $lockedTicket = Ticket::where('id', $ticket->id)
-                    ->where('status', 'resolved')
+                    ->where('status', 'pending_approval')
                     ->lockForUpdate()
                     ->first();
 
@@ -58,17 +58,16 @@ class AutoCloseResolvedTickets extends Command
                 ]);
 
                 // Record Status History
-                // changed_by is set to reporter_id or assignee_id if available as fallback for foreign key constraint
                 $changedById = $lockedTicket->reporter_id ?? $lockedTicket->assigned_to;
                 $lockedTicket->statusHistories()->create([
                     'changed_by' => $changedById,
                     'previous_status' => $previousStatus,
                     'new_status' => 'closed',
-                    'comment' => 'Tiket ditutup secara otomatis oleh sistem (melewati batas 3x24 jam sejak perbaikan selesai).',
+                    'comment' => 'Tiket ditutup secara otomatis oleh sistem (melewati batas 3x24 jam sejak perbaikan teknisi selesai tanpa kendala).',
                     'created_at' => now(),
                 ]);
 
-                // Log system activity (user_id is null for system event)
+                // Log system activity
                 ActivityLogger::log('ticket.auto_closed', $lockedTicket, [
                     'ticket_number' => $lockedTicket->ticket_number,
                     'resolved_at' => $lockedTicket->resolved_at?->toIso8601String(),
@@ -81,7 +80,7 @@ class AutoCloseResolvedTickets extends Command
                 NotificationDispatcher::ticketClosed($lockedTicket);
 
                 $count++;
-                $this->info("Tiket #{$lockedTicket->ticket_number} berhasil ditutup otomatis.");
+                $this->info("Tiket #{$lockedTicket->ticket_number} berhasil disetujui & ditutup otomatis.");
 
             } catch (\Exception $e) {
                 DB::rollBack();

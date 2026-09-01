@@ -22,24 +22,25 @@ class StoreTicketRequest extends FormRequest
      */
     public function rules(): array
     {
-        $priorityRule = $this->user()->role === 'admin' 
-            ? ['required', 'in:low,medium,high,emergency'] 
-            : ['required', 'in:low,medium,high'];
+        $user = $this->user();
 
+        // Base rules for common fields
         $rules = [
-            'network_type' => ['required', 'string', 'in:fiber_optic,lan,wifi'],
-            'category_id' => ['required', 'exists:ticket_categories,id'],
             'title' => ['required', 'string', 'min:5', 'max:200'],
             'location_details' => ['required', 'string', 'min:3', 'max:255'],
             'description' => ['required', 'string', 'min:10'],
-            'priority' => $priorityRule,
             'attachments' => ['nullable', 'array', 'max:3'],
             'attachments.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'], // max 5MB image only
         ];
 
-        // Jika admin membuat on-behalf, department_id wajib diisi
-        if ($this->user()->role === 'admin') {
+        // Admin On-Behalf Creation Rules
+        if ($user->role === 'admin') {
             $rules['department_id'] = ['required', 'exists:departments,id'];
+            $rules['network_type'] = ['required', 'string', 'in:fiber_optic,lan,wifi'];
+            $rules['category_id'] = ['required', 'exists:ticket_categories,id'];
+            $rules['priority'] = ['required', 'in:low,medium,high,emergency'];
+            $rules['technician_ids'] = ['required', 'array', 'min:1'];
+            $rules['technician_ids.*'] = ['exists:users,id'];
         }
 
         return $rules;
@@ -48,14 +49,16 @@ class StoreTicketRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            $category = TicketCategory::find($this->category_id);
-            
-            if ($category && $category->network_type !== $this->network_type) {
-                $validator->errors()->add('category_id', 'Kategori yang dipilih tidak sesuai dengan tipe jaringan.');
-            }
+            if ($this->filled('category_id') && $this->filled('network_type')) {
+                $category = TicketCategory::find($this->category_id);
+                
+                if ($category && $category->network_type !== $this->network_type) {
+                    $validator->errors()->add('category_id', 'Kategori yang dipilih tidak sesuai dengan tipe jaringan.');
+                }
 
-            if ($category && $category->status !== 'active') {
-                $validator->errors()->add('category_id', 'Kategori gangguan yang dipilih sedang tidak aktif.');
+                if ($category && $category->status !== 'active') {
+                    $validator->errors()->add('category_id', 'Kategori gangguan yang dipilih sedang tidak aktif.');
+                }
             }
         });
     }
@@ -65,6 +68,8 @@ class StoreTicketRequest extends FormRequest
         return [
             'attachments.*.max' => 'Ukuran gambar lampiran tidak boleh melebihi 5 MB.',
             'attachments.*.mimes' => 'Format berkas tidak didukung. Harap unggah berkas gambar (JPG, JPEG, PNG).',
+            'technician_ids.required' => 'Harap pilih minimal 1 teknisi penanggung jawab.',
+            'technician_ids.min' => 'Harap pilih minimal 1 teknisi penanggung jawab.',
         ];
     }
 }

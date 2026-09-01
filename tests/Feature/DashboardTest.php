@@ -28,7 +28,10 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
             ->component('Dashboard')
-            ->has('stats.total_active')
+            ->has('stats.pending_admin')
+            ->has('stats.pending_approval')
+            ->has('stats.in_progress')
+            ->has('stats.closed_tickets')
             ->has('stats.total_departments')
             ->has('stats.fiber_optic')
             ->has('recentTickets')
@@ -43,7 +46,7 @@ class DashboardTest extends TestCase
         $opdDinkes = User::where('email', 'operator@dinkes.palukota.go.id')->first();
         $category = TicketCategory::first();
 
-        // Create 2 tickets for Dinkes, 1 for Disdik
+        // Create 2 tickets for Dinkes (1 in process, 1 closed), 1 for Disdik
         Ticket::create([
             'ticket_number' => 'TKT-001',
             'department_id' => $dinkes->id,
@@ -52,8 +55,8 @@ class DashboardTest extends TestCase
             'network_type' => 'wifi',
             'title' => 'WiFi Rusak',
             'location_details' => 'Ruang 1',
-            'description' => 'Mati',
-            'status' => 'open'
+            'description' => 'Mati total.',
+            'status' => 'in_progress'
         ]);
 
         Ticket::create([
@@ -64,8 +67,9 @@ class DashboardTest extends TestCase
             'network_type' => 'lan',
             'title' => 'LAN Rusak',
             'location_details' => 'Ruang 2',
-            'description' => 'Mati',
-            'status' => 'resolved'
+            'description' => 'Mati total.',
+            'status' => 'closed',
+            'closed_at' => now(),
         ]);
 
         Ticket::create([
@@ -76,8 +80,8 @@ class DashboardTest extends TestCase
             'network_type' => 'lan',
             'title' => 'LAN Disdik Rusak',
             'location_details' => 'Ruang Disdik',
-            'description' => 'Mati',
-            'status' => 'open'
+            'description' => 'Mati total.',
+            'status' => 'pending_admin'
         ]);
 
         $response = $this->actingAs($opdDinkes)->get('/dashboard');
@@ -85,9 +89,9 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertInertia(fn ($page) => $page
             ->component('Dashboard')
-            ->where('stats.active_tickets', 1) // Only TKT-001 is active for Dinkes
-            ->where('stats.resolved_tickets', 1) // Only TKT-002 is resolved for Dinkes
-            ->where('stats.total_tickets', 2) // Dinkes has 2 total tickets
+            ->where('stats.in_process', 1) // Only TKT-001 is in_process for Dinkes
+            ->where('stats.closed_tickets', 1) // Only TKT-002 is closed for Dinkes
+            ->where('stats.total_reports', 2) // Dinkes has 2 total tickets
             ->has('recentTickets', 2) // Should only see 2 tickets, not the 3rd one from Disdik
         );
     }

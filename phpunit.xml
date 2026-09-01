@@ -27,8 +27,8 @@
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="3306"/>
         <env name="DB_DATABASE" value="helpdesk_db"/>
-        <env name="DB_USERNAME" value="helpdesk_user"/>
-        <env name="DB_PASSWORD" value="PasswordHelpdesk123!"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

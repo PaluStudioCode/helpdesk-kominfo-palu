@@ -58,11 +58,11 @@ class AutoCloseTicketTest extends TestCase
         ]);
     }
 
-    public function test_tickets_auto_close_closes_tickets_resolved_more_than_72_hours_ago(): void
+    public function test_tickets_auto_close_closes_tickets_in_pending_approval_more_than_72_hours_ago(): void
     {
         Queue::fake();
 
-        // 1. Ticket resolved 73 hours ago -> SHOULD be closed
+        // 1. Ticket pending_approval 73 hours ago -> SHOULD be closed
         $oldResolvedTicket = Ticket::create([
             'ticket_number' => 'TKT-20260815-0001',
             'department_id' => $this->department->id,
@@ -74,13 +74,13 @@ class AutoCloseTicketTest extends TestCase
             'location_details' => 'Ruang Administrasi',
             'description' => 'LAN lepas dari switch.',
             'priority' => 'medium',
-            'status' => 'resolved',
+            'status' => 'pending_approval',
             'resolved_at' => now()->subHours(73),
             'resolution_note' => 'Kabel sudah dicolokkan dan dites normal.',
             'due_at' => now()->subHours(80),
         ]);
 
-        // 2. Ticket resolved 24 hours ago -> SHOULD NOT be closed yet
+        // 2. Ticket pending_approval 24 hours ago -> SHOULD NOT be closed yet
         $recentResolvedTicket = Ticket::create([
             'ticket_number' => 'TKT-20260817-0002',
             'department_id' => $this->department->id,
@@ -92,24 +92,24 @@ class AutoCloseTicketTest extends TestCase
             'location_details' => 'Ruang Kadis',
             'description' => 'Koneksi lambat.',
             'priority' => 'low',
-            'status' => 'resolved',
+            'status' => 'pending_approval',
             'resolved_at' => now()->subHours(24),
             'resolution_note' => 'Switch direstart.',
             'due_at' => now()->subHours(30),
         ]);
 
-        // 3. Ticket currently open -> SHOULD NOT be closed
-        $openTicket = Ticket::create([
+        // 3. Ticket currently in_progress -> SHOULD NOT be closed
+        $inProgressTicket = Ticket::create([
             'ticket_number' => 'TKT-20260818-0003',
             'department_id' => $this->department->id,
             'reporter_id' => $this->opdUser->id,
             'category_id' => $this->category->id,
             'network_type' => 'lan',
-            'title' => 'Tiket Masih Terbuka',
+            'title' => 'Tiket Masih Dikerjakan',
             'location_details' => 'Lantai 1',
             'description' => 'Masalah baru.',
             'priority' => 'high',
-            'status' => 'open',
+            'status' => 'in_progress',
             'due_at' => now()->addHours(10),
         ]);
 
@@ -124,16 +124,16 @@ class AutoCloseTicketTest extends TestCase
         $this->assertNotNull($oldResolvedTicket->closed_at);
 
         $recentResolvedTicket->refresh();
-        $this->assertEquals('resolved', $recentResolvedTicket->status);
+        $this->assertEquals('pending_approval', $recentResolvedTicket->status);
         $this->assertNull($recentResolvedTicket->closed_at);
 
-        $openTicket->refresh();
-        $this->assertEquals('open', $openTicket->status);
+        $inProgressTicket->refresh();
+        $this->assertEquals('in_progress', $inProgressTicket->status);
 
         // Verify status history created
         $this->assertDatabaseHas('ticket_status_histories', [
             'ticket_id' => $oldResolvedTicket->id,
-            'previous_status' => 'resolved',
+            'previous_status' => 'pending_approval',
             'new_status' => 'closed',
         ]);
 

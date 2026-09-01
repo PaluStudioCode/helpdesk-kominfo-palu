@@ -26,7 +26,7 @@ class TicketReplyCreated implements ShouldBroadcastNow
             'ticket_id' => $ticketReply->ticket_id,
             'user_id' => $ticketReply->user_id,
             'message' => $ticketReply->message,
-            'is_internal' => $ticketReply->is_internal,
+            'is_internal' => (bool) $ticketReply->is_internal,
             'created_at' => $ticketReply->created_at->toISOString(),
             'user' => [
                 'id' => $ticketReply->user->id,
@@ -43,6 +43,13 @@ class TicketReplyCreated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        // Dual-Channel Security: Pesan internal disiarkan ke channel khusus Admin & Teknisi
+        if ($this->ticketReply->is_internal) {
+            return [
+                new PrivateChannel("ticket.{$this->ticketId}.internal"),
+            ];
+        }
+
         return [
             new PrivateChannel("ticket.{$this->ticketId}"),
         ];

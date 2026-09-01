@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('ticket_id')->constrained()->onDelete('cascade');
             $table->foreignId('changed_by')->constrained('users')->onDelete('restrict');
-            $table->enum('previous_status', ['open', 'in_progress', 'resolved', 'closed', 'cancelled'])->nullable();
-            $table->enum('new_status', ['open', 'in_progress', 'resolved', 'closed', 'cancelled']);
+            $table->enum('previous_status', ['pending_admin', 'in_progress', 'pending_approval', 'closed', 'cancelled'])->nullable();
+            $table->enum('new_status', ['pending_admin', 'in_progress', 'pending_approval', 'closed', 'cancelled']);
             $table->text('comment')->nullable();
             $table->timestamp('created_at')->nullable();
         });

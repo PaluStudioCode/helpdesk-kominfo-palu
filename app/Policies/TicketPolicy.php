@@ -25,7 +25,7 @@ class TicketPolicy
             return Response::allow();
         }
 
-        return $user->department_id === $ticket->department_id
+        return (int) $user->department_id === (int) $ticket->department_id
             ? Response::allow()
             : Response::denyAsNotFound('Anda tidak memiliki hak akses untuk melihat atau mengelola tiket ini.');
     }
@@ -39,115 +39,112 @@ class TicketPolicy
     }
 
     /**
-     * Determine whether the user can assign the ticket.
+     * Determine whether the user can verify & assign the ticket.
+     * Admin only on pending_admin status.
      */
-    public function assign(User $user, Ticket $ticket): bool
+    public function verifyAndAssign(User $user, Ticket $ticket): Response
     {
-        if ($ticket->status !== 'open') {
-            return false;
-        }
-        
-        return in_array($user->role, ['admin', 'technician']);
+        return ($user->role === 'admin' && $ticket->isPendingAdmin())
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang dapat memverifikasi dan mendisposisikan tiket ini.');
     }
 
     /**
-     * Determine whether the user can update progress.
+     * Determine whether the user can reject the ticket.
+     * Admin only on pending_admin status.
      */
-    public function updateProgress(User $user, Ticket $ticket): bool
+    public function reject(User $user, Ticket $ticket): Response
     {
-        if ($user->role === 'admin') {
-            return true;
-        }
-
-        if ($user->role === 'technician' && $ticket->assigned_to === $user->id) {
-            return true;
-        }
-
-        return false;
+        return ($user->role === 'admin' && $ticket->isPendingAdmin())
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang dapat menolak tiket ini.');
     }
 
     /**
-     * Determine whether the user can resolve the ticket.
+     * Determine whether the OPD user can resubmit a rejected ticket within 72 hours.
      */
-    public function resolve(User $user, Ticket $ticket): bool
+    public function resubmit(User $user, Ticket $ticket): Response
     {
-        if ($ticket->status !== 'in_progress') {
-            return false;
+        if ($user->role !== 'opd_user' || (int) $user->department_id !== (int) $ticket->department_id) {
+            return Response::deny('Anda tidak memiliki wewenang untuk mengajukan ulang tiket instansi ini.');
         }
 
-        if ($user->role === 'admin') {
-            return true;
+        if (!$ticket->canBeResubmitted()) {
+            return Response::deny('Masa pengajuan ulang tiket ini telah berakhir (melewati batas 72 jam sejak penolakan).');
         }
 
-        if ($user->role === 'technician' && $ticket->assigned_to === $user->id) {
-            return true;
-        }
-
-        return false;
+        return Response::allow();
     }
 
     /**
-     * Determine whether the user can close the ticket.
+     * Determine whether the user can submit resolution for the ticket.
+     * Admin or any assigned technician in the team on in_progress status.
      */
-    public function close(User $user, Ticket $ticket): bool
+    public function submitResolution(User $user, Ticket $ticket): Response
     {
-        if ($ticket->status !== 'resolved') {
-            return false;
+        if (!$ticket->isInProgress()) {
+            return Response::deny('Tiket tidak sedang dalam status pengerjaan (In Progress).');
         }
 
         if ($user->role === 'admin') {
-            return true;
+            return Response::allow();
         }
 
-        if ($user->role === 'opd_user' && $ticket->department_id === $user->department_id) {
-            return true;
+        if ($user->role === 'technician') {
+            $isAssigned = $ticket->assigned_to === $user->id 
+                || $ticket->technicians()->where('user_id', $user->id)->exists();
+
+            return $isAssigned 
+                ? Response::allow() 
+                : Response::deny('Anda bukan anggota tim teknisi penanggung jawab tiket ini.');
         }
 
-        return false;
+        return Response::deny('Akses ditolak.');
     }
-    
+
     /**
-     * Determine whether the user can reopen the ticket.
+     * Determine whether the user can approve resolution & close the ticket.
+     * Admin only on pending_approval status.
      */
-    public function reopen(User $user, Ticket $ticket): bool
+    public function approveResolution(User $user, Ticket $ticket): Response
     {
-        if ($ticket->status !== 'resolved') {
-            return false;
-        }
-        
-        if ($user->role === 'admin') {
-            return true;
-        }
-
-        if ($user->role === 'opd_user' && $ticket->department_id === $user->department_id) {
-            return true;
-        }
-
-        return false;
+        return ($user->role === 'admin' && $ticket->isPendingApproval())
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang dapat menyetujui hasil kerja dan menutup tiket ini.');
     }
 
     /**
-     * Determine whether the user can cancel the ticket.
+     * Determine whether the user can request revision / rework.
+     * Admin only on pending_approval status.
      */
-    public function cancel(User $user, Ticket $ticket): bool
+    public function requestRevision(User $user, Ticket $ticket): Response
     {
-        if ($user->role === 'admin') {
-            return in_array($ticket->status, ['open', 'in_progress']);
-        }
-
-        if ($user->role === 'opd_user' && $ticket->department_id === $user->department_id) {
-            return $ticket->status === 'open';
-        }
-
-        return false;
+        return ($user->role === 'admin' && $ticket->isPendingApproval())
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang dapat meminta revisi pengerjaan tiket ini.');
     }
 
     /**
-     * Determine whether the user can reply public.
+     * Determine whether the OPD user can submit rating & review.
+     * OPD Reporter of the department on closed ticket (unrated).
+     */
+    public function rate(User $user, Ticket $ticket): Response
+    {
+        if ($user->role !== 'opd_user' || (int) $user->department_id !== (int) $ticket->department_id) {
+            return Response::deny('Hanya pihak pelapor OPD yang berhak memberikan penilaian kepuasan layanan.');
+        }
+
+        return ($ticket->isClosed() && $ticket->rating === null)
+            ? Response::allow()
+            : Response::deny('Tiket belum ditutup atau sudah dinilai sebelumnya.');
+    }
+
+    /**
+     * Determine whether the user can reply in public discussion.
      */
     public function replyPublic(User $user, Ticket $ticket): bool
     {
-        if (in_array($ticket->status, ['closed', 'cancelled'])) {
+        if ($ticket->isClosed() || $ticket->isCancelled()) {
             return false;
         }
 
@@ -155,7 +152,7 @@ class TicketPolicy
             return true;
         }
 
-        if ($user->role === 'opd_user' && $ticket->department_id === $user->department_id) {
+        if ($user->role === 'opd_user' && (int) $ticket->department_id === (int) $user->department_id) {
             return true;
         }
 
@@ -163,11 +160,11 @@ class TicketPolicy
     }
     
     /**
-     * Determine whether the user can reply internal.
+     * Determine whether the user can post internal notes.
      */
     public function replyInternal(User $user, Ticket $ticket): bool
     {
-        if (in_array($ticket->status, ['closed', 'cancelled'])) {
+        if ($ticket->isClosed() || $ticket->isCancelled()) {
             return false;
         }
 

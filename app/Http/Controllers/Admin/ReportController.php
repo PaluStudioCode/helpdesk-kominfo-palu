@@ -67,7 +67,13 @@ class ReportController extends Controller
      */
     protected function buildFilteredQuery(Request $request)
     {
-        $query = Ticket::with(['department:id,name', 'category:id,name', 'assignee:id,name', 'reporter:id,name']);
+        $query = Ticket::with([
+            'department:id,name', 
+            'category:id,name', 
+            'assignee:id,name', 
+            'technicians:id,name',
+            'reporter:id,name'
+        ]);
 
         // Filter date range
         if ($request->filled('start_date')) {
@@ -93,9 +99,13 @@ class ReportController extends Controller
             $query->where('status', $request->input('status'));
         }
 
-        // Filter technician
+        // Filter technician (lead or in team pivot)
         if ($request->filled('assigned_to') && $request->input('assigned_to') !== 'all') {
-            $query->where('assigned_to', $request->input('assigned_to'));
+            $techId = $request->input('assigned_to');
+            $query->where(function($q) use ($techId) {
+                $q->where('assigned_to', $techId)
+                  ->orWhereHas('technicians', fn($qt) => $qt->where('users.id', $techId));
+            });
         }
 
         return $query->latest('created_at');

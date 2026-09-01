@@ -8,8 +8,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SimpleExcelExport
 {
     /**
-     * Generate an XML-based Excel (.xls / .xlsx compatible SpreadsheetML) or CSV streamed response
-     * without requiring ext-gd.
+     * Generate a CSV / Excel compatible streamed response
      */
     public static function download(Collection $tickets, string $fileName): StreamedResponse
     {
@@ -38,12 +37,15 @@ class SimpleExcelExport
                 'Lokasi / Ruangan',
                 'Prioritas',
                 'Status',
-                'Teknisi Penanggung Jawab',
+                'Tim Teknisi Penanggung Jawab',
                 'Waktu Pelaporan',
+                'Waktu Disposisi (SLA Aktif)',
                 'Target SLA',
                 'Waktu Selesai',
-                'Lama Penanganan',
-                'Status SLA',
+                'Durasi Penanganan',
+                'Kepatuhan SLA',
+                'Skor CSAT (1-5)',
+                'Ulasan Kepuasan OPD',
                 'Catatan Solusi Perbaikan'
             ], ';');
 
@@ -53,8 +55,10 @@ class SimpleExcelExport
                 $slaStatus = '-';
                 $endTime = $ticket->resolved_at ?? $ticket->closed_at;
 
-                if ($ticket->created_at && $ticket->status !== 'cancelled') {
-                    $start = \Carbon\Carbon::parse($ticket->created_at);
+                $startPoint = $ticket->assigned_at ?? $ticket->created_at;
+
+                if ($startPoint && $ticket->status !== 'cancelled') {
+                    $start = \Carbon\Carbon::parse($startPoint);
                     $end = in_array($ticket->status, ['resolved', 'closed']) && $endTime
                         ? \Carbon\Carbon::parse($endTime)
                         : now();
@@ -76,7 +80,9 @@ class SimpleExcelExport
                 }
 
                 if ($ticket->status === 'cancelled') {
-                    $slaStatus = 'Dibatalkan';
+                    $slaStatus = 'Ditolak / Dibatalkan';
+                } elseif ($ticket->status === 'pending_admin') {
+                    $slaStatus = 'Menunggu Verifikasi (SLA Belum Aktif)';
                 } elseif ($ticket->due_at) {
                     $due = \Carbon\Carbon::parse($ticket->due_at);
                     if (in_array($ticket->status, ['resolved', 'closed']) && $endTime) {
@@ -97,22 +103,29 @@ class SimpleExcelExport
                     }
                 }
 
+                $techNames = $ticket->technicians && $ticket->technicians->count() > 0
+                    ? $ticket->technicians->pluck('name')->implode(', ')
+                    : ($ticket->assignee?->name ?? '-');
+
                 fputcsv($handle, [
                     $index + 1,
                     $ticket->ticket_number,
                     $ticket->department?->name ?? '-',
-                    strtoupper($ticket->network_type),
+                    $ticket->network_type ? strtoupper($ticket->network_type) : '-',
                     $ticket->category?->name ?? '-',
                     $ticket->title,
                     $ticket->location_details,
-                    ucfirst($ticket->priority),
+                    $ticket->priority ? ucfirst($ticket->priority) : '-',
                     strtoupper(str_replace('_', ' ', $ticket->status)),
-                    $ticket->assignee?->name ?? '-',
+                    $techNames,
                     $ticket->created_at ? $ticket->created_at->format('d/m/Y H:i') : '-',
+                    $ticket->assigned_at ? $ticket->assigned_at->format('d/m/Y H:i') : '-',
                     $ticket->due_at ? $ticket->due_at->format('d/m/Y H:i') : '-',
                     $endTime ? \Carbon\Carbon::parse($endTime)->format('d/m/Y H:i') : '-',
                     $duration,
                     $slaStatus,
+                    $ticket->rating ? "{$ticket->rating} Bintang" : '-',
+                    $ticket->feedback_comment ?? '-',
                     $ticket->resolution_note ?? '-'
                 ], ';');
             }

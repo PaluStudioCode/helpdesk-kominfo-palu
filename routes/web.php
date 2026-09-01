@@ -21,13 +21,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    // Ticket Routes
+    // Ticket Resource Routes
     Route::resource('tickets', TicketController::class);
     
-    // Ticket Actions
-    Route::post('tickets/{ticket}/assign', [TicketActionController::class, 'assign'])->name('tickets.assign');
+    // Ticket Lifecycle Actions (New Admin-Centric Workflow)
+    Route::post('tickets/{ticket}/verify-assign', [TicketActionController::class, 'verifyAndAssign'])->name('tickets.verify-assign');
+    Route::post('tickets/{ticket}/reject', [TicketActionController::class, 'reject'])->name('tickets.reject');
+    Route::post('tickets/{ticket}/resubmit', [TicketActionController::class, 'resubmit'])->name('tickets.resubmit');
+    Route::post('tickets/{ticket}/submit-resolution', [TicketActionController::class, 'submitResolution'])->name('tickets.submit-resolution');
+    Route::post('tickets/{ticket}/approve-resolution', [TicketActionController::class, 'approveResolution'])->name('tickets.approve-resolution');
+    Route::post('tickets/{ticket}/request-revision', [TicketActionController::class, 'requestRevision'])->name('tickets.request-revision');
+    Route::post('tickets/{ticket}/rate', [TicketActionController::class, 'rate'])->name('tickets.rate');
     Route::post('tickets/{ticket}/replies', [TicketActionController::class, 'storeReply'])->name('tickets.replies.store');
-    Route::post('tickets/{ticket}/status', [TicketActionController::class, 'updateStatus'])->name('tickets.status.update');
 
     // Admin Routes
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -37,7 +42,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('categories', CategoryController::class)->except(['create', 'show', 'edit']);
         Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
 
-        // Reports & Export (Sub-Phase 8.3)
+        // Reports & Export
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
         Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');

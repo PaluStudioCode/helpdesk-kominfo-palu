@@ -27,46 +27,54 @@ class TicketController extends Controller
         $this->authorize('viewAny', Ticket::class);
 
         $user = $request->user();
-        $query = Ticket::with(['department:id,name', 'category:id,name', 'assignee:id,name']);
+        $query = Ticket::with([
+            'department:id,name', 
+            'category:id,name', 
+            'assignee:id,name',
+            'technicians:id,name'
+        ]);
 
-        // Data Isolation Rule
+        // Data Isolation Rule for OPD User
         if ($user->role === 'opd_user') {
             $query->where('department_id', $user->department_id);
         }
 
-        // Apply Filters
+        // Apply Search Filter
         if ($request->has('search')) {
             $search = $request->input('search');
             $query->where(function($q) use ($search) {
                 $q->where('ticket_number', 'like', "%{$search}%")
                   ->orWhere('title', 'like', "%{$search}%")
-                  ->orWhereHas('department', fn($qd) => $q->where('name', 'like', "%{$search}%"));
+                  ->orWhereHas('department', fn($qd) => $qd->where('name', 'like', "%{$search}%"));
             });
         }
 
+        // Apply Network Type Filter
         if ($request->has('network_type') && $request->input('network_type') !== 'all') {
             $query->where('network_type', $request->input('network_type'));
         }
 
+        // Apply Status Filter
         if ($request->has('status') && $request->input('status') !== 'all') {
             $status = $request->input('status');
             if ($status === 'mendekati_sla') {
-                $query->whereIn('status', ['open', 'in_progress'])
+                $query->where('status', 'in_progress')
                       ->whereRaw('TIMESTAMPDIFF(HOUR, NOW(), due_at) <= 2')
                       ->where('due_at', '>=', now());
             } elseif ($status === 'overdue') {
-                $query->whereIn('status', ['open', 'in_progress'])
+                $query->where('status', 'in_progress')
                       ->where('due_at', '<', now());
             } else {
                 $query->where('status', $status);
             }
         }
 
+        // Apply Priority Filter
         if ($request->has('priority') && $request->input('priority') !== 'all') {
             $query->where('priority', $request->input('priority'));
         }
 
-        // Apply Sort
+        // Apply Sorting
         if ($request->has('sort')) {
             $query->orderBy($request->input('sort'), $request->input('direction', 'desc'));
         } else {
@@ -81,9 +89,16 @@ class TicketController extends Controller
                         ->groupBy('network_type');
 
         $departments = [];
+        $technicians = [];
         if ($user->role === 'admin') {
             $departments = Department::where('status', 'active')
                             ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+
+            $technicians = User::where('role', 'technician')
+                            ->where('status', 'active')
+                            ->select('id', 'name', 'phone_number')
                             ->orderBy('name')
                             ->get();
         }
@@ -92,6 +107,7 @@ class TicketController extends Controller
             'tickets' => $tickets,
             'categoriesMap' => $categories,
             'departments' => $departments,
+            'technicians' => $technicians,
             'filters' => $request->only(['search', 'status', 'priority', 'network_type', 'sort', 'direction']),
             'canCreateOnBehalf' => $user->role === 'admin'
         ]);
@@ -110,9 +126,16 @@ class TicketController extends Controller
                         ->groupBy('network_type');
 
         $departments = [];
+        $technicians = [];
         if (auth()->user()->role === 'admin') {
             $departments = Department::where('status', 'active')
                             ->select('id', 'name')
+                            ->orderBy('name')
+                            ->get();
+
+            $technicians = User::where('role', 'technician')
+                            ->where('status', 'active')
+                            ->select('id', 'name', 'phone_number')
                             ->orderBy('name')
                             ->get();
         }
@@ -120,6 +143,7 @@ class TicketController extends Controller
         return Inertia::render('Tickets/Create', [
             'categoriesMap' => $categories,
             'departments' => $departments,
+            'technicians' => $technicians,
             'isAdmin' => auth()->user()->role === 'admin'
         ]);
     }
@@ -135,10 +159,9 @@ class TicketController extends Controller
         // Transaction for Atomic Locking & Integrity
         DB::beginTransaction();
         try {
-            // Generate unique ticket number logic (TKT-YYYYMMDD-XXXX)
+            // Generate unique ticket number (TKT-YYYYMMDD-XXXX)
             $datePrefix = date('Ymd');
             
-            // Get the latest ticket for today using lockForUpdate to prevent race conditions
             $latestTicket = Ticket::where('ticket_number', 'like', "TKT-{$datePrefix}-%")
                 ->lockForUpdate()
                 ->orderBy('id', 'desc')
@@ -152,27 +175,70 @@ class TicketController extends Controller
 
             $ticketNumber = "TKT-{$datePrefix}-" . str_pad($sequence, 4, '0', STR_PAD_LEFT);
 
-            // Fetch SLA config
-            $category = TicketCategory::find($validated['category_id']);
-            $dueAt = now()->addHours($category->sla_hours);
+            if ($user->role === 'admin') {
+                // Admin On-Behalf Mode: Immediately In Progress with SLA & Multi-Technicians
+                $category = TicketCategory::find($validated['category_id']);
+                $dueAt = now()->addHours($category->sla_hours);
+                $leadTechnicianId = $validated['technician_ids'][0];
 
-            // Set Ownership
-            $departmentId = $user->role === 'admin' ? $validated['department_id'] : $user->department_id;
+                $ticket = Ticket::create([
+                    'ticket_number' => $ticketNumber,
+                    'department_id' => $validated['department_id'],
+                    'reporter_id' => $user->id,
+                    'assigned_to' => $leadTechnicianId,
+                    'category_id' => $category->id,
+                    'network_type' => $validated['network_type'],
+                    'title' => $validated['title'],
+                    'location_details' => $validated['location_details'],
+                    'description' => $validated['description'],
+                    'priority' => $validated['priority'],
+                    'status' => 'in_progress',
+                    'assigned_at' => now(),
+                    'due_at' => $dueAt,
+                ]);
 
-            // Create Ticket
-            $ticket = Ticket::create([
-                'ticket_number' => $ticketNumber,
-                'department_id' => $departmentId,
-                'reporter_id' => $user->id,
-                'category_id' => $category->id,
-                'network_type' => $validated['network_type'],
-                'title' => $validated['title'],
-                'location_details' => $validated['location_details'],
-                'description' => $validated['description'],
-                'priority' => $validated['priority'],
-                'status' => 'open',
-                'due_at' => $dueAt,
-            ]);
+                // Sync team technicians
+                $ticket->technicians()->sync($validated['technician_ids']);
+
+                // Status History
+                $ticket->statusHistories()->create([
+                    'changed_by' => $user->id,
+                    'previous_status' => null,
+                    'new_status' => 'in_progress',
+                    'comment' => 'Tiket dibuat mewakili OPD oleh Admin dan langsung ditugaskan ke Tim Teknisi.',
+                    'created_at' => now(),
+                ]);
+
+                $activityAction = 'ticket.created_on_behalf';
+            } else {
+                // OPD User Mode: Initial Pending Admin Verification (No Category/Network/Priority yet)
+                $ticket = Ticket::create([
+                    'ticket_number' => $ticketNumber,
+                    'department_id' => $user->department_id,
+                    'reporter_id' => $user->id,
+                    'assigned_to' => null,
+                    'category_id' => null,
+                    'network_type' => null,
+                    'title' => $validated['title'],
+                    'location_details' => $validated['location_details'],
+                    'description' => $validated['description'],
+                    'priority' => null,
+                    'status' => 'pending_admin',
+                    'assigned_at' => null,
+                    'due_at' => null,
+                ]);
+
+                // Status History
+                $ticket->statusHistories()->create([
+                    'changed_by' => $user->id,
+                    'previous_status' => null,
+                    'new_status' => 'pending_admin',
+                    'comment' => 'Laporan gangguan didaftarkan oleh OPD (Menunggu Verifikasi Admin).',
+                    'created_at' => now(),
+                ]);
+
+                $activityAction = 'ticket.created';
+            }
 
             // Handle Attachments
             if ($request->hasFile('attachments')) {
@@ -189,32 +255,23 @@ class TicketController extends Controller
                 }
             }
 
-            // Log Initial Status History
-            $ticket->statusHistories()->create([
-                'changed_by' => $user->id,
-                'new_status' => 'open',
-                'comment' => 'Tiket berhasil dibuat.',
-                'created_at' => now(),
-            ]);
-
             // Log Activity
-            ActivityLogger::log('ticket.created', $ticket, [
+            ActivityLogger::log($activityAction, $ticket, [
                 'ticket_number' => $ticket->ticket_number,
                 'title' => $ticket->title,
-                'priority' => $ticket->priority,
-                'network_type' => $ticket->network_type,
+                'status' => $ticket->status,
             ], $user->id);
 
             DB::commit();
 
-            // Dispatch Queued Notification (after commit)
+            // Dispatch Notification
             NotificationDispatcher::ticketCreated($ticket);
 
-            return redirect()->route('tickets.index')->with('success', "Tiket #{$ticketNumber} berhasil dibuat.");
+            return redirect()->route('tickets.index')->with('success', "Tiket #{$ticketNumber} berhasil didaftarkan.");
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan saat menyimpan tiket.')->withInput();
+            return back()->with('error', 'Terjadi kesalahan saat menyimpan tiket: ' . $e->getMessage())->withInput();
         }
     }
 
@@ -230,6 +287,7 @@ class TicketController extends Controller
             'department', 
             'reporter', 
             'assignee', 
+            'technicians:id,name,phone_number',
             'category', 
             'attachments',
             'statusHistories.changer'
@@ -242,8 +300,24 @@ class TicketController extends Controller
             $query->with(['user:id,name,role', 'attachments'])->oldest();
         }]);
 
+        $categories = TicketCategory::where('status', 'active')
+            ->select('id', 'name', 'network_type')
+            ->get()
+            ->groupBy('network_type');
+
+        $technicians = [];
+        if ($user->role === 'admin') {
+            $technicians = User::where('role', 'technician')
+                ->where('status', 'active')
+                ->select('id', 'name', 'phone_number')
+                ->orderBy('name')
+                ->get();
+        }
+
         return Inertia::render('Tickets/Show', [
             'ticket' => $ticket,
+            'categoriesMap' => $categories,
+            'technicians' => $technicians,
         ]);
     }
 
@@ -260,7 +334,7 @@ class TicketController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        abort(404); // Using specialized status update routes instead (Phase 7)
+        abort(404);
     }
 
     /**
@@ -268,6 +342,6 @@ class TicketController extends Controller
      */
     public function destroy(string $id)
     {
-        abort(404); // Tickets shouldn't be hard-deleted directly. We use Cancel in Phase 7.
+        abort(404);
     }
 }

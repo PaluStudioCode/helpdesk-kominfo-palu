@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
+use App\Models\TicketCategory;
 use App\Models\User;
 use App\Events\TicketReplyCreated;
+use App\Events\TicketStatusUpdated;
 use App\Services\ActivityLogger;
 use App\Services\NotificationDispatcher;
 use App\Http\Requests\StoreTicketReplyRequest;
-use App\Http\Requests\UpdateTicketStatusRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -19,69 +20,480 @@ class TicketActionController extends Controller
     use AuthorizesRequests;
 
     /**
-     * Sub-Phase 7.1: Penugasan & Klaim Tiket (Assignment)
+     * Admin verifies and assigns ticket to team technicians (pending_admin -> in_progress).
      */
-    public function assign(Request $request, Ticket $ticket)
+    public function verifyAndAssign(Request $request, Ticket $ticket)
     {
-        $this->authorize('assign', $ticket);
+        $this->authorize('verifyAndAssign', $ticket);
 
-        $request->validate([
-            'assigned_to' => ['nullable', 'exists:users,id']
+        $validated = $request->validate([
+            'network_type' => ['required', 'string', 'in:fiber_optic,lan,wifi'],
+            'category_id' => ['required', 'exists:ticket_categories,id'],
+            'priority' => ['required', 'in:low,medium,high,emergency'],
+            'technician_ids' => ['required', 'array', 'min:1'],
+            'technician_ids.*' => ['exists:users,id'],
         ]);
 
         $user = $request->user();
 
         DB::beginTransaction();
         try {
-            // Lock ticket to prevent race conditions when multiple technicians try to assign concurrently
             $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
 
-            if ($lockedTicket->status !== 'open') {
+            if (!$lockedTicket->isPendingAdmin()) {
                 DB::rollBack();
-                return back()->with('error', 'Tiket sudah ditangani oleh teknisi lain.');
+                return back()->with('error', 'Status tiket sudah berubah atau tidak valid untuk diverifikasi.');
             }
 
-            // Assign logic: If admin assigned someone specific, use that; otherwise default to current technician/user
-            $assigneeId = ($user->role === 'admin' && $request->filled('assigned_to'))
-                ? $request->input('assigned_to')
-                : $user->id;
+            $category = TicketCategory::findOrFail($validated['category_id']);
+            $assignedAt = now();
+            $dueAt = (clone $assignedAt)->addHours($category->sla_hours);
+            $leadTechnicianId = $validated['technician_ids'][0];
 
             $lockedTicket->update([
-                'assigned_to' => $assigneeId,
+                'network_type' => $validated['network_type'],
+                'category_id' => $category->id,
+                'priority' => $validated['priority'],
+                'assigned_to' => $leadTechnicianId,
+                'assigned_at' => $assignedAt,
+                'due_at' => $dueAt,
                 'status' => 'in_progress',
             ]);
 
-            // Track Status History
-            $lockedTicket->statusHistories()->create([
+            // Sync multi-technicians
+            $lockedTicket->technicians()->sync($validated['technician_ids']);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
                 'changed_by' => $user->id,
-                'previous_status' => 'open',
+                'previous_status' => 'pending_admin',
                 'new_status' => 'in_progress',
-                'comment' => 'Tiket diambil / ditugaskan ke Teknisi.',
+                'comment' => 'Laporan diverifikasi oleh Admin dan ditugaskan ke Tim Teknisi.',
                 'created_at' => now(),
             ]);
 
-            // Log Activity
-            ActivityLogger::log('ticket.assigned', $lockedTicket, [
-                'assigned_to' => $assigneeId,
+            // Activity Log
+            ActivityLogger::log('ticket.verified_assigned', $lockedTicket, [
+                'technician_ids' => $validated['technician_ids'],
+                'priority' => $validated['priority'],
+                'due_at' => $dueAt->toDateTimeString(),
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notifications
+            NotificationDispatcher::ticketAssigned($lockedTicket);
+
+            return back()->with('success', 'Laporan berhasil diverifikasi dan ditugaskan ke tim teknisi.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat memproses verifikasi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Admin rejects ticket with reason (pending_admin -> cancelled).
+     */
+    public function reject(Request $request, Ticket $ticket)
+    {
+        $this->authorize('reject', $ticket);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isPendingAdmin()) {
+                DB::rollBack();
+                return back()->with('error', 'Status tiket sudah berubah atau tidak valid untuk ditolak.');
+            }
+
+            $lockedTicket->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'pending_admin',
+                'new_status' => 'cancelled',
+                'comment' => 'Laporan ditolak oleh Admin. Alasan: ' . $validated['reason'],
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.rejected', $lockedTicket, [
+                'reason' => $validated['reason'],
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notifications
+            NotificationDispatcher::ticketRejected($lockedTicket, $validated['reason']);
+
+            return back()->with('success', 'Laporan tiket telah ditolak.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat menolak tiket: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * OPD User fixes and resubmits rejected ticket within 72 hours (cancelled -> pending_admin).
+     */
+    public function resubmit(Request $request, Ticket $ticket)
+    {
+        $this->authorize('resubmit', $ticket);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'min:5', 'max:200'],
+            'location_details' => ['required', 'string', 'min:3', 'max:255'],
+            'description' => ['required', 'string', 'min:10'],
+            'attachments' => ['nullable', 'array', 'max:3'],
+            'attachments.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->canBeResubmitted()) {
+                DB::rollBack();
+                return back()->with('error', 'Masa pengajuan ulang tiket ini telah berakhir (melewati 72 jam).');
+            }
+
+            $lockedTicket->update([
+                'title' => $validated['title'],
+                'location_details' => $validated['location_details'],
+                'description' => $validated['description'],
+                'status' => 'pending_admin',
+                'cancelled_at' => null,
+            ]);
+
+            // Handle Attachments
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $path = $file->store('ticket-attachments', 'public');
+                    $lockedTicket->attachments()->create([
+                        'uploaded_by' => $user->id,
+                        'attachment_type' => 'issue_proof',
+                        'file_path' => $path,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+            }
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'cancelled',
+                'new_status' => 'pending_admin',
+                'comment' => 'OPD telah memperbaiki data laporan dan mengajukan kembali.',
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.resubmitted', $lockedTicket, [
                 'ticket_number' => $lockedTicket->ticket_number,
             ], $user->id);
 
             DB::commit();
 
-            // Trigger Notification
-            $assigneeUser = User::find($assigneeId);
-            NotificationDispatcher::ticketAssigned($lockedTicket, $assigneeUser);
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
 
-            return back()->with('success', 'Tiket berhasil diklaim dan status diubah ke In Progress.');
+            // Dispatch Notification
+            NotificationDispatcher::ticketResubmitted($lockedTicket);
+
+            return back()->with('success', 'Laporan perbaikan berhasil diajukan kembali ke Admin.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan saat memproses penugasan.');
+            return back()->with('error', 'Terjadi kesalahan saat mengajukan ulang: ' . $e->getMessage());
         }
     }
 
     /**
-     * Sub-Phase 7.2: Thread Diskusi & Catatan Internal
+     * Technician submits resolution & real category confirmation (in_progress -> pending_approval).
+     */
+    public function submitResolution(Request $request, Ticket $ticket)
+    {
+        $this->authorize('submitResolution', $ticket);
+
+        $validated = $request->validate([
+            'resolution_note' => ['required', 'string', 'min:10'],
+            'network_type' => ['nullable', 'string', 'in:fiber_optic,lan,wifi'],
+            'category_id' => ['nullable', 'exists:ticket_categories,id'],
+            'resolution_proofs' => ['nullable', 'array', 'max:3'],
+            'resolution_proofs.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isInProgress()) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket tidak sedang dalam status pengerjaan (In Progress).');
+            }
+
+            $updateData = [
+                'resolution_note' => $validated['resolution_note'],
+                'status' => 'pending_approval',
+                'resolved_at' => now(),
+            ];
+
+            // Dynamic SLA recalculation if technician updated real category
+            if (!empty($validated['category_id']) && (int) $validated['category_id'] !== (int) $lockedTicket->category_id) {
+                $newCategory = TicketCategory::findOrFail($validated['category_id']);
+                $updateData['category_id'] = $newCategory->id;
+                
+                if (!empty($validated['network_type'])) {
+                    $updateData['network_type'] = $validated['network_type'];
+                }
+
+                // Recalculate SLA from assigned_at
+                $startPoint = $lockedTicket->assigned_at ?? $lockedTicket->created_at;
+                $updateData['due_at'] = (clone $startPoint)->addHours($newCategory->sla_hours);
+            }
+
+            $lockedTicket->update($updateData);
+
+            // Handle Resolution Proof Uploads
+            if ($request->hasFile('resolution_proofs')) {
+                foreach ($request->file('resolution_proofs') as $file) {
+                    $path = $file->store('ticket-attachments', 'public');
+                    $lockedTicket->attachments()->create([
+                        'uploaded_by' => $user->id,
+                        'attachment_type' => 'resolution_proof',
+                        'file_path' => $path,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+            }
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'in_progress',
+                'new_status' => 'pending_approval',
+                'comment' => 'Teknisi menyelesaikan perbaikan di lokasi dan mengajukan review hasil kerja.',
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.resolution_submitted', $lockedTicket, [
+                'category_id' => $lockedTicket->category_id,
+                'due_at' => $lockedTicket->due_at?->toDateTimeString(),
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notification
+            NotificationDispatcher::pendingApproval($lockedTicket);
+
+            return back()->with('success', 'Laporan perbaikan berhasil dikirim ke Admin untuk ditinjau.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat mengirim laporan perbaikan: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Admin approves resolution & closes ticket (pending_approval -> closed).
+     */
+    public function approveResolution(Request $request, Ticket $ticket)
+    {
+        $this->authorize('approveResolution', $ticket);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isPendingApproval()) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket tidak dalam status menunggu review.');
+            }
+
+            $lockedTicket->update([
+                'status' => 'closed',
+                'resolved_at' => $lockedTicket->resolved_at ?? now(),
+                'closed_at' => now(),
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'pending_approval',
+                'new_status' => 'closed',
+                'comment' => 'Admin memverifikasi mutu hasil perbaikan dan menutup tiket secara resmi.',
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.approved', $lockedTicket, [
+                'closed_at' => now()->toDateTimeString(),
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notification
+            NotificationDispatcher::ticketClosed($lockedTicket);
+
+            return back()->with('success', 'Hasil perbaikan disetujui dan tiket resmi ditutup.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat menyetujui tiket: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Admin requests revision / rework from technicians (pending_approval -> in_progress).
+     */
+    public function requestRevision(Request $request, Ticket $ticket)
+    {
+        $this->authorize('requestRevision', $ticket);
+
+        $validated = $request->validate([
+            'comment' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isPendingApproval()) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket tidak dalam status menunggu review.');
+            }
+
+            // Status returns to in_progress (SLA due_at is NOT extended)
+            $lockedTicket->update([
+                'status' => 'in_progress',
+                'resolved_at' => null,
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'pending_approval',
+                'new_status' => 'in_progress',
+                'comment' => 'Admin meminta perbaikan ulang/revisi. Instruksi: ' . $validated['comment'],
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.revision_requested', $lockedTicket, [
+                'comment' => $validated['comment'],
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notification
+            NotificationDispatcher::ticketRevision($lockedTicket, $validated['comment']);
+
+            return back()->with('success', 'Instruksi revisi telah dikirimkan ke tim teknisi.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat meminta revisi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * OPD User rates and provides feedback for closed ticket.
+     */
+    public function rate(Request $request, Ticket $ticket)
+    {
+        $this->authorize('rate', $ticket);
+
+        $validated = $request->validate([
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'feedback_comment' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isClosed() || $lockedTicket->rating !== null) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket belum selesai atau penilaian sudah pernah dikirim.');
+            }
+
+            $lockedTicket->update([
+                'rating' => $validated['rating'],
+                'feedback_comment' => $validated['feedback_comment'] ?? null,
+                'rated_at' => now(),
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'closed',
+                'new_status' => 'closed',
+                'comment' => "OPD memberikan penilaian kepuasan layanan: {$validated['rating']} bintang.",
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.rated', $lockedTicket, [
+                'rating' => $validated['rating'],
+                'feedback_comment' => $validated['feedback_comment'] ?? null,
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            return back()->with('success', 'Terima kasih! Penilaian kepuasan Anda telah berhasil dikirim.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat menyimpan penilaian: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Thread discussion & internal notes.
      */
     public function storeReply(StoreTicketReplyRequest $request, Ticket $ticket)
     {
@@ -124,98 +536,6 @@ class TicketActionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan.')->withInput();
-        }
-    }
-
-    /**
-     * Sub-Phase 7.3: Penyelesaian, Konfirmasi Selesai, Reopen, dan Cancel
-     */
-    public function updateStatus(UpdateTicketStatusRequest $request, Ticket $ticket)
-    {
-        $validated = $request->validated();
-        $user = $request->user();
-        $newStatus = $validated['status'];
-        $previousStatus = $ticket->status;
-
-        DB::beginTransaction();
-        try {
-            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
-
-            $updateData = ['status' => $newStatus];
-            $comment = $validated['comment'] ?? "Status diubah menjadi {$newStatus}.";
-
-            if ($newStatus === 'resolved') {
-                $updateData['resolved_at'] = now();
-                $updateData['resolution_note'] = $validated['resolution_note'];
-                $comment = 'Teknisi menandai tiket telah diselesaikan.';
-                
-                // Handle Resolution Proof Uploads
-                if ($request->hasFile('resolution_proofs')) {
-                    foreach ($request->file('resolution_proofs') as $file) {
-                        $path = $file->store('ticket-attachments', 'public');
-                        $lockedTicket->attachments()->create([
-                            'uploaded_by' => $user->id,
-                            'attachment_type' => 'resolution_proof',
-                            'file_path' => $path,
-                            'file_name' => $file->getClientOriginalName(),
-                            'file_size' => $file->getSize(),
-                        ]);
-                    }
-                }
-            } 
-            elseif ($newStatus === 'closed') {
-                $updateData['closed_at'] = now();
-                $comment = 'OPD mengonfirmasi bahwa kendala telah selesai dengan baik.';
-            } 
-            elseif ($newStatus === 'in_progress' && $previousStatus === 'resolved') { // REOPEN
-                $updateData['resolved_at'] = null; // Clear resolved timestamp
-                // NOTE: We intentionally DO NOT reset 'assigned_to'. It is kept.
-                $comment = 'OPD membuka kembali tiket karena kendala belum tuntas.';
-                if (isset($validated['comment'])) {
-                    $comment .= " Alasan: " . $validated['comment'];
-                }
-            }
-            elseif ($newStatus === 'cancelled') {
-                $updateData['closed_at'] = now();
-                $comment = 'Tiket dibatalkan. Alasan: ' . $validated['comment'];
-            }
-
-            $lockedTicket->update($updateData);
-
-            // Track Status History
-            $lockedTicket->statusHistories()->create([
-                'changed_by' => $user->id,
-                'previous_status' => $previousStatus,
-                'new_status' => $newStatus,
-                'comment' => $comment,
-                'created_at' => now(),
-            ]);
-
-            // Log Activity
-            ActivityLogger::log('ticket.status_changed', $lockedTicket, [
-                'previous_status' => $previousStatus,
-                'new_status' => $newStatus,
-                'comment' => $comment,
-            ], $user->id);
-
-            DB::commit();
-
-            // Trigger Queued Notifications based on new status
-            if ($newStatus === 'resolved') {
-                NotificationDispatcher::ticketResolved($lockedTicket);
-            } elseif ($newStatus === 'closed') {
-                NotificationDispatcher::ticketClosed($lockedTicket);
-            } elseif ($newStatus === 'in_progress' && $previousStatus === 'resolved') {
-                NotificationDispatcher::ticketReopened($lockedTicket);
-            } elseif ($newStatus === 'cancelled') {
-                NotificationDispatcher::ticketCancelled($lockedTicket, $validated['comment']);
-            }
-
-            return back()->with('success', "Status tiket berhasil diubah menjadi {$newStatus}.");
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan saat mengubah status tiket.')->withInput();
         }
     }
 }

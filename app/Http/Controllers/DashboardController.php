@@ -21,51 +21,66 @@ class DashboardController extends Controller
             $departmentId = $user->department_id;
 
             $stats = [
-                'active_tickets' => Ticket::where('department_id', $departmentId)
-                    ->whereIn('status', ['open', 'in_progress'])->count(),
-                'resolved_tickets' => Ticket::where('department_id', $departmentId)
-                    ->where('status', 'resolved')->count(),
-                'total_tickets' => Ticket::where('department_id', $departmentId)->count(),
+                'in_process' => Ticket::where('department_id', $departmentId)
+                    ->whereIn('status', ['pending_admin', 'in_progress', 'pending_approval'])
+                    ->count(),
+                'closed_tickets' => Ticket::where('department_id', $departmentId)
+                    ->where('status', 'closed')
+                    ->count(),
+                'needs_fix' => Ticket::where('department_id', $departmentId)
+                    ->where('status', 'cancelled')
+                    ->whereRaw('TIMESTAMPDIFF(HOUR, COALESCE(cancelled_at, updated_at), NOW()) < 72')
+                    ->count(),
+                'total_reports' => Ticket::where('department_id', $departmentId)->count(),
             ];
 
             $recentTickets = Ticket::where('department_id', $departmentId)
-                ->with(['category:id,name', 'assignee:id,name'])
+                ->with(['category:id,name', 'technicians:id,name', 'assignee:id,name'])
                 ->latest()
                 ->take(5)
                 ->get();
         } 
         elseif ($role === 'technician') {
+            $myTicketsQuery = function($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('technicians', fn($qt) => $qt->where('users.id', $user->id));
+            };
+
             $stats = [
-                'open_tickets' => Ticket::where('status', 'open')->count(),
-                'my_progress' => Ticket::where('assigned_to', $user->id)
-                    ->where('status', 'in_progress')->count(),
-                'resolved_today' => Ticket::where('assigned_to', $user->id)
-                    ->where('status', 'resolved')
-                    ->whereDate('resolved_at', today())->count(),
+                'my_team_tickets' => Ticket::where('status', 'in_progress')
+                    ->where($myTicketsQuery)
+                    ->count(),
+                'pending_approval' => Ticket::where('status', 'pending_approval')
+                    ->where($myTicketsQuery)
+                    ->count(),
+                'resolved_this_month' => Ticket::where('status', 'closed')
+                    ->where($myTicketsQuery)
+                    ->whereMonth('closed_at', now()->month)
+                    ->count(),
             ];
 
-            $recentTickets = Ticket::whereIn('status', ['open', 'in_progress'])
-                ->where(function($query) use ($user) {
-                    $query->whereNull('assigned_to')
-                          ->orWhere('assigned_to', $user->id);
-                })
-                ->with(['department:id,name', 'category:id,name', 'assignee:id,name'])
-                ->orderByRaw("CASE WHEN status = 'open' THEN 1 WHEN status = 'in_progress' THEN 2 ELSE 3 END")
+            $recentTickets = Ticket::whereIn('status', ['in_progress', 'pending_approval'])
+                ->where($myTicketsQuery)
+                ->with(['department:id,name', 'category:id,name', 'technicians:id,name', 'assignee:id,name'])
+                ->orderByRaw("CASE WHEN status = 'in_progress' THEN 1 WHEN status = 'pending_approval' THEN 2 ELSE 3 END")
                 ->latest()
                 ->take(5)
                 ->get();
         } 
         elseif ($role === 'admin') {
             $stats = [
-                'total_active' => Ticket::whereIn('status', ['open', 'in_progress'])->count(),
-                'total_resolved' => Ticket::whereIn('status', ['resolved', 'closed'])->count(),
+                'pending_admin' => Ticket::where('status', 'pending_admin')->count(),
+                'pending_approval' => Ticket::where('status', 'pending_approval')->count(),
+                'in_progress' => Ticket::where('status', 'in_progress')->count(),
+                'closed_tickets' => Ticket::where('status', 'closed')->count(),
+                'avg_csat' => round((float) Ticket::whereNotNull('rating')->avg('rating'), 1) ?: 0.0,
                 'fiber_optic' => Ticket::where('network_type', 'fiber_optic')->count(),
                 'lan' => Ticket::where('network_type', 'lan')->count(),
                 'wifi' => Ticket::where('network_type', 'wifi')->count(),
                 'total_departments' => Department::count(),
             ];
 
-            $recentTickets = Ticket::with(['department:id,name', 'category:id,name', 'assignee:id,name'])
+            $recentTickets = Ticket::with(['department:id,name', 'category:id,name', 'technicians:id,name', 'assignee:id,name'])
                 ->latest()
                 ->take(5)
                 ->get();

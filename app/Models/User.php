@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
@@ -67,6 +68,11 @@ class User extends Authenticatable
     public function assignedTickets(): HasMany
     {
         return $this->hasMany(Ticket::class, 'assigned_to');
+    }
+
+    public function teamTickets(): BelongsToMany
+    {
+        return $this->belongsToMany(Ticket::class, 'ticket_technicians')->withTimestamps();
     }
 
     public function ticketReplies(): HasMany

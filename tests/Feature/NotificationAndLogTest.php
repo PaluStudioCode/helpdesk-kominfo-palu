@@ -90,17 +90,14 @@ class NotificationAndLogTest extends TestCase
         Queue::fake();
 
         $response = $this->actingAs($this->opdUser)->post(route('tickets.store'), [
-            'network_type' => 'fiber_optic',
-            'category_id' => $this->category->id,
             'title' => 'Kabel Utama Putus di Ruang Server',
             'location_details' => 'Gedung A Lantai 2 Ruang Server',
             'description' => 'Indikator FO di switch mati total sejak pagi ini.',
-            'priority' => 'high',
         ]);
 
         $response->assertRedirect(route('tickets.index'));
 
-        // Check Notification Jobs queued for OPD and staff
+        // Check Notification Jobs queued for Admin & OPD
         Queue::assertPushed(SendTicketNotificationJob::class);
 
         // Check Activity Log
@@ -119,24 +116,25 @@ class NotificationAndLogTest extends TestCase
             'ticket_number' => 'TKT-20260818-0001',
             'department_id' => $this->department->id,
             'reporter_id' => $this->opdUser->id,
-            'category_id' => $this->category->id,
-            'network_type' => 'fiber_optic',
             'title' => 'Kabel FO Putus',
             'location_details' => 'Ruang Server',
             'description' => 'Deskripsi gangguan kabel.',
-            'priority' => 'high',
-            'status' => 'open',
-            'due_at' => now()->addHours(4),
+            'status' => 'pending_admin',
         ]);
 
-        $response = $this->actingAs($this->technician)->post(route('tickets.assign', $ticket));
+        $response = $this->actingAs($this->admin)->post(route('tickets.verify-assign', $ticket), [
+            'network_type' => 'fiber_optic',
+            'category_id' => $this->category->id,
+            'priority' => 'high',
+            'technician_ids' => [$this->technician->id],
+        ]);
         $response->assertRedirect();
 
         Queue::assertPushed(SendTicketNotificationJob::class);
 
         $this->assertDatabaseHas('activity_logs', [
-            'user_id' => $this->technician->id,
-            'action' => 'ticket.assigned',
+            'user_id' => $this->admin->id,
+            'action' => 'ticket.verified_assigned',
             'subject_type' => Ticket::class,
             'subject_id' => $ticket->id,
         ]);
@@ -154,7 +152,7 @@ class NotificationAndLogTest extends TestCase
             'location_details' => 'Ruang Rapat',
             'description' => 'Deskripsi masalah.',
             'priority' => 'medium',
-            'status' => 'open',
+            'status' => 'in_progress',
             'due_at' => now()->addHours(4),
         ]);
 

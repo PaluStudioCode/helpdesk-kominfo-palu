@@ -45,14 +45,16 @@ const networkFilter = ref(props.filters?.network_type || 'all');
 // Create Ticket Modal State & Form
 const isCreateModalOpen = ref(false);
 const form = useForm({
-    network_type: '',
-    category_id: '',
     title: '',
     location_details: '',
     description: '',
-    priority: 'medium',
-    department_id: '',
     attachments: [] as File[],
+    // Admin On-Behalf Fields
+    department_id: '',
+    network_type: '',
+    category_id: '',
+    priority: 'medium',
+    technician_ids: [] as number[],
 });
 
 const availableCategories = computed(() => {
@@ -65,13 +67,26 @@ const handleNetworkChange = (type: string) => {
     form.category_id = '';
 };
 
+const toggleTechnician = (techId: number) => {
+    const index = form.technician_ids.indexOf(techId);
+    if (index === -1) {
+        form.technician_ids.push(techId);
+    } else {
+        form.technician_ids.splice(index, 1);
+    }
+};
+
 const openCreateTicketModal = () => {
     form.reset();
     form.clearErrors();
+    form.title = '';
+    form.location_details = '';
+    form.description = '';
     form.network_type = '';
     form.category_id = '';
     form.priority = 'medium';
     form.department_id = '';
+    form.technician_ids = [];
     form.attachments = [];
     isCreateModalOpen.value = true;
 };
@@ -134,16 +149,17 @@ const columns = [
     { key: 'ticket_number', label: 'No. Tiket', sortable: true },
     { key: 'title', label: 'Subjek', sortable: false },
     { key: 'department', label: 'OPD / Instansi', sortable: false },
+    { key: 'technicians', label: 'Tim Teknisi', sortable: false },
     { key: 'status', label: 'Status', sortable: true },
     { key: 'sla_status', label: 'SLA', sortable: false },
 ];
 
 const getSlaStatus = (ticket: any) => {
-    if (['resolved', 'closed'].includes(ticket.status)) {
+    if (ticket.status === 'closed') {
         return { status: 'completed', label: 'Selesai' };
     }
 
-    if (!ticket.due_at || ticket.status === 'cancelled') return null;
+    if (!ticket.due_at || ['cancelled', 'pending_admin'].includes(ticket.status)) return null;
     
     const now = new Date();
     const dueAt = new Date(ticket.due_at);
@@ -176,7 +192,7 @@ const formatDate = (dateStr: string) => {
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Antrean & Riwayat Tiket Gangguan</h1>
                     <p class="text-sm text-slate-500 mt-1">
-                        Pantau status penanganan, tindak lanjuti eskalasi kendala infrastruktur jaringan, serta buat laporan tiket baru.
+                        Pantau status penanganan, kelola verifikasi dan eskalasi kendala jaringan, serta buat laporan baru.
                     </p>
                 </div>
             </div>
@@ -194,15 +210,16 @@ const formatDate = (dateStr: string) => {
                 <template #filters>
                     <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
                         <Select :modelValue="statusFilter" @update:modelValue="handleStatusFilter">
-                            <SelectTrigger class="w-full sm:w-[150px] bg-white text-xs h-9">
+                            <SelectTrigger class="w-full sm:w-[170px] bg-white text-xs h-9">
                                 <SelectValue placeholder="Status Tiket" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="open">Open (Menunggu)</SelectItem>
-                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
-                                <SelectItem value="closed">Closed (Ditutup)</SelectItem>
+                                <SelectItem value="pending_admin">Menunggu Verifikasi</SelectItem>
+                                <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
+                                <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
+                                <SelectItem value="closed">Selesai</SelectItem>
+                                <SelectItem value="cancelled">Ditolak</SelectItem>
                                 <SelectItem value="mendekati_sla">Mendekati SLA</SelectItem>
                                 <SelectItem value="overdue">Overdue SLA</SelectItem>
                             </SelectContent>
@@ -224,7 +241,7 @@ const formatDate = (dateStr: string) => {
 
                 <template #actions>
                     <Button v-if="canCreateTicket" @click="openCreateTicketModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark w-full sm:w-auto text-xs sm:text-sm h-9">
-                        <Plus class="w-4 h-4 mr-1.5" /> {{ canCreateOnBehalf ? 'Buat Tiket (On-Behalf)' : 'Buat Tiket Baru' }}
+                        <Plus class="w-4 h-4 mr-1.5" /> {{ canCreateOnBehalf ? 'Buat Tiket (On-Behalf)' : 'Buat Laporan Baru' }}
                     </Button>
                 </template>
 
@@ -236,13 +253,31 @@ const formatDate = (dateStr: string) => {
                 <template #cell-title="{ item }">
                     <div class="font-medium text-slate-900 text-xs sm:text-sm truncate max-w-[180px] sm:max-w-xs" :title="item.title">{{ item.title }}</div>
                     <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                        <StatusBadge type="network" :status="item.network_type" />
-                        <StatusBadge type="priority" :status="item.priority" />
+                        <StatusBadge v-if="item.network_type" type="network" :status="item.network_type" />
+                        <StatusBadge v-if="item.priority" type="priority" :status="item.priority" />
                     </div>
                 </template>
 
                 <template #cell-department="{ item }">
                     <span class="text-xs sm:text-sm text-slate-700 font-medium">{{ item.department.name }}</span>
+                </template>
+
+                <template #cell-technicians="{ item }">
+                    <div v-if="item.technicians && item.technicians.length > 0" class="flex flex-wrap gap-1 max-w-[160px]">
+                        <span 
+                            v-for="tech in item.technicians" 
+                            :key="tech.id"
+                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                        >
+                            {{ tech.name }}
+                        </span>
+                    </div>
+                    <span v-else-if="item.assignee" class="text-xs text-slate-700 font-medium">
+                        {{ item.assignee.name }}
+                    </span>
+                    <span v-else class="text-xs text-slate-400 italic">
+                        -
+                    </span>
                 </template>
 
                 <template #cell-status="{ item }">
@@ -275,145 +310,180 @@ const formatDate = (dateStr: string) => {
                 </DialogHeader>
 
                 <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-1 sm:pt-2">
+                    
+                    <!-- OPD Explanatory Info -->
+                    <div v-if="!canCreateOnBehalf" class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 leading-relaxed">
+                        <span class="font-semibold">Informasi:</span> Anda cukup mengisi rincian kendala secara umum. Tim Verifikator Diskominfo akan menetapkan jenis jaringan, kategori teknis, dan menugaskan tim teknisi.
+                    </div>
+
                     <!-- On-Behalf Selection (Admin Only) -->
-                    <div v-if="canCreateOnBehalf && departments && departments.length > 0">
-                        <InputLabel for="department_id" value="Instansi / OPD Pelapor (On-Behalf)" />
-                        <Select v-model="form.department_id">
-                            <SelectTrigger>
-                                <SelectValue placeholder="Pilih OPD Terkait" />
-                            </SelectTrigger>
-                            <SelectContent class="max-h-56">
-                                <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id">
-                                    {{ dept.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="form.errors.department_id" />
-                    </div>
-
-                    <!-- Network Type Card Selector -->
-                    <div>
-                        <InputLabel value="Tipe Infrastruktur Jaringan" />
-                        <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-1.5">
-                            <button
-                                type="button"
-                                @click="handleNetworkChange('fiber_optic')"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
-                                    form.network_type === 'fiber_optic' 
-                                        ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
-                                ]"
-                            >
-                                <Cable class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
-                                <span class="text-[11px] sm:text-xs">Fiber Optic</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                @click="handleNetworkChange('lan')"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
-                                    form.network_type === 'lan' 
-                                        ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
-                                ]"
-                            >
-                                <Network class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
-                                <span class="text-[11px] sm:text-xs">LAN</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                @click="handleNetworkChange('wifi')"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-lg border-2 text-center transition-all',
-                                    form.network_type === 'wifi' 
-                                        ? 'border-kominfo-primary bg-blue-50/50 text-kominfo-primary font-semibold ring-2 ring-kominfo-primary/20' 
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
-                                ]"
-                            >
-                                <Wifi class="w-5 h-5 sm:w-6 sm:h-6 mb-1 sm:mb-1.5" />
-                                <span class="text-[11px] sm:text-xs">WiFi</span>
-                            </button>
+                    <div v-if="canCreateOnBehalf" class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-3.5">
+                        <div class="text-xs font-semibold text-amber-950 border-b border-amber-200 pb-1.5">
+                            Pengaturan On-Behalf & Disposisi Tim (Admin)
                         </div>
-                        <InputError :message="form.errors.network_type" />
-                    </div>
 
-                    <!-- Category & Priority Row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div>
-                            <InputLabel for="category_id" value="Kategori Gangguan" />
-                            <Select 
-                                v-model="form.category_id" 
-                                :disabled="!form.network_type"
-                            >
-                                <SelectTrigger>
-                                    <SelectValue :placeholder="form.network_type ? 'Pilih Kategori' : 'Pilih tipe jaringan dahulu'" />
+                            <InputLabel for="department_id" value="Instansi / OPD Pelapor *" class="text-amber-950 text-xs font-medium" />
+                            <Select v-model="form.department_id">
+                                <SelectTrigger class="bg-white mt-1">
+                                    <SelectValue placeholder="Pilih OPD Terkait" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem 
-                                        v-for="cat in availableCategories" 
-                                        :key="cat.id" 
-                                        :value="cat.id"
-                                    >
-                                        {{ cat.name }}
+                                <SelectContent class="max-h-56">
+                                    <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
+                                        {{ dept.name }}
                                     </SelectItem>
                                 </SelectContent>
                             </Select>
-                            <InputError :message="form.errors.category_id" />
+                            <InputError :message="form.errors.department_id" class="mt-1" />
                         </div>
 
+                        <!-- Network Type Card Selector -->
                         <div>
-                            <InputLabel for="priority" value="Tingkat Urgensi / Prioritas" />
-                            <Select v-model="form.priority">
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Pilih Tingkat Prioritas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="low">Rendah (Low)</SelectItem>
-                                    <SelectItem value="medium">Normal / Sedang (Medium)</SelectItem>
-                                    <SelectItem value="high">Tinggi (High)</SelectItem>
-                                    <SelectItem v-if="currentUser?.role === 'admin'" value="emergency">Darurat (Emergency - Admin)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <InputError :message="form.errors.priority" />
+                            <InputLabel value="Tipe Infrastruktur Jaringan *" class="text-amber-950 text-xs font-medium mb-1" />
+                            <div class="grid grid-cols-3 gap-2">
+                                <button
+                                    type="button"
+                                    @click="handleNetworkChange('fiber_optic')"
+                                    :class="[
+                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
+                                        form.network_type === 'fiber_optic' 
+                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
+                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
+                                    ]"
+                                >
+                                    <Cable class="w-4 h-4 mb-1 text-purple-600" />
+                                    <span>Fiber Optic</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="handleNetworkChange('lan')"
+                                    :class="[
+                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
+                                        form.network_type === 'lan' 
+                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
+                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
+                                    ]"
+                                >
+                                    <Network class="w-4 h-4 mb-1 text-cyan-600" />
+                                    <span>LAN</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="handleNetworkChange('wifi')"
+                                    :class="[
+                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
+                                        form.network_type === 'wifi' 
+                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
+                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
+                                    ]"
+                                >
+                                    <Wifi class="w-4 h-4 mb-1 text-sky-600" />
+                                    <span>WiFi</span>
+                                </button>
+                            </div>
+                            <InputError :message="form.errors.network_type" class="mt-1" />
+                        </div>
+
+                        <!-- Category & Priority Row -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <InputLabel for="category_id" value="Kategori Masalah *" class="text-amber-950 text-xs font-medium" />
+                                <Select 
+                                    v-model="form.category_id" 
+                                    :disabled="!form.network_type"
+                                >
+                                    <SelectTrigger class="bg-white mt-1">
+                                        <SelectValue :placeholder="form.network_type ? 'Pilih Kategori' : 'Pilih tipe jaringan dahulu'" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem 
+                                            v-for="cat in availableCategories" 
+                                            :key="cat.id" 
+                                            :value="cat.id.toString()"
+                                        >
+                                            {{ cat.name }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="form.errors.category_id" class="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel for="priority" value="Tingkat Prioritas *" class="text-amber-950 text-xs font-medium" />
+                                <Select v-model="form.priority">
+                                    <SelectTrigger class="bg-white mt-1">
+                                        <SelectValue placeholder="Pilih Prioritas" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="low">Rendah (Low)</SelectItem>
+                                        <SelectItem value="medium">Sedang (Medium)</SelectItem>
+                                        <SelectItem value="high">Tinggi (High)</SelectItem>
+                                        <SelectItem value="emergency">Darurat (Emergency)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="form.errors.priority" class="mt-1" />
+                            </div>
+                        </div>
+
+                        <!-- Multi-select Tim Teknisi -->
+                        <div>
+                            <InputLabel value="Tim Teknisi Penanggung Jawab *" class="text-amber-950 text-xs font-medium mb-1" />
+                            <div class="bg-white border border-amber-200 rounded-lg p-2.5 max-h-32 overflow-y-auto space-y-1.5">
+                                <label 
+                                    v-for="tech in technicians" 
+                                    :key="tech.id"
+                                    class="flex items-center gap-2 text-xs text-slate-800 cursor-pointer hover:bg-slate-50 p-1 rounded-sm"
+                                >
+                                    <input 
+                                        type="checkbox" 
+                                        :checked="form.technician_ids.includes(tech.id)"
+                                        @change="toggleTechnician(tech.id)"
+                                        class="rounded border-slate-300 text-kominfo-primary focus:ring-kominfo-primary w-3.5 h-3.5"
+                                    />
+                                    <span class="font-medium">{{ tech.name }}</span>
+                                    <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[10px]">({{ tech.phone_number }})</span>
+                                </label>
+                            </div>
+                            <InputError :message="form.errors.technician_ids" class="mt-1" />
                         </div>
                     </div>
 
                     <!-- Title -->
                     <div>
-                        <InputLabel for="title" value="Judul / Subjek Ringkas Kendala" />
-                        <Input id="title" v-model="form.title" placeholder="Cth: Akses Internet Ruang Rapat Mati" />
-                        <InputError :message="form.errors.title" />
+                        <InputLabel for="title" value="Subjek / Ringkasan Kendala *" />
+                        <Input id="title" v-model="form.title" placeholder="Cth: Internet mati di ruang bidang informasi" class="mt-1" />
+                        <InputError :message="form.errors.title" class="mt-1" />
                     </div>
 
                     <!-- Location Details -->
                     <div>
-                        <InputLabel for="location_details" value="Lokasi Detail / Ruangan" />
-                        <Input id="location_details" v-model="form.location_details" placeholder="Cth: Gedung B Lantai 2, Ruang Kepala Dinas" />
-                        <InputError :message="form.errors.location_details" />
+                        <InputLabel for="location_details" value="Lokasi Detail / Ruangan *" />
+                        <Input id="location_details" v-model="form.location_details" placeholder="Cth: Gedung B Lantai 2, Ruang Rapat" class="mt-1" />
+                        <InputError :message="form.errors.location_details" class="mt-1" />
                     </div>
 
                     <!-- Description -->
                     <div>
-                        <InputLabel for="description" value="Deskripsi Lengkap Gangguan" />
+                        <InputLabel for="description" value="Deskripsi Detail Kendala *" />
                         <Textarea 
                             id="description" 
                             v-model="form.description" 
                             rows="3" 
-                            placeholder="Jelaskan kronologi, sejak kapan kendala terjadi, atau tindakan yang sudah dicoba..." 
+                            placeholder="Jelaskan kendala apa yang dialami, sejak kapan, dan dampaknya..." 
+                            class="mt-1"
                         />
-                        <InputError :message="form.errors.description" />
+                        <InputError :message="form.errors.description" class="mt-1" />
                     </div>
 
                     <!-- Attachments -->
                     <div>
                         <div class="flex items-center justify-between">
                             <InputLabel value="Lampiran Bukti Foto" />
-                            <span class="text-xs text-slate-400 font-normal italic">(Opsional / Tidak Wajib)</span>
+                            <span class="text-xs text-slate-400 font-normal italic">(Opsional - Maks. 3 File)</span>
                         </div>
-                        <p class="text-xs text-slate-500 mb-2 mt-0.5">Unggah foto kendala atau perangkat jika ada untuk mempercepat proses identifikasi.</p>
+                        <p class="text-xs text-slate-500 mb-2 mt-0.5">Unggah foto perangkat atau pesan error jika ada.</p>
                         <FileUpload 
                             v-model="form.attachments"
                             :multiple="true"
@@ -421,13 +491,13 @@ const formatDate = (dateStr: string) => {
                             :maxSizeMB="5"
                             @error="(msg) => form.errors.attachments = msg"
                         />
-                        <InputError :message="form.errors.attachments" />
+                        <InputError :message="form.errors.attachments" class="mt-1" />
                     </div>
 
                     <DialogFooter class="pt-3 pb-2 border-t border-slate-100 sticky bottom-0 bg-white sm:static">
                         <Button type="button" variant="outline" @click="isCreateModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                            {{ form.processing ? 'Mengirim Laporan...' : 'Kirim Laporan Tiket' }}
+                            {{ form.processing ? 'Mengirim Laporan...' : (canCreateOnBehalf ? 'Terbitkan & Tugaskan' : 'Kirim Laporan Gangguan') }}
                         </Button>
                     </DialogFooter>
                 </form>

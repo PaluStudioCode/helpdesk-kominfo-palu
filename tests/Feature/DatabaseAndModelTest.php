@@ -51,7 +51,7 @@ class DatabaseAndModelTest extends TestCase
             'location_details' => 'Ruang Pelayanan',
             'description' => 'Koneksi FO terputus sejak pagi.',
             'priority' => 'high',
-            'status' => 'open',
+            'status' => 'pending_admin',
             'due_at' => now()->addHours($category->sla_hours),
         ]);
 

@@ -17,17 +17,22 @@ return new class extends Migration
             $table->foreignId('department_id')->constrained()->onDelete('restrict');
             $table->foreignId('reporter_id')->constrained('users')->onDelete('restrict');
             $table->foreignId('assigned_to')->nullable()->constrained('users')->onDelete('set null');
-            $table->foreignId('category_id')->constrained('ticket_categories')->onDelete('restrict');
-            $table->enum('network_type', ['fiber_optic', 'lan', 'wifi']);
+            $table->foreignId('category_id')->nullable()->constrained('ticket_categories')->onDelete('restrict');
+            $table->enum('network_type', ['fiber_optic', 'lan', 'wifi'])->nullable();
             $table->string('title', 200);
             $table->string('location_details', 255);
             $table->text('description');
-            $table->enum('priority', ['low', 'medium', 'high', 'emergency'])->default('medium');
-            $table->enum('status', ['open', 'in_progress', 'resolved', 'closed', 'cancelled'])->default('open');
+            $table->enum('priority', ['low', 'medium', 'high', 'emergency'])->nullable()->default(null);
+            $table->enum('status', ['pending_admin', 'in_progress', 'pending_approval', 'closed', 'cancelled'])->default('pending_admin');
             $table->text('resolution_note')->nullable();
+            $table->timestamp('assigned_at')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
             $table->timestamp('due_at')->nullable();
             $table->timestamp('resolved_at')->nullable();
             $table->timestamp('closed_at')->nullable();
+            $table->unsignedTinyInteger('rating')->nullable();
+            $table->text('feedback_comment')->nullable();
+            $table->timestamp('rated_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
             

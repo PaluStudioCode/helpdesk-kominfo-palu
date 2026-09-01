@@ -33,7 +33,7 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
         ]);     
                
-        // Technician
+        // Technician 1
         User::firstOrCreate(
             ['email' => 'teknisi@example.com'],
             [
@@ -41,6 +41,18 @@ class DatabaseSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role' => 'technician',
                 'phone_number' => '6280033334444',
+                'status' => 'active',
+            ]
+        );
+
+        // Technician 2
+        User::firstOrCreate(
+            ['email' => 'teknisi2@example.com'],
+            [
+                'name' => 'Budi Teknisi',
+                'password' => Hash::make('password'),
+                'role' => 'technician',
+                'phone_number' => '6280055556666',
                 'status' => 'active',
             ]
         );
