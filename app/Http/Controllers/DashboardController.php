@@ -69,15 +69,70 @@ class DashboardController extends Controller
                 $availableYears = [(string) date('Y')];
             }
 
-            // Year selection: user query param or latest year
+            // Filter Type: 'year_month' (default) or 'range'
+            $filterType = $request->query('filter_type', 'year_month');
             $selectedYear = $request->query('year', $availableYears[0]);
             if (!in_array($selectedYear, $availableYears) && $selectedYear !== 'all') {
                 $selectedYear = $availableYears[0];
             }
 
+            $selectedMonth = $request->query('month', 'all'); // 'all', '01'..'12'
+            $selectedPreset = $request->query('preset', null); // '7d', '30d', 'this_month', 'custom'
+            $startDateParam = $request->query('start_date', null);
+            $endDateParam = $request->query('end_date', null);
+
+            $filterStart = null;
+            $filterEnd = null;
+
+            if ($filterType === 'range') {
+                if ($selectedPreset === '7d') {
+                    $filterStart = now()->subDays(6)->startOfDay();
+                    $filterEnd = now()->endOfDay();
+                } elseif ($selectedPreset === '30d') {
+                    $filterStart = now()->subDays(29)->startOfDay();
+                    $filterEnd = now()->endOfDay();
+                } elseif ($selectedPreset === 'this_month') {
+                    $filterStart = now()->startOfMonth();
+                    $filterEnd = now()->endOfMonth();
+                } elseif ($startDateParam && $endDateParam) {
+                    try {
+                        $filterStart = \Carbon\Carbon::parse($startDateParam)->startOfDay();
+                        $filterEnd = \Carbon\Carbon::parse($endDateParam)->endOfDay();
+                        $selectedPreset = 'custom';
+                    } catch (\Exception $e) {
+                        $filterStart = now()->subDays(29)->startOfDay();
+                        $filterEnd = now()->endOfDay();
+                        $selectedPreset = '30d';
+                    }
+                } else {
+                    $filterStart = now()->subDays(29)->startOfDay();
+                    $filterEnd = now()->endOfDay();
+                    $selectedPreset = '30d';
+                }
+            } else {
+                // filterType === 'year_month'
+                $filterType = 'year_month';
+                if ($selectedYear !== 'all') {
+                    if ($selectedMonth !== 'all' && is_numeric($selectedMonth) && (int)$selectedMonth >= 1 && (int)$selectedMonth <= 12) {
+                        $selectedMonth = str_pad($selectedMonth, 2, '0', STR_PAD_LEFT);
+                        $filterStart = \Carbon\Carbon::create((int)$selectedYear, (int)$selectedMonth, 1)->startOfMonth();
+                        $filterEnd = \Carbon\Carbon::create((int)$selectedYear, (int)$selectedMonth, 1)->endOfMonth();
+                    } else {
+                        $selectedMonth = 'all';
+                        $filterStart = \Carbon\Carbon::create((int)$selectedYear, 1, 1)->startOfYear();
+                        $filterEnd = \Carbon\Carbon::create((int)$selectedYear, 12, 31)->endOfYear();
+                    }
+                } else {
+                    $selectedMonth = 'all';
+                    $filterStart = null;
+                    $filterEnd = null;
+                }
+            }
+
+            // Apply filter to statsQuery
             $statsQuery = Ticket::query();
-            if ($selectedYear !== 'all') {
-                $statsQuery->whereYear('created_at', $selectedYear);
+            if ($filterStart && $filterEnd) {
+                $statsQuery->whereBetween('created_at', [$filterStart, $filterEnd]);
             }
 
             $stats = [
@@ -159,7 +214,8 @@ class DashboardController extends Controller
                 return "{$mins} menit";
             };
 
-            $query = Ticket::selectRaw("
+            // Monthly Performance Reports Table
+            $tableQuery = Ticket::selectRaw("
                 DATE_FORMAT(created_at, '%Y-%m') as period,
                 COUNT(*) as total_tickets,
                 SUM(CASE WHEN status IN ('in_progress', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
@@ -168,11 +224,11 @@ class DashboardController extends Controller
                 AVG(CASE WHEN status = 'closed' AND closed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, created_at, closed_at) ELSE NULL END) as avg_resolution_minutes
             ");
 
-            if ($selectedYear !== 'all') {
-                $query->whereYear('created_at', $selectedYear);
+            if ($filterStart && $filterEnd) {
+                $tableQuery->whereBetween('created_at', [$filterStart, $filterEnd]);
             }
 
-            $rawReports = $query->groupBy('period')
+            $rawReports = $tableQuery->groupBy('period')
                 ->orderBy('period', 'asc')
                 ->get();
 
@@ -195,7 +251,7 @@ class DashboardController extends Controller
                 ];
             })->values()->toArray();
 
-            // Total Summary calculation
+            // Total Summary calculation for the table
             $totalTickets = array_sum(array_column($monthlyReports, 'total_tickets'));
             $totalInProgress = array_sum(array_column($monthlyReports, 'in_progress'));
             $totalClosed = array_sum(array_column($monthlyReports, 'closed'));
@@ -203,8 +259,8 @@ class DashboardController extends Controller
             $totalCompletionRate = $totalTickets > 0 ? round(($totalClosed / $totalTickets) * 100, 2) : 0;
 
             $overallAvgQuery = Ticket::where('status', 'closed')->whereNotNull('closed_at');
-            if ($selectedYear !== 'all') {
-                $overallAvgQuery->whereYear('created_at', $selectedYear);
+            if ($filterStart && $filterEnd) {
+                $overallAvgQuery->whereBetween('created_at', [$filterStart, $filterEnd]);
             }
             $overallAvgMinutes = $overallAvgQuery->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, closed_at)) as avg_min')->value('avg_min');
 
@@ -218,7 +274,8 @@ class DashboardController extends Controller
                 'completion_rate' => $totalCompletionRate,
             ];
 
-            // Chart 4: Ticket Trend (Line Chart)
+            // Chart 4: Line Chart (Tren Selesai)
+            // Rules from User: Line chart responds ONLY to Year filter and always shows Jan-Des for that year, or multi-year chronological if 'all'
             $shortMonths = [
                 '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr',
                 '05' => 'Mei', '06' => 'Jun', '07' => 'Jul', '08' => 'Agu',
@@ -229,21 +286,36 @@ class DashboardController extends Controller
             $trendCreated = [];
             $trendClosed = [];
 
+            // Line chart query solely based on selectedYear
+            $trendQuery = Ticket::selectRaw("
+                DATE_FORMAT(created_at, '%Y-%m') as period,
+                COUNT(*) as total_tickets,
+                SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed
+            ");
+
             if ($selectedYear !== 'all') {
-                $indexedReports = $rawReports->keyBy('period');
+                $trendQuery->whereYear('created_at', $selectedYear);
+            }
+
+            $rawTrendReports = $trendQuery->groupBy('period')
+                ->orderBy('period', 'asc')
+                ->get();
+
+            if ($selectedYear !== 'all') {
+                $indexedTrend = $rawTrendReports->keyBy('period');
                 foreach ($shortMonths as $mNum => $mLabel) {
                     $periodKey = "{$selectedYear}-{$mNum}";
                     $trendLabels[] = $mLabel;
-                    $trendCreated[] = isset($indexedReports[$periodKey]) ? (int) $indexedReports[$periodKey]->total_tickets : 0;
-                    $trendClosed[] = isset($indexedReports[$periodKey]) ? (int) $indexedReports[$periodKey]->closed : 0;
+                    $trendCreated[] = isset($indexedTrend[$periodKey]) ? (int) $indexedTrend[$periodKey]->total_tickets : 0;
+                    $trendClosed[] = isset($indexedTrend[$periodKey]) ? (int) $indexedTrend[$periodKey]->closed : 0;
                 }
             } else {
-                foreach ($monthlyReports as $rep) {
-                    [$y, $m] = explode('-', $rep['period']);
+                foreach ($rawTrendReports as $rep) {
+                    [$y, $m] = explode('-', $rep->period);
                     $shortYear = substr($y, -2);
                     $trendLabels[] = ($shortMonths[$m] ?? $m) . " '" . $shortYear;
-                    $trendCreated[] = $rep['total_tickets'];
-                    $trendClosed[] = $rep['closed'];
+                    $trendCreated[] = (int) $rep->total_tickets;
+                    $trendClosed[] = (int) $rep->closed;
                 }
             }
 
@@ -330,7 +402,12 @@ class DashboardController extends Controller
             'monthlyReports' => $monthlyReports,
             'monthlySummary' => $monthlySummary,
             'availableYears' => $availableYears,
-            'selectedYear' => $selectedYear,
+            'filterType' => $filterType ?? 'year_month',
+            'selectedYear' => $selectedYear ?? '2025',
+            'selectedMonth' => $selectedMonth ?? 'all',
+            'selectedPreset' => $selectedPreset ?? null,
+            'startDate' => $filterStart ? $filterStart->format('Y-m-d') : null,
+            'endDate' => $filterEnd ? $filterEnd->format('Y-m-d') : null,
             'statusDistribution' => $statusDistribution ?? null,
             'networkTypeDistribution' => $networkTypeDistribution ?? null,
             'priorityDistribution' => $priorityDistribution ?? null,

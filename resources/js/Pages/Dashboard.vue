@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, usePage, Link, router } from '@inertiajs/vue3';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,7 +124,12 @@ const props = withDefaults(defineProps<{
     monthlyReports?: MonthlyReport[];
     monthlySummary?: MonthlyReport | null;
     availableYears?: string[];
+    filterType?: string;
     selectedYear?: string;
+    selectedMonth?: string;
+    selectedPreset?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
     statusDistribution?: ChartDataset | null;
     networkTypeDistribution?: ChartDataset | null;
     priorityDistribution?: ChartDataset | null;
@@ -135,7 +140,12 @@ const props = withDefaults(defineProps<{
     monthlyReports: () => [],
     monthlySummary: null,
     availableYears: () => [],
+    filterType: 'year_month',
     selectedYear: '2025',
+    selectedMonth: 'all',
+    selectedPreset: null,
+    startDate: null,
+    endDate: null,
     statusDistribution: null,
     networkTypeDistribution: null,
     priorityDistribution: null,
@@ -147,19 +157,105 @@ const props = withDefaults(defineProps<{
 const user = computed(() => usePage().props.auth.user as any);
 const role = computed(() => user.value?.role);
 
-// Unified Year / Period Filter
-const currentYear = ref(props.selectedYear || '2025');
+// Unified Period Filter Controller
+const isFilterOpen = ref(false);
+const filterDropdownRef = ref<HTMLElement | null>(null);
+const activeTab = ref<'year_month' | 'range'>(props.filterType === 'range' ? 'range' : 'year_month');
 
-watch(() => props.selectedYear, (newYear) => {
-    if (newYear) {
-        currentYear.value = newYear;
-    }
+// Form state
+const formYear = ref(props.selectedYear || '2025');
+const formMonth = ref(props.selectedMonth || 'all');
+const formPreset = ref(props.selectedPreset || '30d');
+const formStartDate = ref(props.startDate || '');
+const formEndDate = ref(props.endDate || '');
+
+watch(() => [props.filterType, props.selectedYear, props.selectedMonth, props.selectedPreset, props.startDate, props.endDate], () => {
+    activeTab.value = props.filterType === 'range' ? 'range' : 'year_month';
+    formYear.value = props.selectedYear || '2025';
+    formMonth.value = props.selectedMonth || 'all';
+    formPreset.value = props.selectedPreset || '30d';
+    formStartDate.value = props.startDate || '';
+    formEndDate.value = props.endDate || '';
 });
 
-const onYearChange = (year: string) => {
-    currentYear.value = year;
-    router.get(route('dashboard'), { year }, { preserveState: true, preserveScroll: true });
+const activeFilterLabel = computed(() => {
+    if (props.filterType === 'range') {
+        if (props.selectedPreset === '7d') return '7 Hari Terakhir';
+        if (props.selectedPreset === '30d') return '30 Hari Terakhir';
+        if (props.selectedPreset === 'this_month') return 'Bulan Ini';
+        if (props.startDate && props.endDate) return `${props.startDate} s/d ${props.endDate}`;
+        return 'Rentang Tanggal';
+    }
+    
+    // year_month
+    if (props.selectedYear === 'all') return 'Semua Tahun';
+    
+    if (props.selectedMonth && props.selectedMonth !== 'all') {
+        const monthNames: Record<string, string> = {
+            '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
+            '05': 'Mei', '06': 'Juni', '07': 'Juli', '08': 'Agustus',
+            '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember'
+        };
+        const m = monthNames[props.selectedMonth] || props.selectedMonth;
+        return `${m} ${props.selectedYear}`;
+    }
+    
+    return `Tahun ${props.selectedYear}`;
+});
+
+const applyYearMonthFilter = () => {
+    isFilterOpen.value = false;
+    router.get(route('dashboard'), {
+        filter_type: 'year_month',
+        year: formYear.value,
+        month: formMonth.value,
+    }, { preserveState: true, preserveScroll: true });
 };
+
+const applyPresetRange = (preset: '7d' | '30d' | 'this_month') => {
+    isFilterOpen.value = false;
+    formPreset.value = preset;
+    router.get(route('dashboard'), {
+        filter_type: 'range',
+        preset: preset,
+    }, { preserveState: true, preserveScroll: true });
+};
+
+const applyCustomRange = () => {
+    if (!formStartDate.value || !formEndDate.value) return;
+    isFilterOpen.value = false;
+    router.get(route('dashboard'), {
+        filter_type: 'range',
+        preset: 'custom',
+        start_date: formStartDate.value,
+        end_date: formEndDate.value,
+    }, { preserveState: true, preserveScroll: true });
+};
+
+const resetFilter = () => {
+    isFilterOpen.value = false;
+    formYear.value = props.availableYears?.[0] || '2025';
+    formMonth.value = 'all';
+    router.get(route('dashboard'), {
+        filter_type: 'year_month',
+        year: formYear.value,
+        month: 'all',
+    }, { preserveState: true, preserveScroll: true });
+};
+
+const handleClickOutside = (e: MouseEvent) => {
+    if (filterDropdownRef.value && !filterDropdownRef.value.contains(e.target as Node)) {
+        isFilterOpen.value = false;
+    }
+};
+
+onMounted(() => {
+    document.addEventListener('click', handleClickOutside);
+});
+
+onUnmounted(() => {
+    document.removeEventListener('click', handleClickOutside);
+});
 
 // Dynamic progress bar styling
 const getProgressBg = (rate: number) => {
@@ -508,21 +604,173 @@ const lineChartOptions = {
                 </div>
                 <div class="flex flex-wrap items-center gap-2.5">
                     <!-- Unified Period Filter Selector (for Admin) -->
-                    <div v-if="role === 'admin'" class="flex items-center gap-1.5">
-                        <Select :model-value="currentYear" @update:model-value="onYearChange">
-                            <SelectTrigger class="w-[150px] h-9 text-xs bg-white hover:bg-slate-50 border-slate-200 shadow-none font-medium">
-                                <Calendar class="w-3.5 h-3.5 mr-1 text-slate-500" />
-                                <SelectValue placeholder="Pilih Periode" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem v-for="yr in availableYears" :key="yr" :value="yr">
-                                    Tahun {{ yr }}
-                                </SelectItem>
-                                <SelectItem value="all">
-                                    Semua Periode
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <div v-if="role === 'admin'" class="relative" ref="filterDropdownRef">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            class="h-9 text-xs bg-white hover:bg-slate-50 border-slate-200 shadow-none font-medium flex items-center gap-1.5"
+                            @click="isFilterOpen = !isFilterOpen"
+                        >
+                            <Calendar class="w-3.5 h-3.5 text-blue-600" />
+                            <span>{{ activeFilterLabel }}</span>
+                            <SlidersHorizontal class="w-3 h-3 ml-1 text-slate-400" />
+                        </Button>
+
+                        <!-- Dropdown Panel -->
+                        <div 
+                            v-if="isFilterOpen" 
+                            class="absolute right-0 mt-2 w-[340px] sm:w-[380px] bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-4 animate-in fade-in zoom-in-95 duration-100"
+                        >
+                            <!-- Tab Header -->
+                            <div class="flex p-1 bg-slate-100 rounded-lg text-xs font-semibold mb-4">
+                                <button 
+                                    type="button" 
+                                    class="flex-1 py-1.5 rounded-md transition-all text-center"
+                                    :class="activeTab === 'year_month' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
+                                    @click="activeTab = 'year_month'"
+                                >
+                                    Bulan & Tahun
+                                </button>
+                                <button 
+                                    type="button" 
+                                    class="flex-1 py-1.5 rounded-md transition-all text-center"
+                                    :class="activeTab === 'range' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'"
+                                    @click="activeTab = 'range'"
+                                >
+                                    Rentang Tanggal
+                                </button>
+                            </div>
+
+                            <!-- TAB 1: BULAN & TAHUN -->
+                            <div v-if="activeTab === 'year_month'" class="space-y-3">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[11px] font-medium text-slate-500 block mb-1">Tahun</label>
+                                        <Select v-model="formYear">
+                                            <SelectTrigger class="h-8 text-xs bg-white">
+                                                <SelectValue placeholder="Pilih Tahun" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem v-for="yr in availableYears" :key="yr" :value="yr">
+                                                    {{ yr }}
+                                                </SelectItem>
+                                                <SelectItem value="all">Semua Tahun</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div>
+                                        <label class="text-[11px] font-medium text-slate-500 block mb-1">Bulan</label>
+                                        <Select v-model="formMonth" :disabled="formYear === 'all'">
+                                            <SelectTrigger class="h-8 text-xs bg-white">
+                                                <SelectValue placeholder="Semua Bulan" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Semua Bulan</SelectItem>
+                                                <SelectItem value="01">Januari</SelectItem>
+                                                <SelectItem value="02">Februari</SelectItem>
+                                                <SelectItem value="03">Maret</SelectItem>
+                                                <SelectItem value="04">April</SelectItem>
+                                                <SelectItem value="05">Mei</SelectItem>
+                                                <SelectItem value="06">Juni</SelectItem>
+                                                <SelectItem value="07">Juli</SelectItem>
+                                                <SelectItem value="08">Agustus</SelectItem>
+                                                <SelectItem value="09">September</SelectItem>
+                                                <SelectItem value="10">Oktober</SelectItem>
+                                                <SelectItem value="11">November</SelectItem>
+                                                <SelectItem value="12">Desember</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                    <button 
+                                        type="button" 
+                                        class="text-xs text-slate-500 hover:text-slate-800"
+                                        @click="resetFilter"
+                                    >
+                                        Reset
+                                    </button>
+                                    <Button size="sm" class="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" @click="applyYearMonthFilter">
+                                        Terapkan Filter
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: RENTANG TANGGAL -->
+                            <div v-if="activeTab === 'range'" class="space-y-3">
+                                <div>
+                                    <label class="text-[11px] font-medium text-slate-500 block mb-1.5">Preset Cepat</label>
+                                    <div class="grid grid-cols-3 gap-1.5">
+                                        <button 
+                                            type="button" 
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            :class="formPreset === '7d' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
+                                            @click="applyPresetRange('7d')"
+                                        >
+                                            7 Hari
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            :class="formPreset === '30d' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
+                                            @click="applyPresetRange('30d')"
+                                        >
+                                            30 Hari
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            :class="formPreset === 'this_month' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
+                                            @click="applyPresetRange('this_month')"
+                                        >
+                                            Bulan Ini
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t border-slate-100">
+                                    <label class="text-[11px] font-medium text-slate-500 block mb-1.5">Rentang Kustom</label>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <span class="text-[10px] text-slate-400 block mb-0.5">Dari</span>
+                                            <input 
+                                                type="date" 
+                                                v-model="formStartDate" 
+                                                class="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <span class="text-[10px] text-slate-400 block mb-0.5">Sampai</span>
+                                            <input 
+                                                type="date" 
+                                                v-model="formEndDate" 
+                                                class="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                                    <button 
+                                        type="button" 
+                                        class="text-xs text-slate-500 hover:text-slate-800"
+                                        @click="resetFilter"
+                                    >
+                                        Reset
+                                    </button>
+                                    <Button 
+                                        size="sm" 
+                                        class="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" 
+                                        :disabled="!formStartDate || !formEndDate"
+                                        @click="applyCustomRange"
+                                    >
+                                        Terapkan Rentang
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Lihat Semua Tiket Button -->
@@ -677,39 +925,34 @@ const lineChartOptions = {
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="flex items-start gap-3 pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
                             >
-                                <div class="mt-0.5 w-7 h-7 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                                    <Activity class="w-3.5 h-3.5 text-slate-600" />
+                                <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300">•</span>
+                                        <span :class="getRoleColor(act.user_role)">
+                                            {{ getRoleLabel(act.user_role) }}
+                                        </span>
+                                        <span class="text-slate-300">•</span>
+                                        <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
+                                            {{ act.ticket_number }}
+                                        </Link>
+                                    </div>
+                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                        {{ act.created_at_diff }}
+                                    </span>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                            <span class="text-slate-300">•</span>
-                                            <span :class="getRoleColor(act.user_role)">
-                                                {{ getRoleLabel(act.user_role) }}
-                                            </span>
-                                            <span class="text-slate-300">•</span>
-                                            <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
-                                                {{ act.ticket_number }}
-                                            </Link>
-                                        </div>
-                                        <span class="text-[11px] text-slate-400 whitespace-nowrap">
-                                            {{ act.created_at_diff }}
-                                        </span>
-                                    </div>
 
-                                    <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                        {{ act.comment }}
-                                    </p>
+                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    {{ act.comment }}
+                                </p>
 
-                                    <div class="flex items-center gap-2 mt-1.5 text-[11px]">
-                                        <span class="text-slate-400">Status:</span>
-                                        <span :class="getStatusColor(act.new_status)">
-                                            {{ getStatusLabel(act.new_status) }}
-                                        </span>
-                                    </div>
+                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                    <span class="text-slate-400">Status:</span>
+                                    <span :class="getStatusColor(act.new_status)">
+                                        {{ getStatusLabel(act.new_status) }}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -857,43 +1100,38 @@ const lineChartOptions = {
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="flex items-start gap-3 pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
                             >
-                                <div class="mt-0.5 w-7 h-7 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                                    <Activity class="w-3.5 h-3.5 text-slate-600" />
+                                <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300">•</span>
+                                        <span :class="getRoleColor(act.user_role)">
+                                            {{ getRoleLabel(act.user_role) }}
+                                        </span>
+                                        <span class="text-slate-300">•</span>
+                                        <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-amber-600 hover:underline font-medium">
+                                            {{ act.ticket_number }}
+                                        </Link>
+                                    </div>
+                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                        {{ act.created_at_diff }}
+                                    </span>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                            <span class="text-slate-300">•</span>
-                                            <span :class="getRoleColor(act.user_role)">
-                                                {{ getRoleLabel(act.user_role) }}
-                                            </span>
-                                            <span class="text-slate-300">•</span>
-                                            <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-amber-600 hover:underline font-medium">
-                                                {{ act.ticket_number }}
-                                            </Link>
-                                        </div>
-                                        <span class="text-[11px] text-slate-400 whitespace-nowrap">
-                                            {{ act.created_at_diff }}
-                                        </span>
-                                    </div>
 
-                                    <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                        {{ act.comment }}
-                                    </p>
+                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    {{ act.comment }}
+                                </p>
 
-                                    <div class="flex items-center gap-2 mt-1.5 text-[11px]">
-                                        <span class="text-slate-400">Status:</span>
-                                        <span :class="getStatusColor(act.new_status)">
-                                            {{ getStatusLabel(act.new_status) }}
-                                        </span>
-                                        <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
-                                        <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
-                                            {{ act.department_name }}
-                                        </span>
-                                    </div>
+                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                    <span class="text-slate-400">Status:</span>
+                                    <span :class="getStatusColor(act.new_status)">
+                                        {{ getStatusLabel(act.new_status) }}
+                                    </span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
+                                        {{ act.department_name }}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -1228,43 +1466,38 @@ const lineChartOptions = {
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="flex items-start gap-3.5 pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
                             >
-                                <div class="mt-0.5 w-7 h-7 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                                    <Activity class="w-3.5 h-3.5 text-slate-600" />
+                                <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300">•</span>
+                                        <span :class="getRoleColor(act.user_role)">
+                                            {{ getRoleLabel(act.user_role) }}
+                                        </span>
+                                        <span class="text-slate-300">•</span>
+                                        <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
+                                            {{ act.ticket_number }}
+                                        </Link>
+                                    </div>
+                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                        {{ act.created_at_diff }}
+                                    </span>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
-                                        <div class="flex items-center gap-1.5 flex-wrap">
-                                            <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                            <span class="text-slate-300">•</span>
-                                            <span :class="getRoleColor(act.user_role)">
-                                                {{ getRoleLabel(act.user_role) }}
-                                            </span>
-                                            <span class="text-slate-300">•</span>
-                                            <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
-                                                {{ act.ticket_number }}
-                                            </Link>
-                                        </div>
-                                        <span class="text-[11px] text-slate-400 whitespace-nowrap">
-                                            {{ act.created_at_diff }}
-                                        </span>
-                                    </div>
 
-                                    <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                        {{ act.comment }}
-                                    </p>
+                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
+                                    {{ act.comment }}
+                                </p>
 
-                                    <div class="flex items-center gap-2 mt-1.5 text-[11px]">
-                                        <span class="text-slate-400">Status:</span>
-                                        <span :class="getStatusColor(act.new_status)">
-                                            {{ getStatusLabel(act.new_status) }}
-                                        </span>
-                                        <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
-                                        <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
-                                            {{ act.department_name }}
-                                        </span>
-                                    </div>
+                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                    <span class="text-slate-400">Status:</span>
+                                    <span :class="getStatusColor(act.new_status)">
+                                        {{ getStatusLabel(act.new_status) }}
+                                    </span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
+                                        {{ act.department_name }}
+                                    </span>
                                 </div>
                             </div>
                         </div>
