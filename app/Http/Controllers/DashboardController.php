@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Ticket;
 use App\Models\TicketStatusHistory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -19,6 +20,11 @@ class DashboardController extends Controller
         $monthlySummary = null;
         $availableYears = [];
         $selectedYear = null;
+        $filterStart = null;
+        $filterEnd = null;
+        $activeTasks = [];
+        $recentFeedbacks = [];
+        $technicianResolutionChart = null;
 
         if ($role === 'opd_user') {
             $departmentId = $user->department_id;
@@ -43,17 +49,121 @@ class DashboardController extends Controller
                   ->orWhereHas('technicians', fn($qt) => $qt->where('users.id', $user->id));
             };
 
+            $ratedTicketsQuery = Ticket::whereNotNull('rating')->where($myTicketsQuery);
+            $ratingCount = (clone $ratedTicketsQuery)->count();
+            $avgRatingVal = (clone $ratedTicketsQuery)->avg('rating');
+            $avgRating = $ratingCount > 0 ? round($avgRatingVal, 1) : 0;
+
             $stats = [
-                'my_team_tickets' => Ticket::where('status', 'in_progress')
-                    ->where($myTicketsQuery)
-                    ->count(),
-                'pending_approval' => Ticket::where('status', 'pending_approval')
-                    ->where($myTicketsQuery)
-                    ->count(),
-                'resolved_this_month' => Ticket::where('status', 'closed')
-                    ->where($myTicketsQuery)
-                    ->whereMonth('closed_at', now()->month)
-                    ->count(),
+                'closed_tickets' => Ticket::where('status', 'closed')->where($myTicketsQuery)->count(),
+                'in_progress' => Ticket::where('status', 'in_progress')->where($myTicketsQuery)->count(),
+                'pending_approval' => Ticket::where('status', 'pending_approval')->where($myTicketsQuery)->count(),
+                'avg_rating' => $avgRating,
+                'rating_count' => $ratingCount,
+            ];
+
+            // 1. Antrean Tugas Aktif Lapangan (In Progress)
+            $activeTasks = Ticket::with(['department:id,name,code', 'category:id,name'])
+                ->where('status', 'in_progress')
+                ->where($myTicketsQuery)
+                ->orderByRaw("FIELD(priority, 'emergency', 'high', 'medium', 'low') ASC")
+                ->orderBy('due_at', 'asc')
+                ->limit(6)
+                ->get()
+                ->map(function ($t) {
+                    $dueTime = $t->due_at ? \Carbon\Carbon::parse($t->due_at) : null;
+                    $isOverdue = $dueTime ? now()->gt($dueTime) : false;
+                    
+                    $dueHuman = '-';
+                    if ($dueTime) {
+                        if ($isOverdue) {
+                            $dueHuman = 'Lewat ' . $dueTime->diffForHumans(null, true);
+                        } else {
+                            $dueHuman = 'Sisa ' . now()->diffForHumans($dueTime, true);
+                        }
+                    }
+
+                    return [
+                        'id' => $t->id,
+                        'ticket_number' => $t->ticket_number,
+                        'title' => $t->title,
+                        'department_name' => $t->department ? $t->department->name : '-',
+                        'department_code' => $t->department ? $t->department->code : '-',
+                        'location_details' => $t->location_details ?? '-',
+                        'category_name' => $t->category ? $t->category->name : '-',
+                        'network_type' => $t->network_type,
+                        'priority' => $t->priority,
+                        'due_at' => $t->due_at ? $t->due_at->format('d M Y, H:i') : null,
+                        'due_human' => $dueHuman,
+                        'is_overdue' => $isOverdue,
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            // 2. Ulasan & Masukan Kepuasan OPD Terbaru
+            $recentFeedbacks = Ticket::with(['department:id,name,code', 'reporter:id,name'])
+                ->whereNotNull('rating')
+                ->where($myTicketsQuery)
+                ->latest('rated_at')
+                ->limit(5)
+                ->get()
+                ->map(function ($t) {
+                    return [
+                        'id' => $t->id,
+                        'ticket_number' => $t->ticket_number,
+                        'department_name' => $t->department ? $t->department->name : '-',
+                        'reporter_name' => $t->reporter ? $t->reporter->name : 'Pelapor OPD',
+                        'rating' => (int) $t->rating,
+                        'feedback_comment' => $t->feedback_comment,
+                        'rated_at' => $t->rated_at ? $t->rated_at->format('d M Y, H:i') : ($t->updated_at ? $t->updated_at->format('d M Y, H:i') : '-'),
+                        'rated_at_diff' => $t->rated_at ? $t->rated_at->diffForHumans() : ($t->updated_at ? $t->updated_at->diffForHumans() : '-'),
+                    ];
+                })
+                ->values()
+                ->toArray();
+
+            // 3. Rata-rata Waktu Penyelesaian Bulanan (Jam)
+            $months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            $targetYear = (int) $request->query('year', date('Y'));
+            
+            $hasTicketsThisYear = Ticket::whereYear('closed_at', $targetYear)->where($myTicketsQuery)->exists();
+            if (!$hasTicketsThisYear) {
+                $latestYear = Ticket::whereNotNull('closed_at')->where($myTicketsQuery)->orderBy('closed_at', 'desc')->value(DB::raw('YEAR(closed_at)'));
+                if ($latestYear) {
+                    $targetYear = (int) $latestYear;
+                }
+            }
+
+            $resolutionTimeData = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $monthlyClosedQuery = Ticket::where('status', 'closed')
+                    ->whereYear('closed_at', $targetYear)
+                    ->whereMonth('closed_at', $m)
+                    ->where($myTicketsQuery);
+
+                $closedCount = (clone $monthlyClosedQuery)->count();
+                
+                if ($closedCount > 0) {
+                    $avgMinutes = (clone $monthlyClosedQuery)
+                        ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, closed_at)) as avg_min')
+                        ->value('avg_min');
+                    $avgHours = $avgMinutes ? round($avgMinutes / 60, 1) : 0;
+                } else {
+                    $avgHours = 0;
+                }
+
+                $resolutionTimeData[] = [
+                    'avg_hours' => $avgHours,
+                    'closed_count' => $closedCount,
+                ];
+            }
+
+            $technicianResolutionChart = [
+                'labels' => $months,
+                'data' => array_column($resolutionTimeData, 'avg_hours'),
+                'counts' => array_column($resolutionTimeData, 'closed_count'),
+                'year' => (string) $targetYear,
             ];
         } 
         elseif ($role === 'admin') {
@@ -414,6 +524,9 @@ class DashboardController extends Controller
             'ticketTrend' => $ticketTrend ?? null,
             'recentTickets' => $recentTickets,
             'recentActivities' => $recentActivities,
+            'activeTasks' => $activeTasks,
+            'recentFeedbacks' => $recentFeedbacks,
+            'technicianResolutionChart' => $technicianResolutionChart,
         ]);
     }
 }

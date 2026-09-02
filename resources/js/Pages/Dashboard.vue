@@ -2,7 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, usePage, Link, router } from '@inertiajs/vue3';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -34,7 +34,10 @@ import {
   PieChart,
   Network,
   Gauge,
-  TrendingUp
+  TrendingUp,
+  Eye,
+  Star,
+  MapPin,
 } from 'lucide-vue-next';
 
 // Chart.js & vue-chartjs Integration
@@ -119,6 +122,39 @@ interface RecentActivity {
     created_at_diff: string;
 }
 
+interface ActiveTask {
+    id: number;
+    ticket_number: string;
+    title: string;
+    department_name: string;
+    department_code: string;
+    location_details: string;
+    category_name: string;
+    network_type: string;
+    priority: string;
+    due_at: string | null;
+    due_human: string;
+    is_overdue: boolean;
+}
+
+interface RecentFeedback {
+    id: number;
+    ticket_number: string;
+    department_name: string;
+    reporter_name: string;
+    rating: number;
+    feedback_comment: string | null;
+    rated_at: string;
+    rated_at_diff: string;
+}
+
+interface TechnicianResolutionChart {
+    labels: string[];
+    data: number[];
+    counts: number[];
+    year: string;
+}
+
 const props = withDefaults(defineProps<{
     stats: Record<string, any>;
     monthlyReports?: MonthlyReport[];
@@ -136,6 +172,9 @@ const props = withDefaults(defineProps<{
     ticketTrend?: TicketTrendDataset | null;
     recentTickets?: RecentTicket[];
     recentActivities?: RecentActivity[];
+    activeTasks?: ActiveTask[];
+    recentFeedbacks?: RecentFeedback[];
+    technicianResolutionChart?: TechnicianResolutionChart | null;
 }>(), {
     monthlyReports: () => [],
     monthlySummary: null,
@@ -152,6 +191,9 @@ const props = withDefaults(defineProps<{
     ticketTrend: null,
     recentTickets: () => [],
     recentActivities: () => [],
+    activeTasks: () => [],
+    recentFeedbacks: () => [],
+    technicianResolutionChart: null,
 });
 
 const user = computed(() => usePage().props.auth.user as any);
@@ -636,6 +678,144 @@ const lineChartOptions = {
         },
     },
 };
+
+// Technician Resolved Ticket Volume Chart (Bar Chart)
+const techVolumeChartData = computed(() => {
+    if (!props.technicianResolutionChart) {
+        return { labels: [], datasets: [] };
+    }
+    return {
+        labels: props.technicianResolutionChart.labels,
+        datasets: [
+            {
+                label: 'Tiket Selesai',
+                data: props.technicianResolutionChart.counts,
+                backgroundColor: '#10b981',
+                hoverBackgroundColor: '#059669',
+                borderRadius: 4,
+                maxBarThickness: 28,
+            },
+        ],
+    };
+});
+
+const techVolumeChartOptions = computed(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: false,
+        },
+        tooltip: {
+            backgroundColor: '#1e293b',
+            titleFont: { size: 12, weight: 'bold' as const },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 6,
+            callbacks: {
+                label: (context: any) => {
+                    const val = context.parsed.y;
+                    return ` ${val} tiket tuntas`;
+                },
+            },
+        },
+    },
+    scales: {
+        x: {
+            grid: {
+                display: false,
+            },
+            ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+            },
+        },
+        y: {
+            beginAtZero: true,
+            grid: {
+                color: '#f1f5f9',
+            },
+            ticks: {
+                precision: 0,
+                color: '#64748b',
+                font: { size: 11 },
+                callback: (val: any) => `${val} tiket`,
+            },
+        },
+    },
+}));
+
+// Technician Resolution Time Chart (Line Chart)
+const techResolutionChartData = computed(() => {
+    if (!props.technicianResolutionChart) {
+        return { labels: [], datasets: [] };
+    }
+    return {
+        labels: props.technicianResolutionChart.labels,
+        datasets: [
+            {
+                label: 'Rata-rata Durasi (Jam)',
+                data: props.technicianResolutionChart.data,
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: '#2563eb',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            },
+        ],
+    };
+});
+
+const techResolutionChartOptions = computed(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+        legend: {
+            display: false,
+        },
+        tooltip: {
+            backgroundColor: '#1e293b',
+            titleFont: { size: 12, weight: 'bold' as const },
+            bodyFont: { size: 12 },
+            padding: 10,
+            cornerRadius: 6,
+            callbacks: {
+                label: (context: any) => {
+                    const val = context.parsed.y;
+                    const idx = context.dataIndex;
+                    const count = props.technicianResolutionChart?.counts?.[idx] ?? 0;
+                    return ` Rata-rata: ${val} Jam (${count} tiket selesai)`;
+                },
+            },
+        },
+    },
+    scales: {
+        x: {
+            grid: {
+                display: false,
+            },
+            ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+            },
+        },
+        y: {
+            beginAtZero: true,
+            grid: {
+                color: '#f1f5f9',
+            },
+            ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                callback: (val: any) => `${val} jam`,
+            },
+        },
+    },
+}));
 </script>
 
 <template>
@@ -1010,177 +1190,284 @@ const lineChartOptions = {
 
             <!-- ================= TECHNICIAN DASHBOARD ================= -->
             <template v-if="role === 'technician'">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- 1. Total Tiket Selesai -->
+                    <Card class="border-emerald-200 bg-emerald-50/40">
+                        <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-emerald-900">Total Tiket Selesai</CardTitle>
+                            <CheckCircle2 class="h-4 w-4 text-emerald-600" />
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold text-emerald-950">{{ stats.closed_tickets || 0 }}</div>
+                            <p class="text-xs text-emerald-700 mt-1">Seluruh penugasan tuntas</p>
+                        </CardContent>
+                    </Card>
+
+                    <!-- 2. In Progress -->
                     <Card class="border-amber-200 bg-amber-50/40">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-xs sm:text-sm font-semibold text-amber-900">Tugas Tim Saya (In Progress)</CardTitle>
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-amber-900">In Progress</CardTitle>
                             <Clock class="h-4 w-4 text-amber-600" />
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-amber-950">{{ stats.my_team_tickets || 0 }}</div>
-                            <p class="text-xs text-amber-700 mt-1">Tiket aktif ditugaskan ke Anda / Tim</p>
+                            <div class="text-2xl font-bold text-amber-950">{{ stats.in_progress || 0 }}</div>
+                            <p class="text-xs text-amber-700 mt-1">Tugas aktif di lapangan</p>
                         </CardContent>
                     </Card>
                     
+                    <!-- 3. Pending Approval -->
                     <Card class="border-purple-200 bg-purple-50/40">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-xs sm:text-sm font-semibold text-purple-900">Menunggu Review Admin</CardTitle>
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-purple-900">Pending Approval</CardTitle>
                             <ShieldCheck class="h-4 w-4 text-purple-600" />
                         </CardHeader>
                         <CardContent>
                             <div class="text-2xl font-bold text-purple-950">{{ stats.pending_approval || 0 }}</div>
-                            <p class="text-xs text-purple-700 mt-1">Pekerjaan lapangan telah diajukan</p>
+                            <p class="text-xs text-purple-700 mt-1">Menunggu review Admin</p>
                         </CardContent>
                     </Card>
-                    
-                    <Card class="border-emerald-200 bg-emerald-50/40">
+
+                    <!-- 4. Rating Kepuasan -->
+                    <Card class="border-yellow-200 bg-amber-50/30">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-xs sm:text-sm font-semibold text-emerald-900">Tuntas Bulan Ini</CardTitle>
-                            <CheckCircle2 class="h-4 w-4 text-emerald-600" />
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-amber-900">Rating Kepuasan</CardTitle>
+                            <Star class="h-4 w-4 text-amber-500 fill-amber-400" />
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-emerald-950">{{ stats.resolved_this_month || 0 }}</div>
-                            <p class="text-xs text-emerald-700 mt-1">Tiket terverifikasi selesai</p>
+                            <div class="text-2xl font-bold text-amber-950 flex items-center gap-1.5">
+                                <span v-if="stats.avg_rating && stats.avg_rating > 0">
+                                    {{ stats.avg_rating }} <span class="text-sm font-normal text-slate-500">/ 5.0</span>
+                                </span>
+                                <span v-else class="text-slate-400 text-xl font-normal">-</span>
+                            </div>
+                            <p class="text-xs text-amber-700 mt-1">
+                                {{ stats.rating_count ? `${stats.rating_count} ulasan diterima` : 'Belum ada ulasan' }}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>
 
-                <!-- Tiket Terbaru (Teknisi) -->
-                <Card class="border-slate-200 shadow-sm mt-6">
-                    <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <Ticket class="w-4 h-4 text-amber-600" />
-                            <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Tiket Penugasan Terbaru</CardTitle>
-                        </div>
-                        <div>
-                            <Link :href="route('tickets.index')">
-                                <Button variant="ghost" size="sm" class="h-8 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium">
-                                    Lihat Semua Tiket <ArrowRight class="w-3.5 h-3.5 ml-1" />
-                                </Button>
-                            </Link>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="p-0">
-                        <div class="overflow-x-auto">
-                            <Table>
-                                <TableHeader class="bg-slate-50/75">
-                                    <TableRow class="hover:bg-transparent">
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[160px] pl-4 sm:pl-6">No. Tiket</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul Masalah</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Instansi (OPD)</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Status</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <template v-if="recentTickets && recentTickets.length > 0">
-                                        <TableRow 
-                                            v-for="ticket in recentTickets" 
-                                            :key="ticket.id"
-                                            class="hover:bg-slate-50/80 transition-colors"
-                                        >
-                                            <TableCell class="py-3 pl-4 sm:pl-6">
-                                                <Link :href="route('tickets.show', ticket.id)" class="group block">
-                                                    <div class="text-xs font-semibold text-amber-600 font-mono group-hover:underline">
-                                                        {{ ticket.ticket_number }}
-                                                    </div>
-                                                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ticket.created_at }}</div>
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell class="py-3">
-                                                <Link :href="route('tickets.show', ticket.id)" class="block group">
-                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-amber-600 transition-colors line-clamp-1" :title="ticket.title">
-                                                        {{ ticket.title }}
-                                                    </span>
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-slate-700">
-                                                <span class="font-medium text-slate-900 block truncate max-w-[180px]">{{ ticket.department_name }}</span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getPriorityColor(ticket.priority)">
-                                                    {{ getPriorityLabel(ticket.priority) }}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getStatusColor(ticket.status)">
-                                                    {{ getStatusLabel(ticket.status) }}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
-                                                <Link :href="route('tickets.show', ticket.id)">
-                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-amber-500 hover:bg-amber-50/50">
-                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
-                                                    </Button>
-                                                </Link>
-                                            </TableCell>
-                                        </TableRow>
-                                    </template>
-                                    <TableRow v-else>
-                                        <TableCell colspan="6" class="h-28 text-center text-xs text-slate-400">
-                                            Belum ada tiket tugas aktif saat ini.
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <!-- Aktivitas Terbaru (Teknisi) -->
-                <Card class="border-slate-200 shadow-sm mt-6">
-                    <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <Activity class="w-4 h-4 text-amber-600" />
-                            <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Aktivitas Penanganan Terbaru</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="pt-4 pb-2 px-4 sm:px-6">
-                        <div v-if="recentActivities && recentActivities.length > 0" class="divide-y divide-slate-100">
-                            <div 
-                                v-for="act in recentActivities" 
-                                :key="act.id" 
-                                class="py-3.5 first:pt-0 last:pb-0"
-                            >
-                                <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-semibold text-slate-900">{{ act.user_name }}</span>
-                                        <span class="text-slate-300 font-light">•</span>
-                                        <span :class="getRoleColor(act.user_role)" class="font-medium">
-                                            {{ getRoleLabel(act.user_role) }}
-                                        </span>
-                                        <span class="text-slate-300 font-light">•</span>
-                                        <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-amber-600 hover:underline font-medium">
-                                            {{ act.ticket_number }}
-                                        </Link>
-                                    </div>
-                                    <span class="text-[11px] text-slate-400 font-normal whitespace-nowrap">
-                                        {{ act.created_at_diff }}
-                                    </span>
-                                </div>
-
-                                <div v-if="act.comment" class="mt-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-md text-xs text-slate-600 leading-relaxed italic">
-                                    "{{ act.comment }}"
-                                </div>
-
-                                <div class="flex items-center gap-2 mt-2 text-[11px]">
-                                    <span class="text-slate-400">Status:</span>
-                                    <span :class="getStatusColor(act.new_status)" class="font-semibold">
-                                        {{ getStatusLabel(act.new_status) }}
-                                    </span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300 font-light">•</span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 font-medium truncate">
-                                        {{ act.department_name }}
-                                    </span>
+                <!-- Section Grafik Performa: 1. Volume Tiket Selesai & 2. Rata-rata Waktu Penyelesaian -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                    <!-- 1. Volume Tiket Selesai Bulanan (Bar Chart) -->
+                    <Card class="border-slate-200 shadow-sm">
+                        <CardHeader class="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <CheckCircle2 class="w-4 h-4 text-emerald-600" />
+                                <div>
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">
+                                        Volume Tiket Selesai Bulanan
+                                    </CardTitle>
+                                    <CardDescription class="text-xs text-slate-500 mt-0.5">
+                                        Jumlah tiket yang berhasil diselesaikan per bulan pada tahun {{ technicianResolutionChart?.year || '2025' }}
+                                    </CardDescription>
                                 </div>
                             </div>
-                        </div>
-                        <div v-else class="text-center py-6 text-xs text-slate-400">
-                            Belum ada riwayat aktivitas terbaru saat ini.
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardHeader>
+                        <CardContent class="pt-4 pb-2">
+                            <div class="h-64 sm:h-72 w-full">
+                                <Bar 
+                                    :data="techVolumeChartData" 
+                                    :options="techVolumeChartOptions" 
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <!-- 2. Rata-rata Waktu Penyelesaian Tiket (Line Chart) -->
+                    <Card class="border-slate-200 shadow-sm">
+                        <CardHeader class="pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <Clock class="w-4 h-4 text-blue-600" />
+                                <div>
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">
+                                        Rata-rata Waktu Penyelesaian (Jam)
+                                    </CardTitle>
+                                    <CardDescription class="text-xs text-slate-500 mt-0.5">
+                                        Tren kecepatan penanganan tiket selesai per bulan pada tahun {{ technicianResolutionChart?.year || '2025' }}
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent class="pt-4 pb-2">
+                            <div class="h-64 sm:h-72 w-full">
+                                <Line 
+                                    :data="techResolutionChartData" 
+                                    :options="techResolutionChartOptions" 
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <!-- 2-Column Formal Layout: Left (Active Tasks) & Right (OPD Feedbacks) -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                    <!-- Left Column: Daftar Tugas Aktif (In Progress) -->
+                    <div class="lg:col-span-8 space-y-6">
+                        <Card class="border-slate-200 shadow-sm">
+                            <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
+                                <div>
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Daftar Tugas Aktif Lapangan</CardTitle>
+                                    <CardDescription class="text-xs text-slate-500 mt-0.5">Tiket dalam penanganan yang ditugaskan kepada Anda</CardDescription>
+                                </div>
+                                <div>
+                                    <Link :href="route('tickets.index')">
+                                        <Button variant="outline" size="sm" class="h-8 text-xs text-slate-700 hover:text-slate-900 border-slate-200 hover:bg-slate-50 font-medium">
+                                            Lihat Semua Tiket <ArrowRight class="w-3.5 h-3.5 ml-1" />
+                                        </Button>
+                                    </Link>
+                                </div>
+                            </CardHeader>
+                            <CardContent class="p-0">
+                                <div class="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader class="bg-slate-50">
+                                            <TableRow class="hover:bg-transparent">
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[140px] pl-4 sm:pl-6">No. Tiket</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10">Instansi (OPD)</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10">Kendala Teknis</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Batas SLA</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            <template v-if="activeTasks && activeTasks.length > 0">
+                                                <TableRow 
+                                                    v-for="task in activeTasks" 
+                                                    :key="task.id"
+                                                    class="hover:bg-slate-50/80 transition-colors"
+                                                >
+                                                    <TableCell class="py-3 pl-4 sm:pl-6">
+                                                        <Link :href="route('tickets.show', task.id)" class="group block">
+                                                            <div class="text-xs font-semibold text-blue-600 font-mono group-hover:underline">
+                                                                {{ task.ticket_number }}
+                                                            </div>
+                                                            <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
+                                                                {{ task.network_type ? task.network_type.replace('_', ' ') : '-' }}
+                                                            </div>
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell class="py-3">
+                                                        <span class="text-xs font-medium text-slate-900 block truncate max-w-[180px]" :title="task.department_name">
+                                                            {{ task.department_name }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3">
+                                                        <Link :href="route('tickets.show', task.id)" class="block group">
+                                                            <span class="text-xs text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1" :title="task.title">
+                                                                {{ task.title }}
+                                                            </span>
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs text-center whitespace-nowrap">
+                                                        <span 
+                                                            class="font-semibold"
+                                                            :class="{
+                                                                'text-rose-600': task.priority === 'emergency',
+                                                                'text-amber-600': task.priority === 'high',
+                                                                'text-blue-600': task.priority === 'medium',
+                                                                'text-slate-500': task.priority === 'low'
+                                                            }"
+                                                        >
+                                                            {{ getPriorityLabel(task.priority) }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs text-center whitespace-nowrap">
+                                                        <span 
+                                                            :class="task.is_overdue ? 'text-red-600 font-medium' : 'text-slate-600'"
+                                                        >
+                                                            {{ task.due_human }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
+                                                        <Link :href="route('tickets.show', task.id)">
+                                                            <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:bg-slate-100 hover:text-slate-900 font-medium">
+                                                                Buka
+                                                            </Button>
+                                                        </Link>
+                                                    </TableCell>
+                                                </TableRow>
+                                            </template>
+                                            <TableRow v-else>
+                                                <TableCell colspan="6" class="h-32 text-center text-xs text-slate-400">
+                                                    <div class="flex flex-col items-center justify-center py-4">
+                                                        <CheckCircle2 class="w-7 h-7 text-slate-300 mb-1.5 stroke-[1.5]" />
+                                                        <p class="font-medium text-slate-700">Tidak ada tugas aktif di lapangan</p>
+                                                        <p class="text-slate-400 text-[11px] mt-0.5">Seluruh tiket penugasan Anda saat ini telah tertangani.</p>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <!-- Right Column: Ulasan Kepuasan OPD -->
+                    <div class="lg:col-span-4 space-y-6">
+                        <Card class="border-slate-200 shadow-sm">
+                            <CardHeader class="pb-3 border-b border-slate-100">
+                                <div class="flex items-center justify-between">
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Ulasan Kepuasan OPD</CardTitle>
+                                    <span v-if="stats.avg_rating && stats.avg_rating > 0" class="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                        ⭐ {{ stats.avg_rating }} / 5.0
+                                    </span>
+                                </div>
+                                <CardDescription class="text-xs text-slate-500 mt-0.5">Penilaian dari pelapor setelah tiket diselesaikan</CardDescription>
+                            </CardHeader>
+                            <CardContent class="pt-3 pb-2 px-4 sm:px-5">
+                                <div v-if="recentFeedbacks && recentFeedbacks.length > 0" class="divide-y divide-slate-100">
+                                    <div 
+                                        v-for="fb in recentFeedbacks" 
+                                        :key="fb.id" 
+                                        class="py-3.5 first:pt-0 last:pb-0"
+                                    >
+                                        <!-- Rating Stars & Time -->
+                                        <div class="flex items-center justify-between gap-1">
+                                            <div class="flex items-center gap-1">
+                                                <Star 
+                                                    v-for="i in 5" 
+                                                    :key="i" 
+                                                    class="w-3.5 h-3.5" 
+                                                    :class="i <= fb.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200 fill-slate-100'"
+                                                />
+                                                <span class="text-xs font-semibold text-slate-800 ml-1">{{ fb.rating }}.0</span>
+                                            </div>
+                                            <span class="text-[11px] text-slate-400">{{ fb.rated_at_diff }}</span>
+                                        </div>
+
+                                        <!-- Feedback Comment (Formal Quote) -->
+                                        <div v-if="fb.feedback_comment" class="mt-2 text-xs text-slate-700 border-l-2 border-slate-300 pl-2.5 py-0.5 italic leading-relaxed">
+                                            "{{ fb.feedback_comment }}"
+                                        </div>
+                                        <div v-else class="mt-1 text-[11px] text-slate-400 italic">
+                                            (Tidak menyertakan catatan tertulis)
+                                        </div>
+
+                                        <!-- Meta Info: Department & Ticket Number -->
+                                        <div class="flex items-center justify-between gap-2 mt-2 text-[11px] text-slate-500">
+                                            <span class="font-medium text-slate-700 truncate max-w-[170px]" :title="fb.department_name">
+                                                {{ fb.department_name }}
+                                            </span>
+                                            <Link :href="route('tickets.show', fb.id)" class="font-mono text-slate-500 hover:text-blue-600 hover:underline shrink-0">
+                                                {{ fb.ticket_number }}
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else class="text-center py-8 text-xs text-slate-400">
+                                    <div class="flex flex-col items-center justify-center">
+                                        <Star class="w-6 h-6 text-slate-300 mb-1.5 stroke-[1.5]" />
+                                        <p class="font-medium text-slate-600">Belum ada ulasan</p>
+                                        <p class="text-slate-400 text-[11px] mt-0.5">Ulasan dari OPD akan tampil di sini setelah tiket diselesaikan.</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </template>
 
             <!-- ================= ADMIN DASHBOARD ================= -->
