@@ -13,6 +13,7 @@
         "laravel/reverb": "^1.11",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
+        "phpoffice/phpspreadsheet": "^5.9",
         "pusher/pusher-php-server": "*",
         "tightenco/ziggy": "^2.0"
     },

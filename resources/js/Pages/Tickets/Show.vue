@@ -648,18 +648,21 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <!-- Kanan: Action Buttons (Selalu Flex & Ukuran Konsisten) -->
-                <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
+                <!-- Kanan: Action Buttons (Selalu Flex, Overflow Visible agar Animasi Bebas) -->
+                <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap overflow-visible py-1">
                     <!-- Tombol Diskusi & Riwayat -->
                     <Button 
                         @click="isDrawerOpen = true" 
                         size="sm" 
                         variant="outline" 
-                        class="h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs sm:text-sm font-medium relative whitespace-nowrap"
+                        class="h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs sm:text-sm font-medium relative overflow-visible whitespace-nowrap"
                     >
                         <MessageSquare class="w-4 h-4 mr-1.5 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
-                        <span v-if="unreadRepliesCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs animate-bounce">
+                        <span 
+                            v-if="unreadRepliesCount > 0" 
+                            class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs animate-bounce z-20 pointer-events-none"
+                        >
                             {{ unreadRepliesCount }}
                         </span>
                     </Button>
