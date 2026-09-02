@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
 import { Button } from '@/components/ui/button';
@@ -113,16 +112,82 @@ const formatDate = (dateStr: string) => {
     }) + ' WITA';
 };
 
-const getRoleBadgeInfo = (userRole: string) => {
+// Text color helpers (Clean formal typography without bg badge)
+const getStatusLabel = (status: string) => {
+    switch (status) {
+        case 'pending_admin': return 'Menunggu Verifikasi';
+        case 'in_progress': return 'Sedang Dikerjakan';
+        case 'pending_approval': return 'Menunggu Review';
+        case 'closed': return 'Selesai';
+        case 'cancelled': return 'Ditolak';
+        default: return status || '-';
+    }
+};
+
+const getStatusColor = (status: string) => {
+    switch (status) {
+        case 'pending_admin': return 'text-blue-600 font-semibold';
+        case 'in_progress': return 'text-amber-600 font-semibold';
+        case 'pending_approval': return 'text-purple-600 font-semibold';
+        case 'closed': return 'text-emerald-600 font-semibold';
+        case 'cancelled': return 'text-rose-600 font-semibold';
+        default: return 'text-slate-600 font-semibold';
+    }
+};
+
+const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+        case 'low': return 'Rendah';
+        case 'medium': return 'Sedang';
+        case 'high': return 'Tinggi';
+        case 'emergency': return 'Darurat';
+        default: return priority || '-';
+    }
+};
+
+const getPriorityColor = (priority: string) => {
+    switch (priority) {
+        case 'low': return 'text-slate-500 font-semibold';
+        case 'medium': return 'text-blue-600 font-semibold';
+        case 'high': return 'text-amber-600 font-semibold';
+        case 'emergency': return 'text-rose-600 font-semibold';
+        default: return 'text-slate-600 font-semibold';
+    }
+};
+
+const getNetworkLabel = (type: string) => {
+    switch (type) {
+        case 'fiber_optic': return 'Fiber Optic';
+        case 'lan': return 'LAN';
+        case 'wifi': return 'WiFi';
+        default: return type || '-';
+    }
+};
+
+const getNetworkColor = (type: string) => {
+    switch (type) {
+        case 'fiber_optic': return 'text-purple-600 font-semibold';
+        case 'lan': return 'text-cyan-600 font-semibold';
+        case 'wifi': return 'text-sky-600 font-semibold';
+        default: return 'text-slate-600 font-semibold';
+    }
+};
+
+const getRoleLabel = (userRole: string) => {
     switch (userRole) {
-        case 'admin':
-            return { label: 'Administrator', badgeClass: 'bg-blue-100 text-kominfo-primary border-blue-200' };
-        case 'technician':
-            return { label: 'Teknisi', badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
-        case 'opd_user':
-            return { label: 'Pelapor OPD', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
-        default:
-            return { label: userRole || 'User', badgeClass: 'bg-slate-100 text-slate-700 border-slate-200' };
+        case 'admin': return 'Administrator';
+        case 'technician': return 'Teknisi';
+        case 'opd_user': return 'Pelapor OPD';
+        default: return userRole || 'User';
+    }
+};
+
+const getRoleColor = (userRole: string) => {
+    switch (userRole) {
+        case 'admin': return 'text-purple-600 font-semibold';
+        case 'technician': return 'text-amber-600 font-semibold';
+        case 'opd_user': return 'text-blue-600 font-semibold';
+        default: return 'text-slate-600 font-semibold';
     }
 };
 
@@ -560,52 +625,103 @@ onUnmounted(() => {
     <AuthenticatedLayout>
         <div class="max-w-6xl mx-auto space-y-5">
             
-            <!-- Unified Sticky Action Header -->
-            <div class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="flex flex-wrap items-center gap-3">
-                    <Link :href="route('tickets.index')" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors" title="Kembali ke Antrean">
-                        <ArrowLeft class="w-5 h-5" />
+            <!-- Ticket Action Bar (Formal, Rapi, Dimensi Stabil) -->
+            <div class="bg-white rounded-xl border border-slate-200 px-4 sm:px-6 py-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
+                <!-- Kiri: Tombol Kembali + Nomor Tiket + Status -->
+                <div class="flex items-center gap-3 min-w-0">
+                    <Link 
+                        :href="route('tickets.index')" 
+                        class="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 transition-colors shrink-0" 
+                        title="Kembali ke Antrean"
+                    >
+                        <ArrowLeft class="w-4 h-4" />
                     </Link>
-                    <span class="text-xl sm:text-2xl font-bold text-slate-900 font-mono tracking-tight">{{ ticket.ticket_number }}</span>
-                    <StatusBadge type="ticket" :status="ticket.status" class="text-sm px-3 py-1" />
+                    <div class="flex items-center gap-2.5 min-w-0 flex-wrap">
+                        <span class="text-lg sm:text-xl font-bold text-slate-900 font-mono tracking-tight shrink-0">{{ ticket.ticket_number }}</span>
+                        <span class="text-slate-300 font-light hidden sm:inline">•</span>
+                        <div class="flex items-center gap-1.5 text-xs sm:text-sm shrink-0">
+                            <span class="text-slate-400 font-medium">Status:</span>
+                            <span :class="getStatusColor(ticket.status)">
+                                {{ getStatusLabel(ticket.status) }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Action Buttons Container -->
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <Button @click="isDrawerOpen = true" size="default" variant="outline" class="border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium relative">
-                        <MessageSquare class="w-4 h-4 mr-2 text-kominfo-primary" />
+                <!-- Kanan: Action Buttons (Selalu Flex & Ukuran Konsisten) -->
+                <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
+                    <!-- Tombol Diskusi & Riwayat -->
+                    <Button 
+                        @click="isDrawerOpen = true" 
+                        size="sm" 
+                        variant="outline" 
+                        class="h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs sm:text-sm font-medium relative whitespace-nowrap"
+                    >
+                        <MessageSquare class="w-4 h-4 mr-1.5 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
-                        <span v-if="unreadRepliesCount > 0" class="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs animate-bounce">
+                        <span v-if="unreadRepliesCount > 0" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs animate-bounce">
                             {{ unreadRepliesCount }}
                         </span>
                     </Button>
 
                     <!-- Admin Actions: Pending Admin -->
-                    <Button v-if="canVerifyAndAssign" @click="isVerifyModalOpen = true" size="default" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-sm font-medium">
-                        <ShieldCheck class="w-4 h-4 mr-2" /> Verifikasi & Tugaskan
+                    <Button 
+                        v-if="canVerifyAndAssign" 
+                        @click="isVerifyModalOpen = true" 
+                        size="sm" 
+                        class="h-9 px-3.5 bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <ShieldCheck class="w-4 h-4 mr-1.5" /> Verifikasi & Tugaskan
                     </Button>
 
-                    <Button v-if="canReject" @click="isRejectModalOpen = true" size="default" variant="destructive" class="text-sm font-medium">
-                        <XCircle class="w-4 h-4 mr-2" /> Tolak Laporan
+                    <Button 
+                        v-if="canReject" 
+                        @click="isRejectModalOpen = true" 
+                        size="sm" 
+                        variant="destructive" 
+                        class="h-9 px-3.5 text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <XCircle class="w-4 h-4 mr-1.5" /> Tolak Laporan
                     </Button>
 
                     <!-- Technician Action: In Progress -->
-                    <Button v-if="canSubmitResolution" @click="isResolutionModalOpen = true" size="default" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">
-                        <CheckCircle2 class="w-4 h-4 mr-2" /> Selesaikan Perbaikan
+                    <Button 
+                        v-if="canSubmitResolution" 
+                        @click="isResolutionModalOpen = true" 
+                        size="sm" 
+                        class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <CheckCircle2 class="w-4 h-4 mr-1.5" /> Selesaikan Perbaikan
                     </Button>
 
                     <!-- Admin Actions: Pending Approval (Quality Gate) -->
-                    <Button v-if="canApproveResolution" @click="isApproveModalOpen = true" size="default" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium">
-                        <CheckCircle2 class="w-4 h-4 mr-2" /> Setujui Hasil Kerja
+                    <Button 
+                        v-if="canApproveResolution" 
+                        @click="isApproveModalOpen = true" 
+                        size="sm" 
+                        class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <CheckCircle2 class="w-4 h-4 mr-1.5" /> Setujui Hasil Kerja
                     </Button>
 
-                    <Button v-if="canRequestRevision" @click="isRevisionModalOpen = true" size="default" variant="outline" class="border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-sm font-medium">
-                        <RotateCcw class="w-4 h-4 mr-2 text-amber-700" /> Minta Revisi
+                    <Button 
+                        v-if="canRequestRevision" 
+                        @click="isRevisionModalOpen = true" 
+                        size="sm" 
+                        variant="outline" 
+                        class="h-9 px-3.5 border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <RotateCcw class="w-4 h-4 mr-1.5 text-amber-700" /> Minta Revisi
                     </Button>
 
                     <!-- OPD Action: Resubmit on Cancelled (within 72 hours) -->
-                    <Button v-if="canResubmit" @click="isResubmitModalOpen = true" size="default" class="bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium">
-                        <RotateCcw class="w-4 h-4 mr-2" /> Perbaiki & Ajukan Kembali
+                    <Button 
+                        v-if="canResubmit" 
+                        @click="isResubmitModalOpen = true" 
+                        size="sm" 
+                        class="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <RotateCcw class="w-4 h-4 mr-1.5" /> Perbaiki & Ajukan Kembali
                     </Button>
                 </div>
             </div>
@@ -659,83 +775,116 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Main Ticket Card -->
+            <!-- Main Ticket Docket Card -->
             <Card class="border-slate-200 shadow-xs bg-white overflow-hidden rounded-xl">
-                <!-- Header: Title & Tags -->
-                <div class="p-6 sm:p-7 border-b border-slate-100 bg-slate-50/50">
-                    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                        <div class="space-y-3">
-                            <div class="flex flex-wrap items-center gap-2.5">
-                                <StatusBadge v-if="ticket.priority" type="priority" :status="ticket.priority" class="text-xs px-2.5 py-0.5" />
-                                <StatusBadge v-if="ticket.network_type" type="network" :status="ticket.network_type" class="text-xs px-2.5 py-0.5" />
-                                <span v-if="ticket.category" class="text-xs sm:text-sm px-3 py-1 rounded-full bg-white border border-slate-200 font-semibold text-slate-700 shadow-2xs">
-                                    {{ ticket.category.name }}
-                                </span>
+                <!-- Header Kartu: Judul Kendala -->
+                <div class="p-6 sm:p-7 border-b border-slate-100 bg-slate-50/40">
+                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+                        {{ ticket.title }}
+                    </h1>
+                </div>
+
+                <!-- Main Content Body -->
+                <CardContent class="p-6 sm:p-7 space-y-8">
+                    <!-- SEKSI 1: INFORMASI PENGADUAN KENDALA (Pelapor OPD) -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <FileText class="w-4 h-4 text-slate-400" /> Informasi Pengaduan Kendala
+                        </h3>
+
+                        <!-- Grid Data Pengaduan -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Instansi (OPD)</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.department.name }}</p>
                             </div>
-                            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight leading-snug">
-                                {{ ticket.title }}
-                            </h1>
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lokasi / Ruangan</p>
+                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ ticket.location_details || '-' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nama Pelapor</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.reporter.name }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Pengajuan</p>
+                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ formatDate(ticket.created_at) }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Rincian Deskripsi Masalah -->
+                        <div>
+                            <p class="text-xs font-semibold text-slate-700 mb-1.5">Deskripsi Gangguan:</p>
+                            <div class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-slate-200">
+                                {{ ticket.description }}
+                            </div>
+                        </div>
+
+                        <!-- Foto Bukti Gangguan Awal -->
+                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0" class="mt-4">
+                            <p class="text-xs font-semibold text-slate-700 mb-2.5">Foto Bukti Gangguan Awal:</p>
+                            <div class="flex flex-wrap gap-3">
+                                <button 
+                                    type="button"
+                                    v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
+                                    :key="att.id"
+                                    @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
+                                    class="flex items-center gap-3 px-3.5 py-2.5 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/40 bg-white text-xs text-slate-800 transition-all shadow-xs group cursor-pointer"
+                                >
+                                    <div class="w-8 h-8 rounded bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
+                                        <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
+                                    </div>
+                                    <span class="truncate max-w-[200px] font-medium group-hover:text-blue-600">{{ att.file_name }}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Metadata Grid -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-6 pt-6 border-t border-slate-200 text-sm">
-                        <!-- OPD & Location -->
-                        <div class="flex items-start gap-3">
-                            <div class="p-2 rounded-lg bg-blue-50 text-kominfo-primary shrink-0 mt-0.5 border border-blue-100">
-                                <Building2 class="w-4 h-4" />
-                            </div>
-                            <div>
-                                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Instansi & Lokasi</p>
-                                <p class="font-bold text-slate-900 text-sm sm:text-base mt-0.5">{{ ticket.department.name }}</p>
-                                <p class="text-slate-600 text-xs sm:text-sm mt-0.5">{{ ticket.location_details }}</p>
-                            </div>
-                        </div>
+                    <!-- SEKSI 2: DISPOSISI & SPESIFIKASI TEKNIS (Diskominfo) -->
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <Shield class="w-4 h-4 text-slate-400" /> Disposisi & Parameter Penanganan Teknis
+                        </h3>
 
-                        <!-- Reporter & Report Date -->
-                        <div class="flex items-start gap-3">
-                            <div class="p-2 rounded-lg bg-slate-100 text-slate-600 shrink-0 mt-0.5 border border-slate-200">
-                                <User class="w-4 h-4" />
-                            </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80">
                             <div>
-                                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Pelapor & Tanggal</p>
-                                <p class="font-bold text-slate-900 text-sm sm:text-base mt-0.5">{{ ticket.reporter.name }}</p>
-                                <p class="text-slate-600 text-xs sm:text-sm mt-0.5">{{ formatDate(ticket.created_at) }}</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur & Kategori</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">
+                                    {{ ticket.network_type ? getNetworkLabel(ticket.network_type) : '-' }}
+                                </p>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    {{ ticket.category ? ticket.category.name : 'Belum diverifikasi' }}
+                                </p>
                             </div>
-                        </div>
 
-                        <!-- SLA Deadline -->
-                        <div class="flex items-start gap-3">
-                            <div class="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0 mt-0.5 border border-amber-100">
-                                <Clock class="w-4 h-4" />
-                            </div>
                             <div>
-                                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Target SLA</p>
-                                <p class="font-bold text-slate-900 text-sm sm:text-base mt-0.5">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tingkat Prioritas</p>
+                                <p class="text-sm mt-0.5 font-bold" :class="getPriorityColor(ticket.priority)">
+                                    {{ getPriorityLabel(ticket.priority) }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Target Waktu SLA</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">
                                     {{ ticket.due_at ? formatDate(ticket.due_at) : '-' }}
                                 </p>
                                 <p 
                                     v-if="getSlaStatus(ticket)" 
-                                    class="text-xs sm:text-sm mt-0.5 font-medium flex items-center gap-1"
+                                    class="text-xs mt-0.5 font-medium"
                                     :class="getSlaStatus(ticket)?.textColor"
                                 >
                                     {{ getSlaStatus(ticket)?.label }}
                                 </p>
                             </div>
-                        </div>
 
-                        <!-- Assigned Multi-Technicians -->
-                        <div class="flex items-start gap-3">
-                            <div class="p-2 rounded-lg bg-emerald-50 text-emerald-600 shrink-0 mt-0.5 border border-emerald-100">
-                                <Users class="w-4 h-4" />
-                            </div>
                             <div>
-                                <p class="text-slate-400 text-xs uppercase font-bold tracking-wider">Tim Teknisi</p>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tim Teknisi Lapangan</p>
                                 <div v-if="ticket.technicians && ticket.technicians.length > 0" class="flex flex-wrap gap-1.5 mt-1">
                                     <span 
                                         v-for="tech in ticket.technicians" 
                                         :key="tech.id"
-                                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                        class="text-xs font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded"
                                     >
                                         {{ tech.name }}
                                     </span>
@@ -743,157 +892,132 @@ onUnmounted(() => {
                                 <div v-else-if="ticket.assignee" class="mt-0.5">
                                     <p class="font-bold text-slate-900 text-sm">{{ ticket.assignee.name }}</p>
                                 </div>
-                                <span v-else class="inline-block mt-1 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-md text-xs font-medium">
+                                <p v-else class="text-xs text-slate-400 italic mt-0.5">
                                     Belum ditugaskan
-                                </span>
+                                </p>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Main Content Body -->
-                <CardContent class="p-6 sm:p-7 space-y-7">
-                    <!-- Issue Description -->
-                    <div>
-                        <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-2">
-                            <FileText class="w-4 h-4 text-slate-400" /> Deskripsi Gangguan
+                    <!-- SEKSI 3: CATATAN SOLUSI & BUKTI PERBAIKAN (Jika ada) -->
+                    <div v-if="ticket.resolution_note">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <CheckCircle2 class="w-4 h-4 text-slate-400" /> Hasil Penanganan & Solusi Teknis
                         </h3>
-                        <div class="text-slate-800 text-sm sm:text-base leading-relaxed whitespace-pre-wrap bg-slate-50/80 p-5 rounded-xl border border-slate-200">
-                            {{ ticket.description }}
-                        </div>
-                    </div>
 
-                    <!-- Initial Problem Proof Attachments -->
-                    <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0">
-                        <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
-                            <Paperclip class="w-4 h-4 text-slate-400" /> Foto Bukti Gangguan Awal
-                        </h3>
-                        <div class="flex flex-wrap gap-3">
-                            <button 
-                                type="button"
-                                v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
-                                :key="att.id"
-                                @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                class="flex items-center gap-3 px-4 py-3 border border-slate-200 rounded-xl hover:border-kominfo-primary hover:bg-blue-50/50 bg-white text-xs sm:text-sm text-slate-800 transition-all shadow-xs group cursor-pointer"
-                            >
-                                <div class="w-9 h-9 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
-                                    <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
-                                </div>
-                                <span class="truncate max-w-[220px] font-semibold group-hover:text-kominfo-primary">{{ att.file_name }}</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Technician Resolution Card (If submitted) -->
-                    <div v-if="ticket.resolution_note" class="p-6 sm:p-7 bg-emerald-50/80 border border-emerald-200 rounded-2xl space-y-4 shadow-xs">
-                        <div class="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-emerald-200/80">
-                            <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-2">
-                                <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
-                                    <CheckCircle2 class="w-5 h-5" />
-                                </span>
-                                Catatan Solusi Perbaikan Teknisi
-                            </h3>
-                            <span v-if="ticket.resolved_at" class="text-xs sm:text-sm text-emerald-900 font-semibold bg-emerald-100 px-3 py-1 rounded-lg">
-                                Diselesaikan: {{ formatDate(ticket.resolved_at) }}
-                            </span>
+                        <!-- Grid Data Penyelesaian -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status Pengerjaan</p>
+                                <p class="font-bold text-emerald-600 text-sm mt-0.5">Selesai Ditangani</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Penyelesaian</p>
+                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</p>
+                            </div>
                         </div>
 
-                        <div class="text-sm sm:text-base text-emerald-950 leading-relaxed whitespace-pre-wrap font-normal">
-                            {{ ticket.resolution_note }}
+                        <!-- Rincian Solusi Teknis -->
+                        <div>
+                            <p class="text-xs font-semibold text-slate-700 mb-1.5">Tindakan Solusi Teknis:</p>
+                            <div class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-slate-200">
+                                {{ ticket.resolution_note }}
+                            </div>
                         </div>
 
-                        <!-- Resolution Proof Photos -->
-                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0" class="pt-3 border-t border-emerald-200">
-                            <p class="text-xs font-bold uppercase tracking-wider text-emerald-900 mb-3">Foto Bukti Perbaikan</p>
+                        <!-- Foto Bukti Solusi Perbaikan -->
+                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0" class="mt-4">
+                            <p class="text-xs font-semibold text-slate-700 mb-2.5">Foto Bukti Hasil Perbaikan:</p>
                             <div class="flex flex-wrap gap-3">
                                 <button 
                                     type="button"
                                     v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
                                     :key="att.id"
                                     @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                    class="flex items-center gap-3 px-4 py-3 bg-white border border-emerald-300 rounded-xl text-xs sm:text-sm text-emerald-950 hover:bg-emerald-50 hover:border-emerald-400 transition-all cursor-pointer shadow-xs group"
+                                    class="flex items-center gap-3 px-3.5 py-2.5 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50/40 bg-white text-xs text-slate-800 transition-all shadow-xs group cursor-pointer"
                                 >
-                                    <div class="w-9 h-9 rounded-lg bg-emerald-100 overflow-hidden shrink-0 flex items-center justify-center border border-emerald-200">
+                                    <div class="w-8 h-8 rounded bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
                                         <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
                                     </div>
-                                    <span class="truncate max-w-[200px] font-semibold group-hover:text-emerald-700">{{ att.file_name }}</span>
+                                    <span class="truncate max-w-[200px] font-medium group-hover:text-emerald-700">{{ att.file_name }}</span>
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- CSAT Rating & Feedback Section (For Closed Ticket) -->
-                    <div v-if="ticket.status === 'closed'" class="border border-amber-200 bg-amber-50/60 rounded-2xl p-6 sm:p-7 space-y-4">
-                        <div class="flex items-center justify-between flex-wrap gap-2 border-b border-amber-200 pb-3">
-                            <h3 class="text-sm font-bold uppercase tracking-wider text-amber-950 flex items-center gap-2">
-                                <Star class="w-5 h-5 text-amber-500 fill-amber-500" />
-                                Evaluasi & Penilaian Layanan (CSAT)
-                            </h3>
-                            <span v-if="ticket.rated_at" class="text-xs text-amber-800 font-medium">
-                                Dinilai pada: {{ formatDate(ticket.rated_at) }}
-                            </span>
-                        </div>
+                    <!-- SEKSI 4: EVALUASI KEPUASAN LAYANAN (CSAT) (Bila status Closed) -->
+                    <div v-if="ticket.status === 'closed'">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                            <Star class="w-4 h-4 text-slate-400" /> Evaluasi Kepuasan Layanan (CSAT)
+                        </h3>
 
-                        <!-- If already rated: Display result -->
-                        <div v-if="ticket.rating" class="space-y-3">
-                            <div class="flex items-center gap-1.5">
-                                <Star 
-                                    v-for="star in 5" 
-                                    :key="star" 
-                                    class="w-6 h-6"
-                                    :class="star <= ticket.rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
-                                />
-                                <span class="ml-2 font-bold text-slate-800 text-base">({{ ticket.rating }} / 5 Bintang)</span>
+                        <!-- If already rated -->
+                        <div v-if="ticket.rating" class="p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 space-y-3">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-1.5">
+                                    <Star 
+                                        v-for="star in 5" 
+                                        :key="star" 
+                                        class="w-5 h-5"
+                                        :class="star <= ticket.rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
+                                    />
+                                    <span class="ml-2 font-bold text-slate-800 text-sm">({{ ticket.rating }} / 5 Bintang)</span>
+                                </div>
+                                <span v-if="ticket.rated_at" class="text-xs text-slate-400">
+                                    Dinilai pada: {{ formatDate(ticket.rated_at) }}
+                                </span>
                             </div>
-                            <p v-if="ticket.feedback_comment" class="text-sm text-slate-700 italic bg-white p-3.5 rounded-lg border border-amber-200">
+                            <p v-if="ticket.feedback_comment" class="text-sm text-slate-700 italic bg-white p-3.5 rounded-lg border border-slate-200">
                                 "{{ ticket.feedback_comment }}"
                             </p>
                         </div>
 
-                        <!-- If not rated yet and user is OPD reporter: Interactive Rating Form -->
-                        <form v-else-if="canRate" @submit.prevent="submitRating" class="space-y-4">
-                            <p class="text-xs sm:text-sm text-amber-900 leading-relaxed">
-                                Mohon berikan penilaian atas kecepatan dan kualitas layanan perbaikan tim teknisi Diskominfo Palu:
-                            </p>
+                        <!-- If not rated yet and user can rate -->
+                        <div v-else-if="canRate" class="p-5 rounded-lg bg-slate-50/60 border border-slate-200/80">
+                            <form @submit.prevent="submitRating" class="space-y-4">
+                                <p class="text-xs text-slate-700 leading-relaxed">
+                                    Mohon berikan penilaian atas kecepatan dan kualitas layanan perbaikan tim teknisi Diskominfo Palu:
+                                </p>
 
-                            <!-- Interactive Star Selection -->
-                            <div class="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    v-for="star in 5"
-                                    :key="star"
-                                    @mouseenter="ratingHover = star"
-                                    @mouseleave="ratingHover = 0"
-                                    @click="ratingForm.rating = star"
-                                    class="p-1 hover:scale-110 transition-transform focus:outline-none cursor-pointer"
-                                >
-                                    <Star 
-                                        class="w-8 h-8 transition-colors"
-                                        :class="(ratingHover ? star <= ratingHover : star <= ratingForm.rating) ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
+                                <!-- Interactive Star Selection -->
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        v-for="star in 5"
+                                        :key="star"
+                                        @mouseenter="ratingHover = star"
+                                        @mouseleave="ratingHover = 0"
+                                        @click="ratingForm.rating = star"
+                                        class="p-1 hover:scale-110 transition-transform focus:outline-none cursor-pointer"
+                                    >
+                                        <Star 
+                                            class="w-7 h-7 transition-colors"
+                                            :class="(ratingHover ? star <= ratingHover : star <= ratingForm.rating) ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
+                                        />
+                                    </button>
+                                    <span class="font-bold text-slate-800 text-sm ml-2">
+                                        {{ ratingForm.rating }} Bintang
+                                    </span>
+                                </div>
+
+                                <div>
+                                    <InputLabel for="feedback_comment" value="Ulasan atau Catatan Tambahan (Opsional)" class="text-slate-700 text-xs font-medium" />
+                                    <Textarea 
+                                        id="feedback_comment"
+                                        v-model="ratingForm.feedback_comment"
+                                        placeholder="Tuliskan pengalaman atau saran Anda terhadap penanganan tiket ini..."
+                                        rows="2"
+                                        class="bg-white mt-1 text-sm border-slate-200"
                                     />
-                                </button>
-                                <span class="font-bold text-amber-950 text-sm ml-2">
-                                    {{ ratingForm.rating }} Bintang
-                                </span>
-                            </div>
+                                </div>
 
-                            <div>
-                                <InputLabel for="feedback_comment" value="Ulasan atau Catatan Tambahan (Opsional)" class="text-amber-950 text-xs font-medium" />
-                                <Textarea 
-                                    id="feedback_comment"
-                                    v-model="ratingForm.feedback_comment"
-                                    placeholder="Tuliskan pengalaman atau saran Anda terhadap penanganan tiket ini..."
-                                    rows="2"
-                                    class="bg-white mt-1 text-sm border-amber-200"
-                                />
-                            </div>
+                                <Button type="submit" :disabled="ratingForm.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs font-semibold">
+                                    {{ ratingForm.processing ? 'Menyimpan...' : 'Kirim Penilaian Kepuasan' }}
+                                </Button>
+                            </form>
+                        </div>
 
-                            <Button type="submit" :disabled="ratingForm.processing" class="bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-semibold">
-                                {{ ratingForm.processing ? 'Menyimpan...' : 'Kirim Penilaian Kepuasan' }}
-                            </Button>
-                        </form>
-
-                        <div v-else class="text-xs text-slate-500 italic">
+                        <div v-else class="text-xs text-slate-400 italic">
                             Penilaian belum diberikan oleh pihak pelapor OPD.
                         </div>
                     </div>
@@ -1394,16 +1518,18 @@ onUnmounted(() => {
                                                     {{ reply.user.name }}
                                                 </span>
 
+                                                <span class="text-slate-300 font-light">•</span>
+
                                                 <span 
-                                                    class="inline-flex items-center text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border shadow-2xs shrink-0"
-                                                    :class="getRoleBadgeInfo(reply.user.role).badgeClass"
+                                                    class="text-xs font-semibold"
+                                                    :class="getRoleColor(reply.user.role)"
                                                 >
-                                                    {{ getRoleBadgeInfo(reply.user.role).label }}
+                                                    {{ getRoleLabel(reply.user.role) }}
                                                 </span>
 
                                                 <span 
                                                     v-if="Number(reply.user_id) === Number(currentUser.id)" 
-                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-kominfo-primary border border-blue-200 shrink-0"
+                                                    class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
                                                 >
                                                     Anda
                                                 </span>
@@ -1557,7 +1683,9 @@ onUnmounted(() => {
                                 <div class="absolute w-3 h-3 bg-kominfo-primary rounded-full -left-[7px] top-1 border-2 border-white"></div>
                                 <div class="space-y-1.5">
                                     <div class="flex items-center gap-2.5">
-                                        <StatusBadge type="ticket" :status="history.new_status" class="text-xs" />
+                                        <span :class="getStatusColor(history.new_status)" class="text-xs font-semibold">
+                                            {{ getStatusLabel(history.new_status) }}
+                                        </span>
                                         <span class="text-xs text-slate-400 font-mono">{{ formatDate(history.created_at) }}</span>
                                     </div>
                                     <p class="text-sm text-slate-800 leading-relaxed font-normal">{{ history.comment }}</p>

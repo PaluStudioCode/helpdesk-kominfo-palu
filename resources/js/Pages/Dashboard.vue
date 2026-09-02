@@ -340,10 +340,10 @@ const getNetworkColor = (type: string) => {
 
 const getPriorityLabel = (priority: string) => {
     switch (priority) {
-        case 'low': return 'Low';
-        case 'medium': return 'Med';
-        case 'high': return 'High';
-        case 'emergency': return 'Emerg';
+        case 'low': return 'Rendah';
+        case 'medium': return 'Sedang';
+        case 'high': return 'Tinggi';
+        case 'emergency': return 'Darurat';
         default: return priority || '-';
     }
 };
@@ -966,36 +966,36 @@ const lineChartOptions = {
                         </div>
                     </CardHeader>
                     <CardContent class="pt-4 pb-2 px-4 sm:px-6">
-                        <div v-if="recentActivities && recentActivities.length > 0" class="space-y-3.5">
+                        <div v-if="recentActivities && recentActivities.length > 0" class="divide-y divide-slate-100">
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="py-3.5 first:pt-0 last:pb-0"
                             >
                                 <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                        <span class="text-slate-300">•</span>
-                                        <span :class="getRoleColor(act.user_role)">
+                                        <span class="font-semibold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300 font-light">•</span>
+                                        <span :class="getRoleColor(act.user_role)" class="font-medium">
                                             {{ getRoleLabel(act.user_role) }}
                                         </span>
-                                        <span class="text-slate-300">•</span>
+                                        <span class="text-slate-300 font-light">•</span>
                                         <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
                                             {{ act.ticket_number }}
                                         </Link>
                                     </div>
-                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                    <span class="text-[11px] text-slate-400 font-normal whitespace-nowrap">
                                         {{ act.created_at_diff }}
                                     </span>
                                 </div>
 
-                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                    {{ act.comment }}
-                                </p>
+                                <div v-if="act.comment" class="mt-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-md text-xs text-slate-600 leading-relaxed italic">
+                                    "{{ act.comment }}"
+                                </div>
 
-                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                <div class="flex items-center gap-2 mt-2 text-[11px]">
                                     <span class="text-slate-400">Status:</span>
-                                    <span :class="getStatusColor(act.new_status)">
+                                    <span :class="getStatusColor(act.new_status)" class="font-semibold">
                                         {{ getStatusLabel(act.new_status) }}
                                     </span>
                                 </div>
@@ -1137,40 +1137,40 @@ const lineChartOptions = {
                         </div>
                     </CardHeader>
                     <CardContent class="pt-4 pb-2 px-4 sm:px-6">
-                        <div v-if="recentActivities && recentActivities.length > 0" class="space-y-3.5">
+                        <div v-if="recentActivities && recentActivities.length > 0" class="divide-y divide-slate-100">
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="py-3.5 first:pt-0 last:pb-0"
                             >
                                 <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                        <span class="text-slate-300">•</span>
-                                        <span :class="getRoleColor(act.user_role)">
+                                        <span class="font-semibold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300 font-light">•</span>
+                                        <span :class="getRoleColor(act.user_role)" class="font-medium">
                                             {{ getRoleLabel(act.user_role) }}
                                         </span>
-                                        <span class="text-slate-300">•</span>
+                                        <span class="text-slate-300 font-light">•</span>
                                         <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-amber-600 hover:underline font-medium">
                                             {{ act.ticket_number }}
                                         </Link>
                                     </div>
-                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                    <span class="text-[11px] text-slate-400 font-normal whitespace-nowrap">
                                         {{ act.created_at_diff }}
                                     </span>
                                 </div>
 
-                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                    {{ act.comment }}
-                                </p>
+                                <div v-if="act.comment" class="mt-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-md text-xs text-slate-600 leading-relaxed italic">
+                                    "{{ act.comment }}"
+                                </div>
 
-                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                <div class="flex items-center gap-2 mt-2 text-[11px]">
                                     <span class="text-slate-400">Status:</span>
-                                    <span :class="getStatusColor(act.new_status)">
+                                    <span :class="getStatusColor(act.new_status)" class="font-semibold">
                                         {{ getStatusLabel(act.new_status) }}
                                     </span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300 font-light">•</span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 font-medium truncate">
                                         {{ act.department_name }}
                                     </span>
                                 </div>
@@ -1499,40 +1499,40 @@ const lineChartOptions = {
                         </div>
                     </CardHeader>
                     <CardContent class="pt-4 pb-2 px-4 sm:px-6">
-                        <div v-if="recentActivities && recentActivities.length > 0" class="space-y-3.5">
+                        <div v-if="recentActivities && recentActivities.length > 0" class="divide-y divide-slate-100">
                             <div 
                                 v-for="act in recentActivities" 
                                 :key="act.id" 
-                                class="pb-3.5 border-b border-slate-100 last:border-0 last:pb-0"
+                                class="py-3.5 first:pt-0 last:pb-0"
                             >
                                 <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-bold text-slate-900">{{ act.user_name }}</span>
-                                        <span class="text-slate-300">•</span>
-                                        <span :class="getRoleColor(act.user_role)">
+                                        <span class="font-semibold text-slate-900">{{ act.user_name }}</span>
+                                        <span class="text-slate-300 font-light">•</span>
+                                        <span :class="getRoleColor(act.user_role)" class="font-medium">
                                             {{ getRoleLabel(act.user_role) }}
                                         </span>
-                                        <span class="text-slate-300">•</span>
+                                        <span class="text-slate-300 font-light">•</span>
                                         <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
                                             {{ act.ticket_number }}
                                         </Link>
                                     </div>
-                                    <span class="text-[11px] text-slate-400 whitespace-nowrap">
+                                    <span class="text-[11px] text-slate-400 font-normal whitespace-nowrap">
                                         {{ act.created_at_diff }}
                                     </span>
                                 </div>
 
-                                <p v-if="act.comment" class="text-xs text-slate-600 mt-1 leading-relaxed">
-                                    {{ act.comment }}
-                                </p>
+                                <div v-if="act.comment" class="mt-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-md text-xs text-slate-600 leading-relaxed italic">
+                                    "{{ act.comment }}"
+                                </div>
 
-                                <div class="flex items-center gap-2 mt-1.5 text-[11px]">
+                                <div class="flex items-center gap-2 mt-2 text-[11px]">
                                     <span class="text-slate-400">Status:</span>
-                                    <span :class="getStatusColor(act.new_status)">
+                                    <span :class="getStatusColor(act.new_status)" class="font-semibold">
                                         {{ getStatusLabel(act.new_status) }}
                                     </span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300">|</span>
-                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 truncate">
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-300 font-light">•</span>
+                                    <span v-if="act.department_name && act.department_name !== '-'" class="text-slate-500 font-medium truncate">
                                         {{ act.department_name }}
                                     </span>
                                 </div>
