@@ -169,6 +169,38 @@ const formPreset = ref(props.selectedPreset || '30d');
 const formStartDate = ref(props.startDate || '');
 const formEndDate = ref(props.endDate || '');
 
+const selectPreset = (preset: '7d' | '30d' | 'this_month') => {
+    formPreset.value = preset;
+    const today = new Date();
+    const formatDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+    
+    if (preset === '7d') {
+        const start = new Date();
+        start.setDate(today.getDate() - 6);
+        formStartDate.value = formatDate(start);
+        formEndDate.value = formatDate(today);
+    } else if (preset === '30d') {
+        const start = new Date();
+        start.setDate(today.getDate() - 29);
+        formStartDate.value = formatDate(start);
+        formEndDate.value = formatDate(today);
+    } else if (preset === 'this_month') {
+        const start = new Date(today.getFullYear(), today.getMonth(), 1);
+        const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        formStartDate.value = formatDate(start);
+        formEndDate.value = formatDate(end);
+    }
+};
+
+const onCustomDateInput = () => {
+    formPreset.value = 'custom';
+};
+
 watch(() => [props.filterType, props.selectedYear, props.selectedMonth, props.selectedPreset, props.startDate, props.endDate], () => {
     activeTab.value = props.filterType === 'range' ? 'range' : 'year_month';
     formYear.value = props.selectedYear || '2025';
@@ -183,7 +215,23 @@ const activeFilterLabel = computed(() => {
         if (props.selectedPreset === '7d') return '7 Hari Terakhir';
         if (props.selectedPreset === '30d') return '30 Hari Terakhir';
         if (props.selectedPreset === 'this_month') return 'Bulan Ini';
-        if (props.startDate && props.endDate) return `${props.startDate} s/d ${props.endDate}`;
+        if (props.startDate && props.endDate) {
+            const formatShort = (dateStr: string) => {
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    const shortMonths: Record<string, string> = {
+                        '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+                        '05': 'Mei', '06': 'Jun', '07': 'Jul', '08': 'Agu',
+                        '09': 'Sep', '10': 'Okt', '11': 'Nov', '12': 'Des'
+                    };
+                    const d = parseInt(parts[2], 10);
+                    const m = shortMonths[parts[1]] || parts[1];
+                    return `${d} ${m} ${parts[0]}`;
+                }
+                return dateStr;
+            };
+            return `${formatShort(props.startDate)} - ${formatShort(props.endDate)}`;
+        }
         return 'Rentang Tanggal';
     }
     
@@ -212,24 +260,22 @@ const applyYearMonthFilter = () => {
     }, { preserveState: true, preserveScroll: true });
 };
 
-const applyPresetRange = (preset: '7d' | '30d' | 'this_month') => {
+const applyRangeFilter = () => {
     isFilterOpen.value = false;
-    formPreset.value = preset;
-    router.get(route('dashboard'), {
-        filter_type: 'range',
-        preset: preset,
-    }, { preserveState: true, preserveScroll: true });
-};
-
-const applyCustomRange = () => {
-    if (!formStartDate.value || !formEndDate.value) return;
-    isFilterOpen.value = false;
-    router.get(route('dashboard'), {
-        filter_type: 'range',
-        preset: 'custom',
-        start_date: formStartDate.value,
-        end_date: formEndDate.value,
-    }, { preserveState: true, preserveScroll: true });
+    if (formPreset.value && formPreset.value !== 'custom') {
+        router.get(route('dashboard'), {
+            filter_type: 'range',
+            preset: formPreset.value,
+        }, { preserveState: true, preserveScroll: true });
+    } else {
+        if (!formStartDate.value || !formEndDate.value) return;
+        router.get(route('dashboard'), {
+            filter_type: 'range',
+            preset: 'custom',
+            start_date: formStartDate.value,
+            end_date: formEndDate.value,
+        }, { preserveState: true, preserveScroll: true });
+    }
 };
 
 const resetFilter = () => {
@@ -244,7 +290,10 @@ const resetFilter = () => {
 };
 
 const handleClickOutside = (e: MouseEvent) => {
-    if (filterDropdownRef.value && !filterDropdownRef.value.contains(e.target as Node)) {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+
+    if (filterDropdownRef.value && !filterDropdownRef.value.contains(target)) {
         isFilterOpen.value = false;
     }
 };
@@ -602,18 +651,18 @@ const lineChartOptions = {
                         Ringkasan metrik operasional layanan helpdesk jaringan dan efisiensi kinerja penanganan.
                     </p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2.5">
+                <div class="flex items-center gap-2.5 shrink-0 flex-nowrap">
                     <!-- Unified Period Filter Selector (for Admin) -->
-                    <div v-if="role === 'admin'" class="relative" ref="filterDropdownRef">
+                    <div v-if="role === 'admin'" class="relative shrink-0" ref="filterDropdownRef">
                         <Button 
                             variant="outline" 
                             size="sm" 
-                            class="h-9 text-xs bg-white hover:bg-slate-50 border-slate-200 shadow-none font-medium flex items-center gap-1.5"
+                            class="h-9 text-xs bg-white hover:bg-slate-50 border-slate-200 shadow-none font-medium flex items-center gap-1.5 whitespace-nowrap shrink-0"
                             @click="isFilterOpen = !isFilterOpen"
                         >
-                            <Calendar class="w-3.5 h-3.5 text-blue-600" />
-                            <span>{{ activeFilterLabel }}</span>
-                            <SlidersHorizontal class="w-3 h-3 ml-1 text-slate-400" />
+                            <Calendar class="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            <span class="whitespace-nowrap">{{ activeFilterLabel }}</span>
+                            <SlidersHorizontal class="w-3 h-3 ml-1 text-slate-400 shrink-0" />
                         </Button>
 
                         <!-- Dropdown Panel -->
@@ -646,41 +695,38 @@ const lineChartOptions = {
                                 <div class="grid grid-cols-2 gap-2">
                                     <div>
                                         <label class="text-[11px] font-medium text-slate-500 block mb-1">Tahun</label>
-                                        <Select v-model="formYear">
-                                            <SelectTrigger class="h-8 text-xs bg-white">
-                                                <SelectValue placeholder="Pilih Tahun" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem v-for="yr in availableYears" :key="yr" :value="yr">
-                                                    {{ yr }}
-                                                </SelectItem>
-                                                <SelectItem value="all">Semua Tahun</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <select 
+                                            v-model="formYear"
+                                            class="w-full h-8 text-xs bg-white border border-slate-200 rounded-md px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
+                                        >
+                                            <option v-for="yr in availableYears" :key="yr" :value="yr">
+                                                {{ yr }}
+                                            </option>
+                                            <option value="all">Semua Tahun</option>
+                                        </select>
                                     </div>
 
                                     <div>
                                         <label class="text-[11px] font-medium text-slate-500 block mb-1">Bulan</label>
-                                        <Select v-model="formMonth" :disabled="formYear === 'all'">
-                                            <SelectTrigger class="h-8 text-xs bg-white">
-                                                <SelectValue placeholder="Semua Bulan" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">Semua Bulan</SelectItem>
-                                                <SelectItem value="01">Januari</SelectItem>
-                                                <SelectItem value="02">Februari</SelectItem>
-                                                <SelectItem value="03">Maret</SelectItem>
-                                                <SelectItem value="04">April</SelectItem>
-                                                <SelectItem value="05">Mei</SelectItem>
-                                                <SelectItem value="06">Juni</SelectItem>
-                                                <SelectItem value="07">Juli</SelectItem>
-                                                <SelectItem value="08">Agustus</SelectItem>
-                                                <SelectItem value="09">September</SelectItem>
-                                                <SelectItem value="10">Oktober</SelectItem>
-                                                <SelectItem value="11">November</SelectItem>
-                                                <SelectItem value="12">Desember</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <select 
+                                            v-model="formMonth" 
+                                            :disabled="formYear === 'all'"
+                                            class="w-full h-8 text-xs bg-white border border-slate-200 rounded-md px-2 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer disabled:bg-slate-50 disabled:text-slate-400"
+                                        >
+                                            <option value="all">Semua Bulan</option>
+                                            <option value="01">Januari</option>
+                                            <option value="02">Februari</option>
+                                            <option value="03">Maret</option>
+                                            <option value="04">April</option>
+                                            <option value="05">Mei</option>
+                                            <option value="06">Juni</option>
+                                            <option value="07">Juli</option>
+                                            <option value="08">Agustus</option>
+                                            <option value="09">September</option>
+                                            <option value="10">Oktober</option>
+                                            <option value="11">November</option>
+                                            <option value="12">Desember</option>
+                                        </select>
                                     </div>
                                 </div>
 
@@ -705,25 +751,25 @@ const lineChartOptions = {
                                     <div class="grid grid-cols-3 gap-1.5">
                                         <button 
                                             type="button" 
-                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors font-medium"
                                             :class="formPreset === '7d' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
-                                            @click="applyPresetRange('7d')"
+                                            @click="selectPreset('7d')"
                                         >
                                             7 Hari
                                         </button>
                                         <button 
                                             type="button" 
-                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors font-medium"
                                             :class="formPreset === '30d' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
-                                            @click="applyPresetRange('30d')"
+                                            @click="selectPreset('30d')"
                                         >
                                             30 Hari
                                         </button>
                                         <button 
                                             type="button" 
-                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors"
+                                            class="px-2 py-1.5 rounded-lg border text-xs text-center transition-colors font-medium"
                                             :class="formPreset === 'this_month' ? 'bg-blue-50 border-blue-200 text-blue-700 font-semibold' : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'"
-                                            @click="applyPresetRange('this_month')"
+                                            @click="selectPreset('this_month')"
                                         >
                                             Bulan Ini
                                         </button>
@@ -738,6 +784,7 @@ const lineChartOptions = {
                                             <input 
                                                 type="date" 
                                                 v-model="formStartDate" 
+                                                @input="onCustomDateInput"
                                                 class="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             />
                                         </div>
@@ -746,6 +793,7 @@ const lineChartOptions = {
                                             <input 
                                                 type="date" 
                                                 v-model="formEndDate" 
+                                                @input="onCustomDateInput"
                                                 class="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                                             />
                                         </div>
@@ -764,7 +812,7 @@ const lineChartOptions = {
                                         size="sm" 
                                         class="h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white" 
                                         :disabled="!formStartDate || !formEndDate"
-                                        @click="applyCustomRange"
+                                        @click="applyRangeFilter"
                                     >
                                         Terapkan Rentang
                                     </Button>
@@ -774,8 +822,8 @@ const lineChartOptions = {
                     </div>
 
                     <!-- Lihat Semua Tiket Button -->
-                    <Link :href="route('tickets.index')">
-                        <Button variant="outline" size="sm" class="h-9 text-xs">
+                    <Link :href="route('tickets.index')" class="shrink-0">
+                        <Button variant="outline" size="sm" class="h-9 text-xs whitespace-nowrap">
                             Lihat Semua Tiket <ArrowRight class="w-3.5 h-3.5 ml-1.5" />
                         </Button>
                     </Link>
