@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { Head, router, Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DataTable from '@/Components/DataTable.vue';
-import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -147,27 +146,52 @@ const handlePage = (page: number) => {
 
 const columns = [
     { key: 'ticket_number', label: 'No. Tiket', sortable: true },
-    { key: 'title', label: 'Subjek', sortable: false },
-    { key: 'department', label: 'OPD / Instansi', sortable: false },
-    { key: 'technicians', label: 'Tim Teknisi', sortable: false },
+    { key: 'title', label: 'Judul Masalah', sortable: false },
+    { key: 'department', label: 'Instansi (OPD)', sortable: false },
+    { key: 'priority', label: 'Prioritas', sortable: true },
     { key: 'status', label: 'Status', sortable: true },
-    { key: 'sla_status', label: 'SLA', sortable: false },
 ];
 
-const getSlaStatus = (ticket: any) => {
-    if (ticket.status === 'closed') {
-        return { status: 'completed', label: 'Selesai' };
+const getStatusLabel = (status: string) => {
+    switch (status) {
+        case 'pending_admin': return 'Menunggu Verifikasi';
+        case 'in_progress': return 'Sedang Dikerjakan';
+        case 'pending_approval': return 'Menunggu Review';
+        case 'closed': return 'Selesai';
+        case 'cancelled': return 'Ditolak';
+        default: return status || '-';
     }
+};
 
-    if (!ticket.due_at || ['cancelled', 'pending_admin'].includes(ticket.status)) return null;
-    
-    const now = new Date();
-    const dueAt = new Date(ticket.due_at);
-    const diffHours = (dueAt.getTime() - now.getTime()) / (1000 * 60 * 60);
+const getStatusColor = (status: string) => {
+    switch (status) {
+        case 'pending_admin': return 'text-blue-600 font-semibold';
+        case 'in_progress': return 'text-amber-600 font-semibold';
+        case 'pending_approval': return 'text-purple-600 font-semibold';
+        case 'closed': return 'text-emerald-600 font-semibold';
+        case 'cancelled': return 'text-rose-600 font-semibold';
+        default: return 'text-slate-600 font-medium';
+    }
+};
 
-    if (diffHours < 0) return { status: 'danger', label: 'Overdue' };
-    if (diffHours <= 2) return { status: 'warning', label: 'Mendekati SLA' };
-    return { status: 'safe', label: 'Aman' };
+const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+        case 'emergency': return 'Darurat';
+        case 'high': return 'Tinggi';
+        case 'medium': return 'Sedang';
+        case 'low': return 'Rendah';
+        default: return priority || '-';
+    }
+};
+
+const getPriorityColor = (priority: string) => {
+    switch (priority) {
+        case 'emergency': return 'text-rose-600 font-semibold';
+        case 'high': return 'text-amber-600 font-semibold';
+        case 'medium': return 'text-blue-600 font-semibold';
+        case 'low': return 'text-slate-500 font-medium';
+        default: return 'text-slate-600 font-medium';
+    }
 };
 
 const formatDate = (dateStr: string) => {
@@ -220,8 +244,6 @@ const formatDate = (dateStr: string) => {
                                 <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
                                 <SelectItem value="closed">Selesai</SelectItem>
                                 <SelectItem value="cancelled">Ditolak</SelectItem>
-                                <SelectItem value="mendekati_sla">Mendekati SLA</SelectItem>
-                                <SelectItem value="overdue">Overdue SLA</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -246,53 +268,44 @@ const formatDate = (dateStr: string) => {
                 </template>
 
                 <template #cell-ticket_number="{ item }">
-                    <div class="font-medium text-slate-900 font-mono text-xs sm:text-sm">{{ item.ticket_number }}</div>
-                    <div class="text-[11px] text-slate-500">{{ formatDate(item.created_at) }}</div>
+                    <Link :href="route('tickets.show', item.id)" class="group block">
+                        <div class="font-medium text-blue-600 font-mono text-xs sm:text-sm group-hover:underline">
+                            {{ item.ticket_number }}
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">{{ formatDate(item.created_at) }}</div>
+                    </Link>
                 </template>
 
                 <template #cell-title="{ item }">
-                    <div class="font-medium text-slate-900 text-xs sm:text-sm truncate max-w-[180px] sm:max-w-xs" :title="item.title">{{ item.title }}</div>
-                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                        <StatusBadge v-if="item.network_type" type="network" :status="item.network_type" />
-                        <StatusBadge v-if="item.priority" type="priority" :status="item.priority" />
-                    </div>
+                    <Link :href="route('tickets.show', item.id)" class="block group">
+                        <span class="font-medium text-slate-900 text-xs sm:text-sm group-hover:text-blue-600 transition-colors line-clamp-1" :title="item.title">
+                            {{ item.title }}
+                        </span>
+                    </Link>
                 </template>
 
                 <template #cell-department="{ item }">
-                    <span class="text-xs sm:text-sm text-slate-700 font-medium">{{ item.department.name }}</span>
+                    <span class="text-xs sm:text-sm text-slate-700 font-medium">
+                        {{ item.department ? item.department.name : '-' }}
+                    </span>
                 </template>
 
-                <template #cell-technicians="{ item }">
-                    <div v-if="item.technicians && item.technicians.length > 0" class="flex flex-wrap gap-1 max-w-[160px]">
-                        <span 
-                            v-for="tech in item.technicians" 
-                            :key="tech.id"
-                            class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
-                        >
-                            {{ tech.name }}
-                        </span>
-                    </div>
-                    <span v-else-if="item.assignee" class="text-xs text-slate-700 font-medium">
-                        {{ item.assignee.name }}
-                    </span>
-                    <span v-else class="text-xs text-slate-400 italic">
-                        -
+                <template #cell-priority="{ item }">
+                    <span :class="getPriorityColor(item.priority)" class="text-xs sm:text-sm">
+                        {{ getPriorityLabel(item.priority) }}
                     </span>
                 </template>
 
                 <template #cell-status="{ item }">
-                    <StatusBadge type="ticket" :status="item.status" />
-                </template>
-
-                <template #cell-sla_status="{ item }">
-                    <StatusBadge v-if="getSlaStatus(item)" type="sla" :status="getSlaStatus(item).status" />
-                    <span v-else class="text-xs text-slate-400">-</span>
+                    <span :class="getStatusColor(item.status)" class="text-xs sm:text-sm">
+                        {{ getStatusLabel(item.status) }}
+                    </span>
                 </template>
 
                 <template #actions-cell="{ item }">
                     <Link :href="route('tickets.show', item.id)">
-                        <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-kominfo-primary hover:bg-blue-50/50">
-                            <Eye class="w-3.5 h-3.5 mr-1" /> Detail
+                        <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
+                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
                         </Button>
                     </Link>
                 </template>

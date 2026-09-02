@@ -898,12 +898,11 @@ const lineChartOptions = {
                             <Table>
                                 <TableHeader class="bg-slate-50/75">
                                     <TableRow class="hover:bg-transparent">
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[140px] pl-4 sm:pl-6">No. Tiket</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul & Masalah</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Jaringan</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[160px] pl-4 sm:pl-6">No. Tiket</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul Masalah</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Status</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Waktu</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -913,25 +912,20 @@ const lineChartOptions = {
                                             :key="ticket.id"
                                             class="hover:bg-slate-50/80 transition-colors"
                                         >
-                                            <TableCell class="py-3 text-xs font-semibold text-blue-600 font-mono pl-4 sm:pl-6">
-                                                <Link :href="route('tickets.show', ticket.id)" class="hover:underline">
-                                                    {{ ticket.ticket_number }}
+                                            <TableCell class="py-3 pl-4 sm:pl-6">
+                                                <Link :href="route('tickets.show', ticket.id)" class="group block">
+                                                    <div class="text-xs font-semibold text-blue-600 font-mono group-hover:underline">
+                                                        {{ ticket.ticket_number }}
+                                                    </div>
+                                                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ticket.created_at }}</div>
                                                 </Link>
                                             </TableCell>
                                             <TableCell class="py-3">
                                                 <Link :href="route('tickets.show', ticket.id)" class="block group">
-                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1" :title="ticket.title">
                                                         {{ ticket.title }}
                                                     </span>
-                                                    <span class="text-[11px] text-slate-400 block truncate mt-0.5">
-                                                        {{ ticket.category_name }}
-                                                    </span>
                                                 </Link>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getNetworkColor(ticket.network_type)">
-                                                    {{ getNetworkLabel(ticket.network_type) }}
-                                                </span>
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-center">
                                                 <span :class="getPriorityColor(ticket.priority)">
@@ -943,14 +937,17 @@ const lineChartOptions = {
                                                     {{ getStatusLabel(ticket.status) }}
                                                 </span>
                                             </TableCell>
-                                            <TableCell class="py-3 text-xs text-right whitespace-nowrap pr-4 sm:pr-6">
-                                                <span class="text-slate-700 block font-medium">{{ ticket.created_at_diff }}</span>
-                                                <span class="text-[10px] text-slate-400 block">{{ ticket.created_at }}</span>
+                                            <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
+                                                <Link :href="route('tickets.show', ticket.id)">
+                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
+                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
+                                                    </Button>
+                                                </Link>
                                             </TableCell>
                                         </TableRow>
                                     </template>
                                     <TableRow v-else>
-                                        <TableCell colspan="6" class="h-28 text-center text-xs text-slate-400">
+                                        <TableCell colspan="5" class="h-28 text-center text-xs text-slate-400">
                                             Belum ada riwayat tiket terbaru saat ini.
                                         </TableCell>
                                     </TableRow>
@@ -1068,13 +1065,12 @@ const lineChartOptions = {
                             <Table>
                                 <TableHeader class="bg-slate-50/75">
                                     <TableRow class="hover:bg-transparent">
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[140px] pl-4 sm:pl-6">No. Tiket</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul & Masalah</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[160px] pl-4 sm:pl-6">No. Tiket</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul Masalah</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10">Instansi (OPD)</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Jaringan</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Status</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Waktu</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1084,29 +1080,23 @@ const lineChartOptions = {
                                             :key="ticket.id"
                                             class="hover:bg-slate-50/80 transition-colors"
                                         >
-                                            <TableCell class="py-3 text-xs font-semibold text-amber-600 font-mono pl-4 sm:pl-6">
-                                                <Link :href="route('tickets.show', ticket.id)" class="hover:underline">
-                                                    {{ ticket.ticket_number }}
+                                            <TableCell class="py-3 pl-4 sm:pl-6">
+                                                <Link :href="route('tickets.show', ticket.id)" class="group block">
+                                                    <div class="text-xs font-semibold text-amber-600 font-mono group-hover:underline">
+                                                        {{ ticket.ticket_number }}
+                                                    </div>
+                                                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ticket.created_at }}</div>
                                                 </Link>
                                             </TableCell>
                                             <TableCell class="py-3">
                                                 <Link :href="route('tickets.show', ticket.id)" class="block group">
-                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-amber-600 transition-colors line-clamp-1">
+                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-amber-600 transition-colors line-clamp-1" :title="ticket.title">
                                                         {{ ticket.title }}
-                                                    </span>
-                                                    <span class="text-[11px] text-slate-400 block truncate mt-0.5">
-                                                        {{ ticket.category_name }}
                                                     </span>
                                                 </Link>
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-slate-700">
                                                 <span class="font-medium text-slate-900 block truncate max-w-[180px]">{{ ticket.department_name }}</span>
-                                                <span class="text-[10px] text-slate-400 uppercase font-mono">{{ ticket.reporter_name }}</span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getNetworkColor(ticket.network_type)">
-                                                    {{ getNetworkLabel(ticket.network_type) }}
-                                                </span>
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-center">
                                                 <span :class="getPriorityColor(ticket.priority)">
@@ -1118,14 +1108,17 @@ const lineChartOptions = {
                                                     {{ getStatusLabel(ticket.status) }}
                                                 </span>
                                             </TableCell>
-                                            <TableCell class="py-3 text-xs text-right whitespace-nowrap pr-4 sm:pr-6">
-                                                <span class="text-slate-700 block font-medium">{{ ticket.created_at_diff }}</span>
-                                                <span class="text-[10px] text-slate-400 block">{{ ticket.created_at }}</span>
+                                            <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
+                                                <Link :href="route('tickets.show', ticket.id)">
+                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-amber-500 hover:bg-amber-50/50">
+                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
+                                                    </Button>
+                                                </Link>
                                             </TableCell>
                                         </TableRow>
                                     </template>
                                     <TableRow v-else>
-                                        <TableCell colspan="7" class="h-28 text-center text-xs text-slate-400">
+                                        <TableCell colspan="6" class="h-28 text-center text-xs text-slate-400">
                                             Belum ada tiket tugas aktif saat ini.
                                         </TableCell>
                                     </TableRow>
@@ -1434,13 +1427,12 @@ const lineChartOptions = {
                             <Table>
                                 <TableHeader class="bg-slate-50/75">
                                     <TableRow class="hover:bg-transparent">
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[140px] pl-4 sm:pl-6">No. Tiket</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul & Masalah</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[160px] pl-4 sm:pl-6">No. Tiket</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul Masalah</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10">Instansi (OPD)</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Jaringan</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
                                         <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Status</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Waktu</TableHead>
+                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1450,29 +1442,23 @@ const lineChartOptions = {
                                             :key="ticket.id"
                                             class="hover:bg-slate-50/80 transition-colors"
                                         >
-                                            <TableCell class="py-3 text-xs font-semibold text-blue-600 font-mono pl-4 sm:pl-6">
-                                                <Link :href="route('tickets.show', ticket.id)" class="hover:underline">
-                                                    {{ ticket.ticket_number }}
+                                            <TableCell class="py-3 pl-4 sm:pl-6">
+                                                <Link :href="route('tickets.show', ticket.id)" class="group block">
+                                                    <div class="text-xs font-semibold text-blue-600 font-mono group-hover:underline">
+                                                        {{ ticket.ticket_number }}
+                                                    </div>
+                                                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ticket.created_at }}</div>
                                                 </Link>
                                             </TableCell>
                                             <TableCell class="py-3">
                                                 <Link :href="route('tickets.show', ticket.id)" class="block group">
-                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1" :title="ticket.title">
                                                         {{ ticket.title }}
-                                                    </span>
-                                                    <span class="text-[11px] text-slate-400 block truncate mt-0.5">
-                                                        {{ ticket.category_name }}
                                                     </span>
                                                 </Link>
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-slate-700">
                                                 <span class="font-medium text-slate-900 block truncate max-w-[180px]">{{ ticket.department_name }}</span>
-                                                <span class="text-[10px] text-slate-400 uppercase font-mono">{{ ticket.reporter_name }}</span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getNetworkColor(ticket.network_type)">
-                                                    {{ getNetworkLabel(ticket.network_type) }}
-                                                </span>
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-center">
                                                 <span :class="getPriorityColor(ticket.priority)">
@@ -1484,14 +1470,17 @@ const lineChartOptions = {
                                                     {{ getStatusLabel(ticket.status) }}
                                                 </span>
                                             </TableCell>
-                                            <TableCell class="py-3 text-xs text-right whitespace-nowrap pr-4 sm:pr-6">
-                                                <span class="text-slate-700 block font-medium">{{ ticket.created_at_diff }}</span>
-                                                <span class="text-[10px] text-slate-400 block">{{ ticket.created_at }}</span>
+                                            <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
+                                                <Link :href="route('tickets.show', ticket.id)">
+                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
+                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
+                                                    </Button>
+                                                </Link>
                                             </TableCell>
                                         </TableRow>
                                     </template>
                                     <TableRow v-else>
-                                        <TableCell colspan="7" class="h-28 text-center text-xs text-slate-400">
+                                        <TableCell colspan="6" class="h-28 text-center text-xs text-slate-400">
                                             Belum ada riwayat tiket terbaru saat ini.
                                         </TableCell>
                                     </TableRow>
