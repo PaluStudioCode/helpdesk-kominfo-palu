@@ -1,9 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, usePage, Link, router } from '@inertiajs/vue3';
+import { Head, usePage, Link, router, useForm } from '@inertiajs/vue3';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import InputLabel from '@/Components/InputLabel.vue';
+import InputError from '@/Components/InputError.vue';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import FileUpload from '@/Components/FileUpload.vue';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableHeader,
@@ -38,6 +51,13 @@ import {
   Eye,
   Star,
   MapPin,
+  Plus,
+  PlusCircle,
+  Headphones,
+  PhoneCall,
+  MessageSquare,
+  Info,
+  ExternalLink,
 } from 'lucide-vue-next';
 
 // Chart.js & vue-chartjs Integration
@@ -100,6 +120,7 @@ interface RecentTicket {
     department_code: string;
     reporter_name: string;
     category_name: string;
+    technicians_label?: string;
     network_type: string;
     priority: string;
     status: string;
@@ -198,6 +219,30 @@ const props = withDefaults(defineProps<{
 
 const user = computed(() => usePage().props.auth.user as any);
 const role = computed(() => user.value?.role);
+
+// OPD Create Ticket Modal & Form State
+const isCreateModalOpen = ref(false);
+const opdCreateForm = useForm({
+    title: '',
+    location_details: '',
+    description: '',
+    attachments: [] as File[],
+});
+
+const openCreateTicketModal = () => {
+    opdCreateForm.reset();
+    opdCreateForm.clearErrors();
+    isCreateModalOpen.value = true;
+};
+
+const submitCreateTicket = () => {
+    opdCreateForm.post(route('tickets.store'), {
+        onSuccess: () => {
+            isCreateModalOpen.value = false;
+            opdCreateForm.reset();
+        }
+    });
+};
 
 // Unified Period Filter Controller
 const isFilterOpen = ref(false);
@@ -1012,18 +1057,21 @@ const techResolutionChartOptions = computed(() => ({
 
             <!-- ================= OPD USER DASHBOARD ================= -->
             <template v-if="role === 'opd_user'">
+                <!-- 1. 4 SUMMARY STATS CARDS -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card class="border-blue-200 bg-blue-50/40">
+                    <!-- 1. Laporan Sedang Diproses -->
+                    <Card class="border-amber-200 bg-amber-50/40">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-xs sm:text-sm font-semibold text-blue-900">Laporan Diproses</CardTitle>
-                            <Activity class="h-4 w-4 text-blue-600" />
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-amber-900">Sedang Diproses</CardTitle>
+                            <Clock class="h-4 w-4 text-amber-600" />
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-blue-950">{{ stats.in_process || 0 }}</div>
-                            <p class="text-xs text-blue-700 mt-1">Sedang diverifikasi atau ditangani tim</p>
+                            <div class="text-2xl font-bold text-amber-950">{{ stats.in_process || 0 }}</div>
+                            <p class="text-xs text-amber-700 mt-1">Aktif ditangani tim Kominfo</p>
                         </CardContent>
                     </Card>
                     
+                    <!-- 2. Laporan Selesai -->
                     <Card class="border-emerald-200 bg-emerald-50/40">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle class="text-xs sm:text-sm font-semibold text-emerald-900">Laporan Selesai</CardTitle>
@@ -1031,22 +1079,24 @@ const techResolutionChartOptions = computed(() => ({
                         </CardHeader>
                         <CardContent>
                             <div class="text-2xl font-bold text-emerald-950">{{ stats.closed_tickets || 0 }}</div>
-                            <p class="text-xs text-emerald-700 mt-1">Perbaikan selesai & ditutup resmi</p>
+                            <p class="text-xs text-emerald-700 mt-1">Kendala tuntas diperbaiki</p>
                         </CardContent>
                     </Card>
 
-                    <Card class="border-rose-200 bg-rose-50/40">
+                    <!-- 3. Menunggu Penilaian / Rating -->
+                    <Card class="border-yellow-200 bg-amber-50/30">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle class="text-xs sm:text-sm font-semibold text-rose-900">Perlu Perbaikan</CardTitle>
-                            <AlertTriangle class="h-4 w-4 text-rose-600" />
+                            <CardTitle class="text-xs sm:text-sm font-semibold text-amber-900">Menunggu Penilaian</CardTitle>
+                            <Star class="h-4 w-4 text-amber-500 fill-amber-400" />
                         </CardHeader>
                         <CardContent>
-                            <div class="text-2xl font-bold text-rose-950">{{ stats.needs_fix || 0 }}</div>
-                            <p class="text-xs text-rose-700 mt-1">Ditolak & dalam batas 72 jam</p>
+                            <div class="text-2xl font-bold text-amber-950">{{ stats.pending_rating || 0 }}</div>
+                            <p class="text-xs text-amber-700 mt-1">Tiket selesai belum dinilai</p>
                         </CardContent>
                     </Card>
                     
-                    <Card>
+                    <!-- 4. Total Seluruh Laporan -->
+                    <Card class="border-slate-200 bg-slate-50/50 shadow-sm">
                         <CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle class="text-xs sm:text-sm font-semibold text-slate-700">Total Seluruh Laporan</CardTitle>
                             <Ticket class="h-4 w-4 text-slate-500" />
@@ -1058,134 +1108,280 @@ const techResolutionChartOptions = computed(() => ({
                     </Card>
                 </div>
 
-                <!-- Tiket Terbaru (OPD) -->
-                <Card class="border-slate-200 shadow-sm mt-6">
-                    <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <Ticket class="w-4 h-4 text-blue-600" />
-                            <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Tiket Terbaru Instansi</CardTitle>
+                <!-- 2. PENDING RATING NOTICE BANNER (CONDITIONAL) -->
+                <div 
+                    v-if="stats.pending_rating && stats.pending_rating > 0" 
+                    class="p-4 rounded-xl border border-amber-200 bg-amber-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs"
+                >
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                            <Star class="w-5 h-5 text-amber-600 fill-amber-400" />
                         </div>
                         <div>
-                            <Link :href="route('tickets.index')">
-                                <Button variant="ghost" size="sm" class="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium">
-                                    Lihat Semua Tiket <ArrowRight class="w-3.5 h-3.5 ml-1" />
-                                </Button>
-                            </Link>
+                            <h4 class="text-xs sm:text-sm font-bold text-amber-950">Penilaian Kepuasan Layanan</h4>
+                            <p class="text-xs text-amber-800 mt-0.5">
+                                Terdapat <strong>{{ stats.pending_rating }} tiket</strong> yang telah selesai diperbaiki. Mohon berikan penilaian bintang & ulasan terhadap kinerja teknisi Kominfo.
+                            </p>
                         </div>
-                    </CardHeader>
-                    <CardContent class="p-0">
-                        <div class="overflow-x-auto">
-                            <Table>
-                                <TableHeader class="bg-slate-50/75">
-                                    <TableRow class="hover:bg-transparent">
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[160px] pl-4 sm:pl-6">No. Tiket</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10">Judul Masalah</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Prioritas</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-center">Status</TableHead>
-                                        <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    <template v-if="recentTickets && recentTickets.length > 0">
-                                        <TableRow 
-                                            v-for="ticket in recentTickets" 
-                                            :key="ticket.id"
-                                            class="hover:bg-slate-50/80 transition-colors"
-                                        >
-                                            <TableCell class="py-3 pl-4 sm:pl-6">
-                                                <Link :href="route('tickets.show', ticket.id)" class="group block">
-                                                    <div class="text-xs font-semibold text-blue-600 font-mono group-hover:underline">
-                                                        {{ ticket.ticket_number }}
-                                                    </div>
-                                                    <div class="text-[11px] text-slate-400 mt-0.5">{{ ticket.created_at }}</div>
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell class="py-3">
-                                                <Link :href="route('tickets.show', ticket.id)" class="block group">
-                                                    <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1" :title="ticket.title">
-                                                        {{ ticket.title }}
-                                                    </span>
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getPriorityColor(ticket.priority)">
-                                                    {{ getPriorityLabel(ticket.priority) }}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-center">
-                                                <span :class="getStatusColor(ticket.status)">
-                                                    {{ getStatusLabel(ticket.status) }}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
-                                                <Link :href="route('tickets.show', ticket.id)">
-                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
-                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
-                                                    </Button>
-                                                </Link>
-                                            </TableCell>
-                                        </TableRow>
-                                    </template>
-                                    <TableRow v-else>
-                                        <TableCell colspan="5" class="h-28 text-center text-xs text-slate-400">
-                                            Belum ada riwayat tiket terbaru saat ini.
-                                        </TableCell>
-                                    </TableRow>
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                    <Link :href="route('tickets.index', { status: 'closed' })" class="shrink-0 w-full sm:w-auto">
+                        <Button size="sm" class="w-full sm:w-auto text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold h-8 px-3">
+                            Beri Ulasan Sekarang <ArrowRight class="w-3.5 h-3.5 ml-1.5" />
+                        </Button>
+                    </Link>
+                </div>
 
-                <!-- Aktivitas Terbaru (OPD) -->
-                <Card class="border-slate-200 shadow-sm mt-6">
-                    <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
-                        <div class="flex items-center gap-2">
-                            <Activity class="w-4 h-4 text-emerald-600" />
-                            <CardTitle class="text-sm sm:text-base font-bold text-slate-900">Aktivitas Terbaru</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="pt-4 pb-2 px-4 sm:px-6">
-                        <div v-if="recentActivities && recentActivities.length > 0" class="divide-y divide-slate-100">
-                            <div 
-                                v-for="act in recentActivities" 
-                                :key="act.id" 
-                                class="py-3.5 first:pt-0 last:pb-0"
-                            >
-                                <div class="flex flex-wrap items-center justify-between gap-1 text-xs">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-semibold text-slate-900">{{ act.user_name }}</span>
-                                        <span class="text-slate-300 font-light">•</span>
-                                        <span :class="getRoleColor(act.user_role)" class="font-medium">
-                                            {{ getRoleLabel(act.user_role) }}
-                                        </span>
-                                        <span class="text-slate-300 font-light">•</span>
-                                        <Link :href="route('tickets.show', act.ticket_id)" class="font-mono text-blue-600 hover:underline font-medium">
-                                            {{ act.ticket_number }}
-                                        </Link>
-                                    </div>
-                                    <span class="text-[11px] text-slate-400 font-normal whitespace-nowrap">
-                                        {{ act.created_at_diff }}
+                <!-- 3. MAIN 2-COLUMN GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    <!-- LEFT COLUMN (8 Cols): QUICK ACTION & RECENT TICKETS TABLE -->
+                    <div class="lg:col-span-8 space-y-6">
+                        <!-- Quick Action Card -->
+                        <div class="p-4 sm:p-5 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-blue-50/40 to-indigo-50/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800">
+                                        Aksi Cepat
                                     </span>
+                                    <h3 class="text-sm sm:text-base font-bold text-slate-900">
+                                        Mengalami Gangguan Jaringan / Internet?
+                                    </h3>
                                 </div>
-
-                                <div v-if="act.comment" class="mt-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-md text-xs text-slate-600 leading-relaxed italic">
-                                    "{{ act.comment }}"
-                                </div>
-
-                                <div class="flex items-center gap-2 mt-2 text-[11px]">
-                                    <span class="text-slate-400">Status:</span>
-                                    <span :class="getStatusColor(act.new_status)" class="font-semibold">
-                                        {{ getStatusLabel(act.new_status) }}
-                                    </span>
-                                </div>
+                                <p class="text-xs text-slate-600 leading-relaxed max-w-xl">
+                                    Laporkan kendala teknis (Fiber Optic, LAN, WiFi) kantor Anda secara langsung ke tim teknisi Diskominfo Palu untuk segera diverifikasi dan ditangani di lokasi.
+                                </p>
                             </div>
+                            <Button 
+                                @click="openCreateTicketModal" 
+                                class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white font-medium text-xs sm:text-sm h-9 px-4 shrink-0 w-full sm:w-auto shadow-xs"
+                            >
+                                <Plus class="w-4 h-4 mr-1.5" /> Buat Laporan Baru
+                            </Button>
                         </div>
-                        <div v-else class="text-center py-6 text-xs text-slate-400">
-                            Belum ada riwayat aktivitas terbaru saat ini.
-                        </div>
-                    </CardContent>
-                </Card>
+
+                        <!-- Recent Tickets Table -->
+                        <Card class="border-slate-200 shadow-sm">
+                            <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-3 gap-2 border-b border-slate-100">
+                                <div>
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">
+                                        Daftar Laporan Terkini Instansi
+                                    </CardTitle>
+                                    <CardDescription class="text-xs text-slate-500 mt-0.5">
+                                        Pantau progres dan teknisi penanggung jawab kendala jaringan Anda
+                                    </CardDescription>
+                                </div>
+                                <Link :href="route('tickets.index')">
+                                    <Button variant="ghost" size="sm" class="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium">
+                                        Lihat Semua Tiket <ArrowRight class="w-3.5 h-3.5 ml-1" />
+                                    </Button>
+                                </Link>
+                            </CardHeader>
+                            <CardContent class="p-0">
+                                <div class="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader class="bg-slate-50/75">
+                                            <TableRow class="hover:bg-transparent">
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 w-[140px] pl-4 sm:pl-6">No. Tiket</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 min-w-[180px]">Kendala Teknis</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10">Prioritas</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10">Status</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 min-w-[140px]">Teknisi</TableHead>
+                                                <TableHead class="text-xs font-semibold text-slate-700 h-10 text-right pr-4 sm:pr-6">Aksi</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            <template v-if="recentTickets && recentTickets.length > 0">
+                                                <TableRow 
+                                                    v-for="ticket in recentTickets" 
+                                                    :key="ticket.id"
+                                                    class="hover:bg-slate-50/80 transition-colors"
+                                                >
+                                                    <TableCell class="py-3 pl-4 sm:pl-6">
+                                                        <Link :href="route('tickets.show', ticket.id)" class="group block">
+                                                            <div class="text-xs font-semibold text-blue-600 font-mono group-hover:underline">
+                                                                {{ ticket.ticket_number }}
+                                                            </div>
+                                                            <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
+                                                                {{ ticket.network_type ? ticket.network_type.replace('_', ' ') : '-' }}
+                                                            </div>
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell class="py-3">
+                                                        <Link :href="route('tickets.show', ticket.id)" class="block group">
+                                                            <span class="text-xs font-medium text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1" :title="ticket.title">
+                                                                {{ ticket.title }}
+                                                            </span>
+                                                            <span class="text-[11px] text-slate-400 block mt-0.5">{{ ticket.created_at_diff }}</span>
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs whitespace-nowrap">
+                                                        <span :class="getPriorityColor(ticket.priority)">
+                                                            {{ getPriorityLabel(ticket.priority) }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs whitespace-nowrap">
+                                                        <span :class="getStatusColor(ticket.status)">
+                                                            {{ getStatusLabel(ticket.status) }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs text-slate-700">
+                                                        <span class="line-clamp-1" :title="ticket.technicians_label">
+                                                            {{ ticket.technicians_label || '-' }}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6 whitespace-nowrap">
+                                                        <Link :href="route('tickets.show', ticket.id)">
+                                                            <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 font-medium">
+                                                                <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Buka
+                                                            </Button>
+                                                        </Link>
+                                                    </TableCell>
+                                                </TableRow>
+                                            </template>
+                                            <TableRow v-else>
+                                                <TableCell colspan="6" class="h-28 text-center text-xs text-slate-400">
+                                                    Belum ada riwayat laporan tiket saat ini.
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <!-- RIGHT COLUMN (4 Cols): HELPDESK INFO & CONTACT -->
+                    <div class="lg:col-span-4 space-y-6">
+                        <!-- Pusat Informasi & Lokasi Kantor -->
+                        <Card class="border-slate-200 shadow-sm overflow-hidden">
+                            <CardHeader class="pb-3 border-b border-slate-100">
+                                <div class="flex items-center gap-2">
+                                    <Headphones class="w-4 h-4 text-blue-600" />
+                                    <CardTitle class="text-sm sm:text-base font-bold text-slate-900">
+                                        Pusat Informasi & Lokasi Kantor
+                                    </CardTitle>
+                                </div>
+                                <CardDescription class="text-xs text-slate-500">
+                                    Dinas Komunikasi dan Informatika Kota Palu
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent class="pt-4 space-y-3.5">
+                                <!-- Jam Operasional -->
+                                <div class="p-2.5 bg-slate-50 rounded-lg border border-slate-100 space-y-0.5">
+                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                                        <Clock class="w-3.5 h-3.5 text-slate-500" />
+                                        <span>Jam Layanan Operasional</span>
+                                    </div>
+                                    <p class="text-xs text-slate-600 pl-5">
+                                        Senin – Jumat: 08.00 – 16.00 WITA
+                                    </p>
+                                </div>
+
+                                <!-- Alamat Kantor & Peta Interaktif -->
+                                <div class="space-y-2">
+                                    <div class="flex items-start gap-2 text-xs text-slate-700">
+                                        <MapPin class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                        <div class="leading-relaxed">
+                                            <span class="font-bold text-slate-900 block">Kantor Diskominfo Kota Palu</span>
+                                            <span>Jl. Balai Kota No. 1, Tanamodindi, Kec. Mantikulore, Kota Palu, Sulawesi Tengah 94118</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Embedded Interactive Google Maps -->
+                                    <div class="w-full h-48 rounded-lg overflow-hidden border border-slate-200 shadow-xs relative bg-slate-100 mt-2">
+                                        <iframe
+                                            src="https://maps.google.com/maps?q=-0.9053872,119.8941934&hl=id&z=17&output=embed"
+                                            width="100%"
+                                            height="100%"
+                                            style="border: 0;"
+                                            allowfullscreen=""
+                                            loading="lazy"
+                                            referrerpolicy="no-referrer-when-downgrade"
+                                            title="Lokasi Kantor Diskominfo Kota Palu"
+                                        ></iframe>
+                                    </div>
+
+                                    <div class="pt-1 flex justify-end">
+                                        <a 
+                                            href="https://maps.google.com/?q=-0.9053872,119.8941934" 
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                                        >
+                                            <ExternalLink class="w-3.5 h-3.5" />
+                                            <span>Buka Rute di Google Maps</span>
+                                        </a>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                <!-- Create Ticket Modal Dialog (OPD Quick Form) -->
+                <Dialog v-model:open="isCreateModalOpen">
+                    <DialogContent class="w-full h-full max-w-full max-h-full rounded-none top-0 left-0 translate-x-0 translate-y-0 p-4 sm:p-6 overflow-y-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-[650px] sm:max-h-[90vh] sm:h-auto sm:rounded-xl">
+                        <DialogHeader class="pb-2 border-b border-slate-100 sm:border-none">
+                            <DialogTitle class="text-lg sm:text-xl font-bold text-slate-900">Buat Laporan Tiket Gangguan</DialogTitle>
+                            <DialogDescription class="text-xs sm:text-sm text-slate-500">
+                                Lengkapi detail kendala jaringan kantor Anda untuk diteruskan ke tim teknisi Kominfo.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-1 sm:pt-2">
+                            <!-- Title -->
+                            <div>
+                                <InputLabel for="opd_title" value="Subjek / Ringkasan Kendala *" />
+                                <Input id="opd_title" v-model="opdCreateForm.title" placeholder="Cth: Internet mati di ruang bidang informasi" class="mt-1" />
+                                <InputError :message="opdCreateForm.errors.title" class="mt-1" />
+                            </div>
+
+                            <!-- Location Details -->
+                            <div>
+                                <InputLabel for="opd_location_details" value="Lokasi Detail / Ruangan *" />
+                                <Input id="opd_location_details" v-model="opdCreateForm.location_details" placeholder="Cth: Gedung B Lantai 2, Ruang Rapat" class="mt-1" />
+                                <InputError :message="opdCreateForm.errors.location_details" class="mt-1" />
+                            </div>
+
+                            <!-- Description -->
+                            <div>
+                                <InputLabel for="opd_description" value="Deskripsi Detail Kendala *" />
+                                <Textarea 
+                                    id="opd_description" 
+                                    v-model="opdCreateForm.description" 
+                                    rows="3" 
+                                    placeholder="Jelaskan kendala apa yang dialami, sejak kapan, dan dampaknya..." 
+                                    class="mt-1"
+                                />
+                                <InputError :message="opdCreateForm.errors.description" class="mt-1" />
+                            </div>
+
+                            <!-- Attachments -->
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <InputLabel value="Lampiran Bukti Foto" />
+                                    <span class="text-xs text-slate-400 font-normal italic">(Opsional - Maks. 3 File)</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mb-2 mt-0.5">Unggah foto perangkat atau pesan error jika ada.</p>
+                                <FileUpload 
+                                    v-model="opdCreateForm.attachments"
+                                    :multiple="true"
+                                    :maxFiles="3"
+                                    :maxSizeMB="5"
+                                    @error="(msg) => opdCreateForm.errors.attachments = msg"
+                                />
+                                <InputError :message="opdCreateForm.errors.attachments" class="mt-1" />
+                            </div>
+
+                            <DialogFooter class="pt-3 pb-2 border-t border-slate-100 sticky bottom-0 bg-white sm:static">
+                                <Button type="button" variant="outline" @click="isCreateModalOpen = false">Batal</Button>
+                                <Button type="submit" :disabled="opdCreateForm.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                                    {{ opdCreateForm.processing ? 'Mengirim Laporan...' : 'Kirim Laporan Gangguan' }}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </template>
 
             <!-- ================= TECHNICIAN DASHBOARD ================= -->

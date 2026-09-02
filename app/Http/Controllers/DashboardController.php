@@ -36,9 +36,9 @@ class DashboardController extends Controller
                 'closed_tickets' => Ticket::where('department_id', $departmentId)
                     ->where('status', 'closed')
                     ->count(),
-                'needs_fix' => Ticket::where('department_id', $departmentId)
-                    ->where('status', 'cancelled')
-                    ->whereRaw('TIMESTAMPDIFF(HOUR, COALESCE(cancelled_at, updated_at), NOW()) < 72')
+                'pending_rating' => Ticket::where('department_id', $departmentId)
+                    ->where('status', 'closed')
+                    ->whereNull('rating')
                     ->count(),
                 'total_reports' => Ticket::where('department_id', $departmentId)->count(),
             ];
@@ -437,7 +437,7 @@ class DashboardController extends Controller
         }
 
         // Recent Tickets (Top 5)
-        $recentTicketsQuery = Ticket::with(['department:id,name,code', 'category:id,name', 'reporter:id,name']);
+        $recentTicketsQuery = Ticket::with(['department:id,name,code', 'category:id,name', 'reporter:id,name', 'assignee:id,name', 'technicians:id,name']);
 
         if ($role === 'opd_user') {
             $recentTicketsQuery->where('department_id', $user->department_id);
@@ -450,9 +450,21 @@ class DashboardController extends Controller
         }
 
         $recentTickets = $recentTicketsQuery->latest()
-            ->limit(5)
+            ->limit(6)
             ->get()
             ->map(function ($ticket) {
+                $technicianNames = [];
+                if ($ticket->assignee) {
+                    $technicianNames[] = $ticket->assignee->name;
+                }
+                if ($ticket->technicians) {
+                    foreach ($ticket->technicians as $tech) {
+                        if (!in_array($tech->name, $technicianNames)) {
+                            $technicianNames[] = $tech->name;
+                        }
+                    }
+                }
+
                 return [
                     'id' => $ticket->id,
                     'ticket_number' => $ticket->ticket_number,
@@ -461,6 +473,7 @@ class DashboardController extends Controller
                     'department_code' => $ticket->department ? $ticket->department->code : '-',
                     'reporter_name' => $ticket->reporter ? $ticket->reporter->name : '-',
                     'category_name' => $ticket->category ? $ticket->category->name : '-',
+                    'technicians_label' => !empty($technicianNames) ? implode(', ', $technicianNames) : 'Belum ditugaskan',
                     'network_type' => $ticket->network_type,
                     'priority' => $ticket->priority,
                     'status' => $ticket->status,

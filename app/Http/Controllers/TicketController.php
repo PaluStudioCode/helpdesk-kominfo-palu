@@ -34,9 +34,14 @@ class TicketController extends Controller
             'technicians:id,name'
         ]);
 
-        // Data Isolation Rule for OPD User
+        // Data Isolation Rule for OPD User & Technician
         if ($user->role === 'opd_user') {
             $query->where('department_id', $user->department_id);
+        } elseif ($user->role === 'technician') {
+            $query->where(function ($q) use ($user) {
+                $q->where('assigned_to', $user->id)
+                  ->orWhereHas('technicians', fn($qt) => $qt->where('users.id', $user->id));
+            });
         }
 
         // Apply Search Filter
@@ -81,7 +86,36 @@ class TicketController extends Controller
             $query->latest();
         }
 
-        $tickets = $query->paginate(10)->withQueryString();
+        $tickets = $query->paginate(10)->withQueryString()->through(function ($t) {
+            $dueTime = $t->due_at ? \Carbon\Carbon::parse($t->due_at) : null;
+            $isOverdue = $dueTime ? now()->gt($dueTime) : false;
+            
+            $dueHuman = '-';
+            if ($dueTime) {
+                if ($isOverdue) {
+                    $dueHuman = 'Lewat ' . $dueTime->diffForHumans(null, true);
+                } else {
+                    $dueHuman = 'Sisa ' . now()->diffForHumans($dueTime, true);
+                }
+            }
+
+            return [
+                'id' => $t->id,
+                'ticket_number' => $t->ticket_number,
+                'title' => $t->title,
+                'department' => $t->department ? ['id' => $t->department->id, 'name' => $t->department->name] : null,
+                'category' => $t->category ? ['id' => $t->category->id, 'name' => $t->category->name] : null,
+                'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
+                'technicians' => $t->technicians ? $t->technicians->map(fn($tech) => ['id' => $tech->id, 'name' => $tech->name]) : [],
+                'network_type' => $t->network_type,
+                'priority' => $t->priority,
+                'status' => $t->status,
+                'due_at' => $t->due_at ? $t->due_at->format('d M Y, H:i') : null,
+                'due_human' => $dueHuman,
+                'is_overdue' => $isOverdue,
+                'created_at' => $t->created_at ? $t->created_at->toISOString() : null,
+            ];
+        });
 
         $categories = TicketCategory::where('status', 'active')
                         ->select('id', 'name', 'network_type')

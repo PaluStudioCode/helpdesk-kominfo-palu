@@ -144,13 +144,25 @@ const handlePage = (page: number) => {
     }, { preserveState: true });
 };
 
-const columns = [
-    { key: 'ticket_number', label: 'No. Tiket', sortable: true },
-    { key: 'title', label: 'Judul Masalah', sortable: false },
-    { key: 'department', label: 'Instansi (OPD)', sortable: false },
-    { key: 'priority', label: 'Prioritas', sortable: true },
-    { key: 'status', label: 'Status', sortable: true },
-];
+const columns = computed(() => {
+    if (currentUser.value?.role === 'technician') {
+        return [
+            { key: 'ticket_number', label: 'No. Tiket', sortable: true },
+            { key: 'department', label: 'Instansi (OPD)', sortable: false },
+            { key: 'title', label: 'Kendala Teknis', sortable: false },
+            { key: 'priority', label: 'Prioritas', sortable: true },
+            { key: 'sla', label: 'Target SLA', sortable: false },
+            { key: 'status', label: 'Status', sortable: true },
+        ];
+    }
+    return [
+        { key: 'ticket_number', label: 'No. Tiket', sortable: true },
+        { key: 'title', label: 'Judul Masalah', sortable: false },
+        { key: 'department', label: 'Instansi (OPD)', sortable: false },
+        { key: 'priority', label: 'Prioritas', sortable: true },
+        { key: 'status', label: 'Status', sortable: true },
+    ];
+});
 
 const getStatusLabel = (status: string) => {
     switch (status) {
@@ -189,8 +201,8 @@ const getPriorityColor = (priority: string) => {
         case 'emergency': return 'text-rose-600 font-semibold';
         case 'high': return 'text-amber-600 font-semibold';
         case 'medium': return 'text-blue-600 font-semibold';
-        case 'low': return 'text-slate-500 font-medium';
-        default: return 'text-slate-600 font-medium';
+        case 'low': return 'text-slate-500 font-semibold';
+        default: return 'text-slate-600 font-semibold';
     }
 };
 
@@ -203,20 +215,25 @@ const formatDate = (dateStr: string) => {
 </script>
 
 <template>
-    <Head title="Antrean Tiket" />
+    <Head :title="currentUser?.role === 'technician' ? 'Daftar Penugasan Tiket' : 'Antrean Tiket'" />
 
     <AuthenticatedLayout>
         <template #header>
-            Antrean Tiket Gangguan
+            {{ currentUser?.role === 'technician' ? 'Daftar Penugasan Tiket' : 'Antrean Tiket Gangguan' }}
         </template>
 
         <div class="space-y-6">
             <!-- Header Title and Description -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-5">
                 <div>
-                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Antrean & Riwayat Tiket Gangguan</h1>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">
+                        {{ currentUser?.role === 'technician' ? 'Daftar Penugasan Tiket Lapangan' : 'Antrean & Riwayat Tiket Gangguan' }}
+                    </h1>
                     <p class="text-sm text-slate-500 mt-1">
-                        Pantau status penanganan, kelola verifikasi dan eskalasi kendala jaringan, serta buat laporan baru.
+                        {{ currentUser?.role === 'technician' 
+                            ? 'Daftar seluruh tiket perbaikan jaringan yang ditugaskan kepada Anda, baik sebagai penanggung jawab utama maupun tim pendukung.'
+                            : 'Pantau status penanganan, kelola verifikasi dan eskalasi kendala jaringan, serta buat laporan baru.' 
+                        }}
                     </p>
                 </div>
             </div>
@@ -238,8 +255,8 @@ const formatDate = (dateStr: string) => {
                                 <SelectValue placeholder="Status Tiket" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Semua Status</SelectItem>
-                                <SelectItem value="pending_admin">Menunggu Verifikasi</SelectItem>
+                                <SelectItem value="all">{{ currentUser?.role === 'technician' ? 'Semua Tugas Saya' : 'Semua Status' }}</SelectItem>
+                                <SelectItem v-if="currentUser?.role !== 'technician'" value="pending_admin">Menunggu Verifikasi</SelectItem>
                                 <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
                                 <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
                                 <SelectItem value="closed">Selesai</SelectItem>
@@ -272,7 +289,9 @@ const formatDate = (dateStr: string) => {
                         <div class="font-medium text-blue-600 font-mono text-xs sm:text-sm group-hover:underline">
                             {{ item.ticket_number }}
                         </div>
-                        <div class="text-[11px] text-slate-400 mt-0.5">{{ formatDate(item.created_at) }}</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
+                            {{ item.network_type ? item.network_type.replace('_', ' ') : '-' }}
+                        </div>
                     </Link>
                 </template>
 
@@ -285,27 +304,36 @@ const formatDate = (dateStr: string) => {
                 </template>
 
                 <template #cell-department="{ item }">
-                    <span class="text-xs sm:text-sm text-slate-700 font-medium">
+                    <span class="text-xs sm:text-sm text-slate-700 font-medium block truncate max-w-[200px]" :title="item.department ? item.department.name : '-'">
                         {{ item.department ? item.department.name : '-' }}
                     </span>
                 </template>
 
                 <template #cell-priority="{ item }">
-                    <span :class="getPriorityColor(item.priority)" class="text-xs sm:text-sm">
+                    <span :class="getPriorityColor(item.priority)" class="text-xs sm:text-sm whitespace-nowrap">
                         {{ getPriorityLabel(item.priority) }}
                     </span>
                 </template>
 
+                <template #cell-sla="{ item }">
+                    <span 
+                        class="text-xs sm:text-sm whitespace-nowrap"
+                        :class="item.is_overdue ? 'text-rose-600 font-medium' : 'text-slate-600'"
+                    >
+                        {{ item.due_human || '-' }}
+                    </span>
+                </template>
+
                 <template #cell-status="{ item }">
-                    <span :class="getStatusColor(item.status)" class="text-xs sm:text-sm">
+                    <span :class="getStatusColor(item.status)" class="text-xs sm:text-sm whitespace-nowrap">
                         {{ getStatusLabel(item.status) }}
                     </span>
                 </template>
 
                 <template #actions-cell="{ item }">
                     <Link :href="route('tickets.show', item.id)">
-                        <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
-                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
+                        <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 font-medium">
+                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> {{ currentUser?.role === 'technician' ? 'Buka' : 'Detail' }}
                         </Button>
                     </Link>
                 </template>
@@ -323,11 +351,6 @@ const formatDate = (dateStr: string) => {
                 </DialogHeader>
 
                 <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-1 sm:pt-2">
-                    
-                    <!-- OPD Explanatory Info -->
-                    <div v-if="!canCreateOnBehalf" class="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 leading-relaxed">
-                        <span class="font-semibold">Informasi:</span> Anda cukup mengisi rincian kendala secara umum. Tim Verifikator Diskominfo akan menetapkan jenis jaringan, kategori teknis, dan menugaskan tim teknisi.
-                    </div>
 
                     <!-- On-Behalf Selection (Admin Only) -->
                     <div v-if="canCreateOnBehalf" class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-3.5">
