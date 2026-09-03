@@ -22,15 +22,18 @@ class NotificationDispatcher
 
         // 1. Notify OPD Reporter
         $opdPhone = !empty($reporter?->phone_number) ? $reporter->phone_number : ($department?->operator?->phone_number ?? '');
-        $waReporterMessage = "*[Helpdesk Kominfo Palu - Laporan Terdaftar]*\n\n"
-            . "Laporan gangguan jaringan Anda telah berhasil didaftarkan ke sistem.\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($department?->name ?? '-') . "\n"
-            . "📝 *Subjek:* {$ticket->title}\n"
-            . "📍 *Lokasi:* {$ticket->location_details}\n"
-            . "🔄 *Status:* Menunggu Verifikasi Admin\n\n"
-            . "Admin Kominfo akan segera memeriksa kelayakan laporan dan menugaskan tim teknisi ke lokasi.\n"
-            . "Pantau status: " . url('/tickets/' . $ticket->id);
+        $waReporterMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Pemberitahuan Laporan Gangguan Terdaftar*\n\n"
+            . "Yth. Bapak/Ibu,\n"
+            . "Laporan kendala jaringan intra pemerintah Anda telah berhasil didaftarkan ke sistem.\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($department?->name ?? '-') . "\n"
+            . "Judul Masalah: {$ticket->title}\n"
+            . "Lokasi: {$ticket->location_details}\n"
+            . "Status: Menunggu Verifikasi Admin\n\n"
+            . "Tim Administrator Kominfo akan segera memeriksa kelayakan laporan dan menugaskan tim teknisi ke lokasi.\n\n"
+            . "Tautan Pemantauan: " . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         if ($reporter) {
             SendTicketNotificationJob::dispatch(
@@ -50,14 +53,18 @@ class NotificationDispatcher
             ->where('status', 'active')
             ->get();
 
-        $waAdminMessage = "*[Helpdesk Kominfo Palu - Laporan Baru Masuk]*\n\n"
-            . "Laporan gangguan jaringan baru memerlukan verifikasi kelayakan & penugasan tim:\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($department?->name ?? '-') . "\n"
-            . "📝 *Judul:* {$ticket->title}\n"
-            . "📍 *Lokasi:* {$ticket->location_details}\n"
-            . "🔄 *Status:* Menunggu Verifikasi\n\n"
-            . "Buka tiket untuk verifikasi: " . url('/tickets/' . $ticket->id);
+        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Pemberitahuan Laporan Masuk (Perlu Verifikasi)*\n\n"
+            . "Yth. Administrator,\n"
+            . "Laporan kendala jaringan baru memerlukan verifikasi kelayakan dan penugasan tim:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($department?->name ?? '-') . "\n"
+            . "Judul Masalah: {$ticket->title}\n"
+            . "Lokasi: {$ticket->location_details}\n"
+            . "Status: Menunggu Verifikasi\n\n"
+            . "Silakan lakukan verifikasi melalui tautan berikut:\n"
+            . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         foreach ($admins as $admin) {
             if ($reporter && $admin->id === $reporter->id) {
@@ -88,13 +95,17 @@ class NotificationDispatcher
             ->where('status', 'active')
             ->get();
 
-        $waAdminMessage = "*[Helpdesk Kominfo Palu - Pengajuan Ulang Laporan]*\n\n"
-            . "Laporan gangguan berikut telah diperbaiki oleh pihak OPD dan diajukan kembali:\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($ticket->department?->name ?? '-') . "\n"
-            . "📝 *Judul:* {$ticket->title}\n"
-            . "📍 *Lokasi:* {$ticket->location_details}\n\n"
-            . "Harap periksa kembali laporan: " . url('/tickets/' . $ticket->id);
+        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Pemberitahuan Pengajuan Ulang Laporan*\n\n"
+            . "Yth. Administrator,\n"
+            . "Laporan kendala jaringan berikut telah diperbaiki oleh pihak OPD dan diajukan kembali:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+            . "Judul Masalah: {$ticket->title}\n"
+            . "Lokasi: {$ticket->location_details}\n\n"
+            . "Silakan periksa kembali laporan melalui tautan berikut:\n"
+            . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         foreach ($admins as $admin) {
             SendTicketNotificationJob::dispatch(
@@ -117,7 +128,7 @@ class NotificationDispatcher
      */
     public static function ticketAssigned(Ticket $ticket): void
     {
-        $ticket->loadMissing(['department', 'reporter', 'technicians', 'category']);
+        $ticket->loadMissing(['department', 'reporter', 'technicians', 'category', 'assignee']);
         $technicians = $ticket->technicians;
         $reporter = $ticket->reporter;
 
@@ -127,17 +138,20 @@ class NotificationDispatcher
         }
 
         // 1. Broadcast to all assigned technicians
-        $waTechMessage = "*[Helpdesk Kominfo Palu - Penugasan Tim Teknisi]*\n\n"
-            . "Anda telah ditugaskan dalam tim penanganan tiket gangguan berikut:\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($ticket->department?->name ?? '-') . "\n"
-            . "🌐 *Jenis Jaringan:* " . strtoupper($ticket->network_type ?? 'Jaringan') . "\n"
-            . "📝 *Judul:* {$ticket->title}\n"
-            . "📍 *Lokasi:* {$ticket->location_details}\n"
-            . "⚡ *Prioritas:* " . ucfirst($ticket->priority ?? 'Medium') . "\n"
-            . "👥 *Anggota Tim:* " . ($techNames ?: 'Tim Teknisi') . "\n"
-            . "⏱ *Target SLA:* " . ($ticket->due_at ? $ticket->due_at->translatedFormat('d M Y H:i') . ' WITA' : '-') . "\n\n"
-            . "Buka detail tiket: " . url('/tickets/' . $ticket->id);
+        $waTechMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Surat Tugas Penanganan Kendala Jaringan*\n\n"
+            . "Yth. Tim Teknisi,\n"
+            . "Anda telah ditugaskan dalam penanganan laporan kendala jaringan berikut:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+            . "Jenis Jaringan: " . strtoupper($ticket->network_type ?? 'Jaringan') . "\n"
+            . "Judul Masalah: {$ticket->title}\n"
+            . "Lokasi: {$ticket->location_details}\n"
+            . "Prioritas: " . ucfirst($ticket->priority ?? 'Medium') . "\n"
+            . "Anggota Tim: " . ($techNames ?: 'Tim Teknisi') . "\n"
+            . "Target Batas Waktu (SLA): " . ($ticket->due_at ? $ticket->due_at->translatedFormat('d M Y H:i') . ' WITA' : '-') . "\n\n"
+            . "Buka detail tiket: " . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         foreach ($technicians as $tech) {
             SendTicketNotificationJob::dispatch(
@@ -154,14 +168,18 @@ class NotificationDispatcher
 
         // 2. Notify Reporter OPD
         if ($reporter) {
-            $waOpdMessage = "*[Helpdesk Kominfo Palu - Progres Penanganan]*\n\n"
-                . "Laporan gangguan Anda telah diverifikasi dan tim teknisi telah ditugaskan:\n\n"
-                . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-                . "👨‍🔧 *Tim Teknisi:* " . ($techNames ?: 'Teknisi Jaringan Kominfo') . "\n"
-                . "📝 *Judul:* {$ticket->title}\n"
-                . "🔄 *Status:* Sedang Dikerjakan (In Progress)\n"
-                . "⏱ *Estimasi Selesai:* " . ($ticket->due_at ? $ticket->due_at->translatedFormat('d M Y H:i') . ' WITA' : '-') . "\n\n"
-                . "Pantau penanganan: " . url('/tickets/' . $ticket->id);
+            $waOpdMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+                . "*Pemberitahuan Progres Penanganan*\n\n"
+                . "Yth. Bapak/Ibu,\n"
+                . "Laporan kendala jaringan Anda telah diverifikasi dan tim teknisi telah ditugaskan ke lokasi:\n\n"
+                . "Nomor Tiket: {$ticket->ticket_number}\n"
+                . "Tim Teknisi: " . ($techNames ?: 'Teknisi Jaringan Kominfo') . "\n"
+                . "Judul Masalah: {$ticket->title}\n"
+                . "Status: Sedang Dikerjakan (In Progress)\n"
+                . "Estimasi Target Selesai: " . ($ticket->due_at ? $ticket->due_at->translatedFormat('d M Y H:i') . ' WITA' : '-') . "\n\n"
+                . "Pantau progres penanganan melalui tautan berikut:\n"
+                . url('/tickets/' . $ticket->id) . "\n\n"
+                . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
             SendTicketNotificationJob::dispatch(
                 ticket: $ticket,
@@ -185,13 +203,16 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[Helpdesk Kominfo Palu - Laporan Ditolak]*\n\n"
-                . "Laporan gangguan jaringan Anda tidak dapat diproses lebih lanjut:\n\n"
-                . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-                . "📝 *Judul:* {$ticket->title}\n"
-                . "❌ *Alasan Penolakan:* {$reason}\n\n"
-                . "ℹ️ *Masa Perbaikan:* Anda dapat memperbaiki deskripsi/foto bukti dan mengajukan kembali dalam waktu *3x24 jam (72 jam)* melalui portal:\n"
-                . url('/tickets/' . $ticket->id);
+            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+                . "*Pemberitahuan Penolakan Laporan*\n\n"
+                . "Yth. Bapak/Ibu,\n"
+                . "Laporan kendala jaringan Anda tidak dapat diproses lebih lanjut:\n\n"
+                . "Nomor Tiket: {$ticket->ticket_number}\n"
+                . "Judul Masalah: {$ticket->title}\n"
+                . "Alasan Penolakan: {$reason}\n\n"
+                . "Catatan: Anda dapat memperbaiki data laporan atau bukti pendukung dan mengajukan kembali dalam batas waktu maksimal 3x24 jam (72 jam) melalui portal:\n"
+                . url('/tickets/' . $ticket->id) . "\n\n"
+                . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
             SendTicketNotificationJob::dispatch(
                 ticket: $ticket,
@@ -219,14 +240,18 @@ class NotificationDispatcher
 
         $techNames = $ticket->technicians->pluck('name')->implode(', ');
 
-        $waAdminMessage = "*[Helpdesk Kominfo Palu - Menunggu Review Mutu]*\n\n"
-            . "Tim teknisi telah menyelesaikan perbaikan dan mengajukan review hasil kerja:\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($ticket->department?->name ?? '-') . "\n"
-            . "👨‍🔧 *Teknisi:* " . ($techNames ?: 'Tim Teknisi') . "\n"
-            . "🌐 *Kategori Riil:* " . ($ticket->category?->name ?? '-') . "\n"
-            . "📝 *Solusi Perbaikan:* {$ticket->resolution_note}\n\n"
-            . "Tinjau bukti dan lakukan verifikasi mutu: " . url('/tickets/' . $ticket->id);
+        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Pemberitahuan Pekerjaan Selesai (Menunggu Review Mutu)*\n\n"
+            . "Yth. Administrator,\n"
+            . "Tim teknisi telah menyelesaikan perbaikan lapangan dan mengajukan peninjauan mutu hasil kerja:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+            . "Teknisi Penanggung Jawab: " . ($techNames ?: 'Tim Teknisi') . "\n"
+            . "Kategori Riil: " . ($ticket->category?->name ?? '-') . "\n"
+            . "Catatan Solusi Teknis: {$ticket->resolution_note}\n\n"
+            . "Silakan tinjau bukti foto dan lakukan persetujuan melalui tautan berikut:\n"
+            . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         foreach ($admins as $admin) {
             SendTicketNotificationJob::dispatch(
@@ -250,12 +275,16 @@ class NotificationDispatcher
         $ticket->loadMissing(['department', 'technicians']);
         $technicians = $ticket->technicians;
 
-        $waTechMessage = "*[Helpdesk Kominfo Palu - Permintaan Perbaikan Ulang]*\n\n"
-            . "Admin meminta tindak lanjut perbaikan tambahan pada tiket berikut:\n\n"
-            . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-            . "🏛 *Instansi:* " . ($ticket->department?->name ?? '-') . "\n"
-            . "⚠️ *Catatan Instruksi Revisi:* {$instruction}\n\n"
-            . "Harap segera tindak lanjuti di lokasi: " . url('/tickets/' . $ticket->id);
+        $waTechMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Instruksi Perbaikan Lanjutan / Revisi*\n\n"
+            . "Yth. Tim Teknisi,\n"
+            . "Administrator meminta tindak lanjut perbaikan tambahan pada tiket berikut:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+            . "Catatan Instruksi Revisi: {$instruction}\n\n"
+            . "Harap segera menindaklanjuti perbaikan di lokasi:\n"
+            . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
         foreach ($technicians as $tech) {
             SendTicketNotificationJob::dispatch(
@@ -280,15 +309,18 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[Helpdesk Kominfo Palu - Tiket Resmi Ditutup]*\n\n"
+            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+                . "*Pemberitahuan Tiket Selesai & Resmi Ditutup*\n\n"
+                . "Yth. Bapak/Ibu,\n"
                 . "Perbaikan kendala jaringan pada laporan Anda telah diverifikasi dan resmi ditutup:\n\n"
-                . "📌 *Nomor Tiket:* {$ticket->ticket_number}\n"
-                . "🏛 *Instansi:* " . ($ticket->department?->name ?? '-') . "\n"
-                . "📝 *Subjek:* {$ticket->title}\n"
-                . "🛠 *Solusi Perbaikan:* {$ticket->resolution_note}\n\n"
-                . "⭐ *Evaluasi Kepuasan:* Mohon luangkan waktu sejenak untuk memberikan penilaian rating & ulasan atas pelayanan teknisi kami di tautan berikut:\n"
+                . "Nomor Tiket: {$ticket->ticket_number}\n"
+                . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+                . "Subjek Masalah: {$ticket->title}\n"
+                . "Solusi Perbaikan: {$ticket->resolution_note}\n\n"
+                . "Mohon kesediaan Bapak/Ibu untuk memberikan penilaian rating dan ulasan atas pelayanan teknisi kami melalui tautan berikut:\n"
                 . url('/tickets/' . $ticket->id) . "\n\n"
-                . "Terima kasih atas kerja sama Anda.";
+                . "Terima kasih atas kerja sama Anda.\n\n"
+                . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
 
             SendTicketNotificationJob::dispatch(
                 ticket: $ticket,

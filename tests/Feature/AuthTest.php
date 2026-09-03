@@ -60,6 +60,19 @@ class AuthTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_user_can_view_profile_with_phone_number(): void
+    {
+        $admin = $this->createAdmin(['phone_number' => '081234567890']);
+
+        $response = $this->actingAs($admin)->get('/profile');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Profile/Edit')
+            ->where('auth.user.phone_number', '081234567890')
+        );
+    }
+
     public function test_user_can_update_profile_information(): void
     {
         $admin = $this->createAdmin();
@@ -72,6 +85,7 @@ class AuthTest extends TestCase
 
         $response->assertSessionHasNoErrors();
         $this->assertEquals('Nama Baru Admin', $admin->fresh()->name);
+        $this->assertEquals('089876543210', $admin->fresh()->phone_number);
     }
 
     public function test_user_can_logout(): void

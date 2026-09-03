@@ -38,8 +38,16 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'phone_number' => $user->phone_number,
                     'role' => $user->role,
+                    'status' => $user->status,
                     'department_id' => $user->department_id,
+                    'department' => $user->department ? [
+                        'id' => $user->department->id,
+                        'name' => $user->department->name,
+                        'code' => $user->department->code,
+                    ] : null,
+                    'email_verified_at' => $user->email_verified_at,
                 ] : null,
             ],
             'flash' => [
