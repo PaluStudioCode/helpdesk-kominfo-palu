@@ -24,6 +24,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
+  TableFooter,
 } from '@/components/ui/table';
 import {
   Select,
@@ -2024,25 +2025,39 @@ const techResolutionChartOptions = computed(() => ({
 
                 <!-- Monthly Performance & Resolution Summary Table Component -->
                 <div class="mt-8">
-                    <Card class="border-slate-200 shadow-sm overflow-hidden">
-                        <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 gap-3 bg-slate-50/40 border-b border-slate-100">
-                            <div class="flex items-center gap-2">
-                                <BarChart3 class="w-5 h-5 text-slate-700" />
-                                <CardTitle class="text-base font-bold text-slate-900">Ringkasan Kinerja & Tingkat Penyelesaian Bulanan</CardTitle>
+                    <Card class="border-slate-200 shadow-sm overflow-hidden bg-white rounded-xl">
+                        <CardHeader class="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 gap-3 bg-slate-50/60 border-b border-slate-100 px-6 py-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-kominfo-primary">
+                                        <BarChart3 class="w-4 h-4" />
+                                    </div>
+                                    <CardTitle class="text-base font-bold text-slate-900">Ringkasan Kinerja & Tingkat Penyelesaian Bulanan</CardTitle>
+                                </div>
+                                <CardDescription class="text-xs text-slate-500">
+                                    Rekapitulasi kuantitas tiket, status penanganan, rata-rata durasi penyelesaian, dan efektivitas per bulan.
+                                </CardDescription>
+                            </div>
+                            <div class="shrink-0">
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                                    <Calendar class="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Periode: {{ activeFilterLabel }}</span>
+                                </span>
                             </div>
                         </CardHeader>
 
                         <CardContent class="p-0">
                             <div class="overflow-x-auto">
                                 <Table>
-                                    <TableHeader class="bg-slate-50/80">
+                                    <TableHeader class="bg-slate-50/90 border-b border-slate-200">
                                         <TableRow class="hover:bg-transparent">
-                                            <TableHead class="font-bold text-slate-800 text-xs py-3 pl-6">Bulan</TableHead>
-                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3">Total Tiket</TableHead>
-                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3">Selesai</TableHead>
-                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3">Ditolak</TableHead>
-                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3">Rata-rata Waktu Penyelesaian</TableHead>
-                                            <TableHead class="font-bold text-slate-800 text-xs py-3 pr-6 min-w-[200px]">Tingkat Penyelesaian</TableHead>
+                                            <TableHead class="font-bold text-slate-800 text-xs py-3.5 pl-6">Bulan</TableHead>
+                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3.5">Total Tiket</TableHead>
+                                            <TableHead class="text-center font-bold text-amber-800 text-xs py-3.5">Diproses</TableHead>
+                                            <TableHead class="text-center font-bold text-emerald-800 text-xs py-3.5">Selesai</TableHead>
+                                            <TableHead class="text-center font-bold text-rose-800 text-xs py-3.5">Ditolak / Batal</TableHead>
+                                            <TableHead class="text-center font-bold text-slate-800 text-xs py-3.5">Rata-rata Waktu Penanganan</TableHead>
+                                            <TableHead class="font-bold text-slate-800 text-xs py-3.5 pr-6 min-w-[200px]">Tingkat Penyelesaian</TableHead>
                                         </TableRow>
                                     </TableHeader>
 
@@ -2051,50 +2066,62 @@ const techResolutionChartOptions = computed(() => ({
                                             <TableRow 
                                                 v-for="row in monthlyReports" 
                                                 :key="row.period"
-                                                class="hover:bg-slate-50/60 transition-colors border-b border-slate-100 text-xs"
+                                                class="hover:bg-slate-50/70 transition-colors border-b border-slate-100 text-xs"
                                             >
                                                 <!-- 1. Bulan / Periode -->
-                                                <TableCell class="font-medium text-slate-900 py-3.5 pl-6 whitespace-nowrap">
+                                                <TableCell class="font-semibold text-slate-900 py-3.5 pl-6 whitespace-nowrap">
                                                     {{ row.month_name }}
                                                 </TableCell>
 
                                                 <!-- 2. Total Tiket -->
-                                                <TableCell class="text-center font-bold text-slate-900 py-3.5">
-                                                    {{ row.total_tickets }}
+                                                <TableCell class="text-center py-3.5">
+                                                    <span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 font-bold text-slate-900 text-xs">
+                                                        {{ row.total_tickets }}
+                                                    </span>
                                                 </TableCell>
 
-                                                <!-- 3. Selesai -->
+                                                <!-- 3. Diproses (In Progress + Pending) -->
                                                 <TableCell class="text-center py-3.5">
                                                     <span 
                                                         class="text-xs font-semibold"
-                                                        :class="row.closed > 0 ? 'text-emerald-600' : 'text-slate-400'"
+                                                        :class="row.in_progress > 0 ? 'text-amber-600 font-bold' : 'text-slate-400'"
+                                                    >
+                                                        {{ row.in_progress }}
+                                                    </span>
+                                                </TableCell>
+
+                                                <!-- 4. Selesai (Closed) -->
+                                                <TableCell class="text-center py-3.5">
+                                                    <span 
+                                                        class="text-xs font-semibold"
+                                                        :class="row.closed > 0 ? 'text-emerald-600 font-bold' : 'text-slate-400'"
                                                     >
                                                         {{ row.closed }}
                                                     </span>
                                                 </TableCell>
 
-                                                <!-- 4. Ditolak -->
+                                                <!-- 5. Ditolak / Dibatalkan -->
                                                 <TableCell class="text-center py-3.5">
                                                     <span 
                                                         class="text-xs font-semibold"
-                                                        :class="row.cancelled > 0 ? 'text-rose-600' : 'text-slate-400'"
+                                                        :class="row.cancelled > 0 ? 'text-rose-600 font-bold' : 'text-slate-400'"
                                                     >
                                                         {{ row.cancelled }}
                                                     </span>
                                                 </TableCell>
 
-                                                <!-- 5. Rata-rata Waktu Penyelesaian -->
+                                                <!-- 6. Rata-rata Waktu Penyelesaian -->
                                                 <TableCell class="text-center text-slate-700 py-3.5 whitespace-nowrap">
-                                                    <span class="inline-flex items-center gap-1">
+                                                    <span class="inline-flex items-center gap-1.5 font-medium">
                                                         <Clock class="w-3.5 h-3.5 text-slate-400" />
-                                                        {{ row.avg_resolution_time }}
+                                                        {{ row.avg_resolution_time || '-' }}
                                                     </span>
                                                 </TableCell>
 
-                                                <!-- 6. Tingkat Penyelesaian (Status Bar + Persentase) -->
+                                                <!-- 7. Tingkat Penyelesaian (Status Bar + Persentase) -->
                                                 <TableCell class="py-3.5 pr-6">
                                                     <div class="flex items-center gap-3">
-                                                        <!-- Horizontal Progress / Status Bar -->
+                                                        <!-- Horizontal Progress Bar -->
                                                         <div class="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden min-w-[70px]">
                                                             <div 
                                                                 class="h-full rounded-full transition-all duration-500"
@@ -2104,10 +2131,10 @@ const techResolutionChartOptions = computed(() => ({
                                                         </div>
                                                         <!-- Percentage Label -->
                                                         <span 
-                                                            class="text-xs font-mono w-14 text-right shrink-0"
+                                                            class="text-xs font-mono font-bold w-14 text-right shrink-0"
                                                             :class="getRateTextColor(row.completion_rate)"
                                                         >
-                                                            {{ row.completion_rate.toFixed(2) }}%
+                                                            {{ Number(row.completion_rate || 0).toFixed(2) }}%
                                                         </span>
                                                     </div>
                                                 </TableCell>
@@ -2115,44 +2142,59 @@ const techResolutionChartOptions = computed(() => ({
                                         </template>
 
                                         <TableRow v-else>
-                                            <TableCell colspan="6" class="text-center py-8 text-slate-500 text-xs">
-                                                Tidak ada data rekapitulasi tiket pada periode ini.
+                                            <TableCell colspan="7" class="text-center py-12 text-slate-500 text-xs">
+                                                <div class="flex flex-col items-center justify-center space-y-2">
+                                                    <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                                                        <BarChart3 class="w-5 h-5" />
+                                                    </div>
+                                                    <p class="font-semibold text-slate-700">Tidak ada data rekapitulasi tiket pada periode ini</p>
+                                                    <p class="text-slate-400 text-[11px]">Silakan ubah filter periode atau rentang tanggal pada panel di atas.</p>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     </TableBody>
 
                                     <!-- Table Summary Footer (Baris TOTAL) -->
-                                    <TableFooter v-if="monthlySummary" class="bg-slate-100/80 border-t-2 border-slate-300 font-bold text-xs">
-                                        <TableRow class="hover:bg-slate-100/90 font-bold">
+                                    <TableFooter v-if="monthlySummary" class="bg-slate-100/90 border-t-2 border-slate-300 font-bold text-xs">
+                                        <TableRow class="hover:bg-slate-100 font-bold">
                                             <!-- Total Label -->
-                                            <TableCell class="py-4 pl-6 font-extrabold text-slate-950 uppercase tracking-wide">
-                                                {{ monthlySummary.month_name }}
+                                            <TableCell class="py-4 pl-6 font-extrabold text-slate-950 uppercase tracking-wider">
+                                                TOTAL KESELURUHAN
                                             </TableCell>
 
                                             <!-- Total Tiket -->
-                                            <TableCell class="text-center font-extrabold text-slate-950 py-4">
-                                                {{ monthlySummary.total_tickets }}
+                                            <TableCell class="text-center py-4">
+                                                <span class="inline-block px-2.5 py-0.5 rounded-md bg-slate-200/80 font-extrabold text-slate-950 text-xs">
+                                                    {{ monthlySummary.total_tickets }}
+                                                </span>
+                                            </TableCell>
+
+                                            <!-- Total Diproses -->
+                                            <TableCell class="text-center py-4">
+                                                <span class="text-xs font-extrabold text-amber-700">
+                                                    {{ monthlySummary.in_progress }}
+                                                </span>
                                             </TableCell>
 
                                             <!-- Total Selesai -->
                                             <TableCell class="text-center py-4">
-                                                <span class="text-xs font-extrabold text-emerald-600">
+                                                <span class="text-xs font-extrabold text-emerald-700">
                                                     {{ monthlySummary.closed }}
                                                 </span>
                                             </TableCell>
 
-                                            <!-- Total Ditolak -->
+                                            <!-- Total Ditolak / Batal -->
                                             <TableCell class="text-center py-4">
-                                                <span class="text-xs font-extrabold text-rose-600">
+                                                <span class="text-xs font-extrabold text-rose-700">
                                                     {{ monthlySummary.cancelled }}
                                                 </span>
                                             </TableCell>
 
                                             <!-- Overall Average Resolution Time -->
                                             <TableCell class="text-center text-slate-900 py-4 font-bold whitespace-nowrap">
-                                                <span class="inline-flex items-center gap-1 font-bold">
+                                                <span class="inline-flex items-center gap-1.5 font-bold">
                                                     <Clock class="w-3.5 h-3.5 text-slate-600" />
-                                                    {{ monthlySummary.avg_resolution_time }}
+                                                    {{ monthlySummary.avg_resolution_time || '-' }}
                                                 </span>
                                             </TableCell>
 
@@ -2170,7 +2212,7 @@ const techResolutionChartOptions = computed(() => ({
                                                         class="text-xs font-mono font-extrabold w-14 text-right shrink-0"
                                                         :class="getRateTextColor(monthlySummary.completion_rate)"
                                                     >
-                                                        {{ monthlySummary.completion_rate.toFixed(2) }}%
+                                                        {{ Number(monthlySummary.completion_rate || 0).toFixed(2) }}%
                                                     </span>
                                                 </div>
                                             </TableCell>

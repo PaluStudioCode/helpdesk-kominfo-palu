@@ -152,6 +152,67 @@ class TicketActionController extends Controller
     }
 
     /**
+     * OPD User cancels their pending ticket with a reason (pending_admin -> cancelled).
+     */
+    public function cancelByReporter(Request $request, Ticket $ticket)
+    {
+        $this->authorize('cancelByReporter', $ticket);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ], [
+            'reason.required' => 'Alasan pembatalan laporan wajib diisi.',
+            'reason.min' => 'Alasan pembatalan minimal 5 karakter.',
+            'reason.max' => 'Alasan pembatalan maksimal 500 karakter.',
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isPendingAdmin()) {
+                DB::rollBack();
+                return back()->with('error', 'Status tiket sudah berubah atau tidak valid untuk dibatalkan.');
+            }
+
+            $lockedTicket->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'pending_admin',
+                'new_status' => 'cancelled',
+                'comment' => 'Dibatalkan oleh Pelapor: ' . $validated['reason'],
+                'created_at' => now(),
+            ]);
+
+            // Activity Log
+            ActivityLogger::log('ticket.cancelled_by_reporter', $lockedTicket, [
+                'reason' => $validated['reason'],
+            ], $user->id);
+
+            DB::commit();
+
+            // Broadcast Realtime Status
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            // Dispatch Notifications to Admins
+            NotificationDispatcher::ticketCancelledByReporter($lockedTicket, $validated['reason']);
+
+            return back()->with('success', 'Laporan berhasil dibatalkan.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat membatalkan laporan: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * OPD User fixes and resubmits rejected ticket within 72 hours (cancelled -> pending_admin).
      */
     public function resubmit(Request $request, Ticket $ticket)

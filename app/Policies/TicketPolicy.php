@@ -70,6 +70,20 @@ class TicketPolicy
     }
 
     /**
+     * Determine whether the OPD user can cancel their own pending ticket.
+     */
+    public function cancelByReporter(User $user, Ticket $ticket): Response
+    {
+        if ($user->role !== 'opd_user' || (int) $user->department_id !== (int) $ticket->department_id) {
+            return Response::deny('Anda tidak memiliki hak akses untuk membatalkan tiket ini.');
+        }
+
+        return $ticket->isPendingAdmin()
+            ? Response::allow()
+            : Response::deny('Laporan hanya dapat dibatalkan ketika masih dalam status Menunggu Verifikasi Admin.');
+    }
+
+    /**
      * Determine whether the OPD user can resubmit a rejected ticket within 72 hours.
      */
     public function resubmit(User $user, Ticket $ticket): Response

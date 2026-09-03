@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     // Ticket Lifecycle Actions (New Admin-Centric Workflow)
     Route::post('tickets/{ticket}/verify-assign', [TicketActionController::class, 'verifyAndAssign'])->name('tickets.verify-assign');
     Route::post('tickets/{ticket}/reject', [TicketActionController::class, 'reject'])->name('tickets.reject');
+    Route::post('tickets/{ticket}/cancel-by-reporter', [TicketActionController::class, 'cancelByReporter'])->name('tickets.cancel-by-reporter');
     Route::post('tickets/{ticket}/resubmit', [TicketActionController::class, 'resubmit'])->name('tickets.resubmit');
     Route::post('tickets/{ticket}/submit-resolution', [TicketActionController::class, 'submitResolution'])->name('tickets.submit-resolution');
     Route::post('tickets/{ticket}/approve-resolution', [TicketActionController::class, 'approveResolution'])->name('tickets.approve-resolution');

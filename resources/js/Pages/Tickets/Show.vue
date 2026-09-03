@@ -104,6 +104,7 @@ const remainingResubmitHours = computed(() => {
 // Action Permissions
 const canVerifyAndAssign = computed(() => props.ticket.status === 'pending_admin' && role.value === 'admin');
 const canReject = computed(() => props.ticket.status === 'pending_admin' && role.value === 'admin');
+const canCancelByReporter = computed(() => props.ticket.status === 'pending_admin' && role.value === 'opd_user' && isDepartmentMatch.value);
 const canResubmit = computed(() => props.ticket.status === 'cancelled' && role.value === 'opd_user' && isDepartmentMatch.value && isWithin72Hours.value);
 const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && (role.value === 'admin' || (role.value === 'technician' && isAssignedTechnician.value)));
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
@@ -117,7 +118,15 @@ const canReply = computed(() => {
     return false;
 });
 
-
+const cancellationInfo = computed(() => {
+    if (props.ticket.status !== 'cancelled') return null;
+    const cancelledHistory = props.ticket.status_histories?.find((h: any) => h.new_status === 'cancelled');
+    const isCancelledByReporter = cancelledHistory?.comment?.startsWith('Dibatalkan oleh Pelapor');
+    return {
+        isCancelledByReporter,
+        comment: cancelledHistory?.comment || 'Laporan telah dibatalkan / ditolak.',
+    };
+});
 
 const getSlaStatus = (ticket: any) => {
     if (ticket.status === 'closed') {
@@ -131,7 +140,7 @@ const getSlaStatus = (ticket: any) => {
     if (ticket.status === 'cancelled') {
         return {
             status: 'cancelled',
-            label: '• Tiket ditolak',
+            label: '• Tiket ditolak / dibatalkan',
             textColor: 'text-slate-500'
         };
     }
@@ -175,11 +184,43 @@ const getSlaStatus = (ticket: any) => {
 // Modals State
 const isVerifyModalOpen = ref(false);
 const isRejectModalOpen = ref(false);
+const isCancelModalOpen = ref(false);
 const isResubmitModalOpen = ref(false);
 const isResolutionModalOpen = ref(false);
 const isApproveModalOpen = ref(false);
 const isRevisionModalOpen = ref(false);
 const isDrawerOpen = ref(false);
+
+const quickCancelReasons = [
+    'Kendala jaringan telah teratasi sendiri oleh OPD',
+    'Terdapat kesalahan input lokasi / deskripsi masalah',
+    'Laporan ganda (sudah dilaporkan staf lain)',
+    'Lainnya (Tuliskan alasan sendiri)',
+];
+const selectedQuickReason = ref<string>('');
+
+const cancelForm = useForm({
+    reason: '',
+});
+
+const selectQuickCancelReason = (option: string) => {
+    selectedQuickReason.value = option;
+    if (option === 'Lainnya (Tuliskan alasan sendiri)') {
+        cancelForm.reason = '';
+    } else {
+        cancelForm.reason = option;
+    }
+};
+
+const submitCancelByReporter = () => {
+    cancelForm.post(route('tickets.cancel-by-reporter', props.ticket.id), {
+        onSuccess: () => {
+            isCancelModalOpen.value = false;
+            cancelForm.reset();
+            selectedQuickReason.value = '';
+        }
+    });
+};
 
 // Active Tab in Feed
 const activeTab = ref<'discussion' | 'history'>('discussion');
@@ -615,6 +656,17 @@ onUnmounted(() => {
                         <XCircle class="w-4 h-4 mr-1.5" /> Tolak Laporan
                     </Button>
 
+                    <!-- OPD Action: Cancel Pending Report -->
+                    <Button 
+                        v-if="canCancelByReporter" 
+                        @click="isCancelModalOpen = true" 
+                        size="sm" 
+                        variant="destructive" 
+                        class="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <XCircle class="w-4 h-4 mr-1.5" /> Batalkan Laporan
+                    </Button>
+
                     <!-- Technician Action: In Progress -->
                     <Button 
                         v-if="canSubmitResolution" 
@@ -659,16 +711,18 @@ onUnmounted(() => {
 
             <!-- Contextual Workflow Status Banners -->
             
-            <!-- 1. Cancelled / Rejection Banner (OPD Resubmit Grace Period) -->
+            <!-- 1. Cancelled / Rejection Banner -->
             <div v-if="ticket.status === 'cancelled'" class="p-5 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
                 <div class="flex items-start gap-3">
                     <AlertTriangle class="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
                     <div class="space-y-1 text-sm text-rose-900 flex-1">
-                        <p class="font-bold text-rose-950">Laporan Tiket Ditolak oleh Admin Diskominfo</p>
-                        <p class="text-rose-800 leading-relaxed">
-                            Laporan tidak dapat diproses lebih lanjut pada kondisi saat ini.
+                        <p class="font-bold text-rose-950">
+                            {{ cancellationInfo?.isCancelledByReporter ? 'Laporan Dibatalkan oleh Pelapor OPD' : 'Laporan Tiket Ditolak oleh Admin Diskominfo' }}
                         </p>
-                        <div v-if="isWithin72Hours" class="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 mt-2">
+                        <p class="text-rose-800 leading-relaxed font-normal">
+                            {{ cancellationInfo?.comment }}
+                        </p>
+                        <div v-if="!cancellationInfo?.isCancelledByReporter && isWithin72Hours" class="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 mt-2">
                             <span class="text-xs font-semibold text-rose-900 flex items-center gap-1.5">
                                 <Clock class="w-4 h-4 text-rose-600" />
                                 Masa perbaikan laporan aktif: Tersisa {{ remainingResubmitHours }} jam
@@ -677,7 +731,7 @@ onUnmounted(() => {
                                 Perbaiki Laporan Sekarang
                             </Button>
                         </div>
-                        <div v-else class="text-xs text-rose-700 pt-1 font-medium italic">
+                        <div v-else-if="!cancellationInfo?.isCancelledByReporter" class="text-xs text-rose-700 pt-1 font-medium italic">
                             Masa perbaikan (72 jam) telah berakhir. Harap daftarkan laporan baru jika kendala masih terjadi.
                         </div>
                     </div>
@@ -1104,6 +1158,74 @@ onUnmounted(() => {
                         <Button type="button" variant="outline" @click="isRejectModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="rejectForm.processing || !rejectForm.reason" variant="destructive">
                             {{ rejectForm.processing ? 'Memproses...' : 'Ya, Tolak Laporan' }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- Cancel Ticket Modal (OPD Self-Cancellation) -->
+        <Dialog v-model:open="isCancelModalOpen">
+            <DialogContent class="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle class="text-slate-900 flex items-center gap-2">
+                        <XCircle class="w-5 h-5 text-rose-600" />
+                        Batalkan Laporan Gangguan
+                    </DialogTitle>
+                    <DialogDescription class="text-slate-600 text-xs sm:text-sm">
+                        Apakah Anda yakin ingin membatalkan laporan ini? Tindakan ini akan menghentikan proses verifikasi oleh Admin Diskominfo.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form @submit.prevent="submitCancelByReporter" class="space-y-4 pt-2">
+                    <div>
+                        <InputLabel value="Pilih Alasan Pembatalan *" class="text-xs font-medium mb-2 text-slate-700" />
+                        <div class="space-y-2">
+                            <label 
+                                v-for="option in quickCancelReasons" 
+                                :key="option"
+                                class="flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer text-xs transition-colors"
+                                :class="selectedQuickReason === option ? 'border-rose-300 bg-rose-50/60 font-semibold text-rose-950' : 'border-slate-200 hover:bg-slate-50 text-slate-700'"
+                            >
+                                <input 
+                                    type="radio" 
+                                    name="cancel_quick_reason" 
+                                    :value="option" 
+                                    :checked="selectedQuickReason === option"
+                                    @change="selectQuickCancelReason(option)"
+                                    class="mt-0.5 text-rose-600 focus:ring-rose-500 border-slate-300"
+                                />
+                                <span>{{ option }}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <InputLabel for="cancel_reason_text" value="Penjelasan Alasan Pembatalan *" class="text-xs font-medium text-slate-700" />
+                        <Textarea 
+                            id="cancel_reason_text"
+                            v-model="cancelForm.reason"
+                            placeholder="Tuliskan keterangan detail alasan pembatalan laporan (min. 5 karakter)..."
+                            rows="3"
+                            class="mt-1 text-sm bg-white"
+                            required
+                        />
+                        <div class="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+                            <span>Minimal 5 karakter</span>
+                            <span>{{ cancelForm.reason.length }}/500</span>
+                        </div>
+                        <InputError :message="cancelForm.errors.reason" class="mt-1" />
+                    </div>
+
+                    <DialogFooter class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                        <Button type="button" variant="outline" @click="isCancelModalOpen = false">Batal</Button>
+                        <Button 
+                            type="submit" 
+                            :disabled="cancelForm.processing || cancelForm.reason.trim().length < 5" 
+                            variant="destructive"
+                            class="bg-rose-600 hover:bg-rose-700 text-white"
+                        >
+                            {{ cancelForm.processing ? 'Membatalkan...' : 'Ya, Batalkan Laporan' }}
                         </Button>
                     </DialogFooter>
                 </form>

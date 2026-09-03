@@ -229,4 +229,95 @@ class TicketLifecycleTest extends TestCase
         ]);
         $secondResponse->assertStatus(403);
     }
+
+    public function test_opd_user_can_cancel_their_own_pending_ticket(): void
+    {
+        $dept = $this->createDepartment();
+        $opdUser = $this->createOpdUser($dept);
+        $ticket = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'pending_admin',
+        ]);
+
+        $response = $this->actingAs($opdUser)->post("/tickets/{$ticket->id}/cancel-by-reporter", [
+            'reason' => 'Kendala jaringan telah teratasi sendiri oleh OPD.',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $ticket->refresh();
+
+        $this->assertEquals('cancelled', $ticket->status);
+        $this->assertNotNull($ticket->cancelled_at);
+
+        $this->assertDatabaseHas('ticket_status_histories', [
+            'ticket_id' => $ticket->id,
+            'changed_by' => $opdUser->id,
+            'previous_status' => 'pending_admin',
+            'new_status' => 'cancelled',
+            'comment' => 'Dibatalkan oleh Pelapor: Kendala jaringan telah teratasi sendiri oleh OPD.',
+        ]);
+    }
+
+    public function test_opd_user_cannot_cancel_ticket_in_progress_or_closed(): void
+    {
+        $dept = $this->createDepartment();
+        $opdUser = $this->createOpdUser($dept);
+
+        $ticketInProgress = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'in_progress',
+        ]);
+
+        $response = $this->actingAs($opdUser)->post("/tickets/{$ticketInProgress->id}/cancel-by-reporter", [
+            'reason' => 'Mencoba membatalkan tiket yang sedang dikerjakan.',
+        ]);
+        $response->assertStatus(403);
+
+        $ticketClosed = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'closed',
+        ]);
+
+        $response2 = $this->actingAs($opdUser)->post("/tickets/{$ticketClosed->id}/cancel-by-reporter", [
+            'reason' => 'Mencoba membatalkan tiket yang sudah selesai.',
+        ]);
+        $response2->assertStatus(403);
+    }
+
+    public function test_opd_user_cannot_cancel_another_department_ticket(): void
+    {
+        $deptA = $this->createDepartment();
+        $deptB = $this->createDepartment();
+
+        $opdUserA = $this->createOpdUser($deptA);
+        $ticketOfB = $this->createTicket([
+            'department_id' => $deptB->id,
+            'status' => 'pending_admin',
+        ]);
+
+        $response = $this->actingAs($opdUserA)->post("/tickets/{$ticketOfB->id}/cancel-by-reporter", [
+            'reason' => 'Mencoba membatalkan tiket milik dinas lain.',
+        ]);
+        $response->assertStatus(403);
+    }
+
+    public function test_cancel_by_reporter_validates_reason_length(): void
+    {
+        $dept = $this->createDepartment();
+        $opdUser = $this->createOpdUser($dept);
+        $ticket = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'pending_admin',
+        ]);
+
+        $response = $this->actingAs($opdUser)->post("/tickets/{$ticket->id}/cancel-by-reporter", [
+            'reason' => 'abc', // < 5 characters
+        ]);
+        $response->assertSessionHasErrors(['reason']);
+    }
 }

@@ -387,7 +387,7 @@ class DashboardService
         $tableQuery = Ticket::selectRaw("
             DATE_FORMAT(created_at, '%Y-%m') as period,
             COUNT(*) as total_tickets,
-            SUM(CASE WHEN status IN ('in_progress', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN status IN ('pending_admin', 'in_progress', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
             SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed,
             SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
             AVG(CASE WHEN status = 'closed' AND closed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, created_at, closed_at) ELSE NULL END) as avg_resolution_minutes

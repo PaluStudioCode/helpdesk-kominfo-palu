@@ -228,6 +228,44 @@ class NotificationDispatcher
     }
 
     /**
+     * Dispatch notification when OPD cancels their own pending ticket.
+     */
+    public static function ticketCancelledByReporter(Ticket $ticket, string $reason): void
+    {
+        $ticket->loadMissing(['department', 'reporter']);
+        $department = $ticket->department;
+
+        $admins = User::where('role', 'admin')
+            ->where('status', 'active')
+            ->get();
+
+        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            . "*Pemberitahuan Pembatalan Laporan oleh OPD*\n\n"
+            . "Yth. Administrator,\n"
+            . "Laporan kendala jaringan berikut telah dibatalkan secara mandiri oleh pelapor OPD:\n\n"
+            . "Nomor Tiket: {$ticket->ticket_number}\n"
+            . "Instansi / OPD: " . ($department?->name ?? '-') . "\n"
+            . "Judul Masalah: {$ticket->title}\n"
+            . "Alasan Pembatalan: {$reason}\n"
+            . "Status: Dibatalkan (Keluar dari Antrean Verifikasi)\n\n"
+            . "Tautan: " . url('/tickets/' . $ticket->id) . "\n\n"
+            . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
+
+        foreach ($admins as $admin) {
+            SendTicketNotificationJob::dispatch(
+                ticket: $ticket,
+                recipient: $admin,
+                eventType: 'ticket_cancelled_by_reporter',
+                targetPhone: $admin->phone_number ?? '',
+                waMessage: $waAdminMessage,
+                emailSubject: "Laporan Dibatalkan oleh OPD ({$ticket->ticket_number})",
+                emailHeadline: "Pelapor dari " . ($department?->name ?? 'OPD') . " telah membatalkan laporannya.",
+                emailCustomMessage: "Alasan pembatalan: {$reason}. Laporan telah dikeluarkan dari antrean verifikasi."
+            );
+        }
+    }
+
+    /**
      * Dispatch notification for pending_approval event (Technician completed fieldwork).
      */
     public static function pendingApproval(Ticket $ticket): void
