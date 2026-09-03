@@ -127,11 +127,11 @@
                     </tr>
                     <tr>
                         <td class="label">Jenis Jaringan</td>
-                        <td class="value">{{ strtoupper($ticket->network_type) }}</td>
+                        <td class="value">{{ strtoupper($ticket->network_type ?? '-') }}</td>
                     </tr>
                     <tr>
                         <td class="label">Prioritas / SLA</td>
-                        <td class="value">{{ ucfirst($ticket->priority) }} (Target: {{ $ticket->due_at ? $ticket->due_at->translatedFormat('d M Y, H:i') : '-' }} WITA)</td>
+                        <td class="value">{{ ucfirst($ticket->priority ?? 'normal') }} (Target: {{ $ticket->due_at ? $ticket->due_at->translatedFormat('d M Y, H:i') : '-' }} WITA)</td>
                     </tr>
                     <tr>
                         <td class="label">Status Saat Ini</td>
