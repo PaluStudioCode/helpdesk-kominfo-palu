@@ -21,8 +21,17 @@ class TicketPolicy
      */
     public function view(User $user, Ticket $ticket): Response
     {
-        if ($user->role === 'admin' || $user->role === 'technician') {
+        if ($user->role === 'admin') {
             return Response::allow();
+        }
+
+        if ($user->role === 'technician') {
+            $isAssigned = $ticket->assigned_to === $user->id 
+                || $ticket->technicians()->where('user_id', $user->id)->exists();
+
+            return $isAssigned
+                ? Response::allow()
+                : Response::denyAsNotFound('Anda tidak memiliki hak akses untuk melihat atau mengelola tiket ini.');
         }
 
         return (int) $user->department_id === (int) $ticket->department_id
@@ -148,8 +157,13 @@ class TicketPolicy
             return false;
         }
 
-        if (in_array($user->role, ['admin', 'technician'])) {
+        if ($user->role === 'admin') {
             return true;
+        }
+
+        if ($user->role === 'technician') {
+            return $ticket->assigned_to === $user->id 
+                || $ticket->technicians()->where('user_id', $user->id)->exists();
         }
 
         if ($user->role === 'opd_user' && (int) $ticket->department_id === (int) $user->department_id) {
@@ -168,6 +182,15 @@ class TicketPolicy
             return false;
         }
 
-        return in_array($user->role, ['admin', 'technician']);
+        if ($user->role === 'admin') {
+            return true;
+        }
+
+        if ($user->role === 'technician') {
+            return $ticket->assigned_to === $user->id 
+                || $ticket->technicians()->where('user_id', $user->id)->exists();
+        }
+
+        return false;
     }
 }

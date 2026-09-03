@@ -32,6 +32,7 @@ const props = defineProps<{
     canCreateOnBehalf: boolean;
     categoriesMap?: Record<string, Array<{id: number, name: string, network_type: string}>>;
     departments?: Array<{id: number, name: string}>;
+    technicians?: Array<{id: number, name: string, phone_number?: string}>;
 }>();
 
 const currentUser = computed(() => usePage().props.auth.user as any);
@@ -465,21 +466,37 @@ const formatDate = (dateStr: string) => {
 
                         <!-- Multi-select Tim Teknisi -->
                         <div>
-                            <InputLabel value="Tim Teknisi Penanggung Jawab *" class="text-amber-950 text-xs font-medium mb-1" />
-                            <div class="bg-white border border-amber-200 rounded-lg p-2.5 max-h-32 overflow-y-auto space-y-1.5">
+                            <div class="flex items-center justify-between mb-1">
+                                <InputLabel value="Tim Teknisi Penanggung Jawab *" class="text-amber-950 text-xs font-medium" />
+                                <span v-if="form.technician_ids.length > 0" class="text-[11px] font-semibold text-amber-800">
+                                    {{ form.technician_ids.length }} teknisi dipilih
+                                </span>
+                            </div>
+
+                            <div class="bg-white border border-amber-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-100">
+                                <div v-if="!technicians || technicians.length === 0" class="text-xs text-slate-500 italic p-2 text-center">
+                                    Belum ada data teknisi aktif yang tersedia.
+                                </div>
                                 <label 
                                     v-for="tech in technicians" 
                                     :key="tech.id"
-                                    class="flex items-center gap-2 text-xs text-slate-800 cursor-pointer hover:bg-slate-50 p-1 rounded-sm"
+                                    class="flex items-center justify-between text-xs text-slate-800 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
                                 >
-                                    <input 
-                                        type="checkbox" 
-                                        :checked="form.technician_ids.includes(tech.id)"
-                                        @change="toggleTechnician(tech.id)"
-                                        class="rounded border-slate-300 text-kominfo-primary focus:ring-kominfo-primary w-3.5 h-3.5"
-                                    />
-                                    <span class="font-medium">{{ tech.name }}</span>
-                                    <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[10px]">({{ tech.phone_number }})</span>
+                                    <div class="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            :checked="form.technician_ids.includes(tech.id)"
+                                            @change="toggleTechnician(tech.id)"
+                                            class="rounded border-slate-300 text-kominfo-primary focus:ring-0 focus:ring-offset-0 focus:outline-none outline-none w-4 h-4 cursor-pointer"
+                                        />
+                                        <span :class="form.technician_ids.includes(tech.id) ? 'font-medium text-slate-900' : 'text-slate-700'">{{ tech.name }}</span>
+                                        <span v-if="form.technician_ids[0] === tech.id" class="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">
+                                            Lead
+                                        </span>
+                                    </div>
+                                    <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[11px]">
+                                        {{ tech.phone_number }}
+                                    </span>
                                 </label>
                             </div>
                             <InputError :message="form.errors.technician_ids" class="mt-1" />

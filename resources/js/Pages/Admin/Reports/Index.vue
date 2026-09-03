@@ -451,7 +451,7 @@ const formatDateTime = (dateStr: string | null) => {
                         <button 
                             type="button" 
                             @click="openDetailModal(item)"
-                            class="font-mono font-bold text-slate-900 hover:text-kominfo-primary text-xs transition-colors text-left cursor-pointer"
+                            class="font-mono font-medium text-blue-600 hover:text-blue-800 hover:underline text-xs sm:text-sm transition-colors text-left cursor-pointer"
                         >
                             {{ item.ticket_number }}
                         </button>
@@ -502,10 +502,10 @@ const formatDateTime = (dateStr: string | null) => {
                             type="button"
                             variant="outline" 
                             size="sm" 
-                            class="h-8 px-2.5 text-xs text-kominfo-primary border-slate-200 hover:bg-blue-50/50 hover:text-kominfo-primary-dark font-medium shadow-2xs cursor-pointer"
+                            class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 font-medium cursor-pointer"
                             @click="openDetailModal(item)"
                         >
-                            <Eye class="w-3.5 h-3.5 mr-1" /> Detail
+                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
                         </Button>
                     </template>
                 </DataTable>
@@ -642,7 +642,7 @@ const formatDateTime = (dateStr: string | null) => {
                     <Button 
                         type="button" 
                         variant="outline" 
-                        class="text-xs border-slate-200 text-slate-700"
+                        class="text-xs border-slate-200 text-slate-700 cursor-pointer"
                         @click="isDetailModalOpen = false"
                     >
                         Tutup

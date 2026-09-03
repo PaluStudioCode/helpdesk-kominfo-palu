@@ -101,7 +101,13 @@ const canSubmitResolution = computed(() => props.ticket.status === 'in_progress'
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
-const canReply = computed(() => !['closed', 'cancelled'].includes(props.ticket.status) && (['admin', 'technician'].includes(role.value) || (role.value === 'opd_user' && isDepartmentMatch.value)));
+const canReply = computed(() => {
+    if (['closed', 'cancelled'].includes(props.ticket.status)) return false;
+    if (role.value === 'admin') return true;
+    if (role.value === 'technician') return isAssignedTechnician.value;
+    if (role.value === 'opd_user') return isDepartmentMatch.value;
+    return false;
+});
 
 const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
@@ -580,8 +586,8 @@ onMounted(() => {
         // Listen for typing whispers on public channel
         echoChannel.listenForWhisper('typing', onUserTyping);
 
-        // 2. Subscribe to Internal Channel (Admin & Technician ONLY)
-        if (['admin', 'technician'].includes(role.value)) {
+        // 2. Subscribe to Internal Channel (Admin & Assigned Technician ONLY)
+        if (role.value === 'admin' || (role.value === 'technician' && isAssignedTechnician.value)) {
             echoInternalChannel = (window as any).Echo.private(`ticket.${props.ticket.id}.internal`);
 
             echoInternalChannel.listen('.reply.created', (event: any) => {
@@ -1648,7 +1654,7 @@ onUnmounted(() => {
                                             <span class="text-[11px] text-slate-400">({{ replyForm.attachments.length }}/3)</span>
                                         </button>
 
-                                        <div v-if="['admin', 'technician'].includes(role)" class="flex items-center space-x-1.5">
+                                        <div v-if="role === 'admin' || (role === 'technician' && isAssignedTechnician)" class="flex items-center space-x-1.5">
                                             <Checkbox id="drawer_is_internal" v-model="replyForm.is_internal" />
                                             <label for="drawer_is_internal" class="text-xs font-semibold text-amber-800 cursor-pointer select-none flex items-center gap-1">
                                                 <Lock class="w-3 h-3 text-amber-700" />

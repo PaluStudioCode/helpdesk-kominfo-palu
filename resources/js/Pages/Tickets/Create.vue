@@ -213,7 +213,7 @@ const submitForm = () => {
                                                 type="checkbox" 
                                                 :checked="form.technician_ids.includes(tech.id)"
                                                 @change="toggleTechnician(tech.id)"
-                                                class="rounded border-slate-300 text-kominfo-primary focus:ring-kominfo-primary w-4 h-4"
+                                                class="rounded border-slate-300 text-kominfo-primary focus:ring-0 focus:ring-offset-0 focus:outline-none outline-none w-4 h-4 cursor-pointer"
                                             />
                                             <span class="font-medium">{{ tech.name }}</span>
                                             <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[10px]">({{ tech.phone_number }})</span>
