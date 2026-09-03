@@ -22,7 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     // Ticket Resource Routes
-    Route::resource('tickets', TicketController::class);
+    Route::resource('tickets', TicketController::class)->except(['edit', 'update', 'destroy']);
     
     // Ticket Lifecycle Actions (New Admin-Centric Workflow)
     Route::post('tickets/{ticket}/verify-assign', [TicketActionController::class, 'verifyAndAssign'])->name('tickets.verify-assign');

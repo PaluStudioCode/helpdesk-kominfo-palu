@@ -56,6 +56,7 @@ const props = defineProps<{
     departments: Department[];
     technicians: Technician[];
     filters: {
+        search?: string;
         start_date?: string;
         end_date?: string;
         department_id?: string;
@@ -66,6 +67,7 @@ const props = defineProps<{
 }>();
 
 const form = reactive({
+    search: props.filters.search || '',
     start_date: props.filters.start_date || '',
     end_date: props.filters.end_date || '',
     department_id: props.filters.department_id || 'all',
@@ -86,6 +88,7 @@ const handleSelectChange = (key: keyof typeof form, val: string) => {
 };
 
 const resetFilters = () => {
+    form.search = '';
     form.start_date = '';
     form.end_date = '';
     form.department_id = 'all';
@@ -444,7 +447,10 @@ const formatDateTime = (dateStr: string | null) => {
                 <DataTable 
                     :columns="tableColumns" 
                     :data="tickets"
+                    v-model="form.search"
+                    @update:modelValue="applyFilters"
                     @page="handlePage"
+                    searchPlaceholder="Cari no. tiket, instansi, kendala..."
                 >
                     <!-- Column 1: Ticket Number -->
                     <template #cell-ticket_number="{ item }">

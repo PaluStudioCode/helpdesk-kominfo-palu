@@ -76,8 +76,6 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, User $user): RedirectResponse
     {
-        $request->merge(['user_model' => $user]); // Provide model to authorize
-        
         $validated = $request->validated();
         
         if (!empty($validated['password'])) {

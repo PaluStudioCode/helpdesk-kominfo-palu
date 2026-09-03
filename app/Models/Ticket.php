@@ -51,7 +51,7 @@ class Ticket extends Model
 
     public function department(): BelongsTo
     {
-        return $this->belongsTo(Department::class);
+        return $this->belongsTo(Department::class)->withTrashed();
     }
 
     public function reporter(): BelongsTo
@@ -71,7 +71,7 @@ class Ticket extends Model
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(TicketCategory::class, 'category_id');
+        return $this->belongsTo(TicketCategory::class, 'category_id')->withTrashed();
     }
 
     public function attachments(): HasMany

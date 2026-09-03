@@ -8,8 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import FileUpload from '@/Components/FileUpload.vue';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Cable, Network, Wifi, Info, Users, ShieldAlert } from 'lucide-vue-next';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Cable, Network, Wifi } from 'lucide-vue-next';
 import {
   Select,
   SelectContent,

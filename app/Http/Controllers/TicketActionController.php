@@ -12,7 +12,6 @@ use App\Services\NotificationDispatcher;
 use App\Http\Requests\StoreTicketReplyRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class TicketActionController extends Controller

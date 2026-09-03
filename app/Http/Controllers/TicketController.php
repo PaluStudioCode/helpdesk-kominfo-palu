@@ -6,18 +6,19 @@ use App\Models\Ticket;
 use App\Models\TicketCategory;
 use App\Models\Department;
 use App\Models\User;
-use App\Services\ActivityLogger;
-use App\Services\NotificationDispatcher;
+use App\Services\TicketService;
 use App\Http\Requests\StoreTicketRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Inertia\Inertia;
 
 class TicketController extends Controller
 {
     use AuthorizesRequests;
+
+    public function __construct(
+        protected TicketService $ticketService
+    ) {}
 
     /**
      * Display a listing of the resource.
@@ -187,124 +188,15 @@ class TicketController extends Controller
      */
     public function store(StoreTicketRequest $request)
     {
-        $validated = $request->validated();
-        $user = $request->user();
-
-        // Transaction for Atomic Locking & Integrity
-        DB::beginTransaction();
         try {
-            // Generate unique ticket number (TKT-YYYYMMDD-XXXX)
-            $datePrefix = date('Ymd');
-            
-            $latestTicket = Ticket::where('ticket_number', 'like', "TKT-{$datePrefix}-%")
-                ->lockForUpdate()
-                ->orderBy('id', 'desc')
-                ->first();
+            $ticket = $this->ticketService->createTicket(
+                $request->validated(),
+                $request->user(),
+                $request->file('attachments', [])
+            );
 
-            $sequence = 1;
-            if ($latestTicket) {
-                $lastSequence = (int) substr($latestTicket->ticket_number, -4);
-                $sequence = $lastSequence + 1;
-            }
-
-            $ticketNumber = "TKT-{$datePrefix}-" . str_pad($sequence, 4, '0', STR_PAD_LEFT);
-
-            if ($user->role === 'admin') {
-                // Admin On-Behalf Mode: Immediately In Progress with SLA & Multi-Technicians
-                $category = TicketCategory::find($validated['category_id']);
-                $dueAt = now()->addHours($category->sla_hours);
-                $leadTechnicianId = $validated['technician_ids'][0];
-
-                $ticket = Ticket::create([
-                    'ticket_number' => $ticketNumber,
-                    'department_id' => $validated['department_id'],
-                    'reporter_id' => $user->id,
-                    'assigned_to' => $leadTechnicianId,
-                    'category_id' => $category->id,
-                    'network_type' => $validated['network_type'],
-                    'title' => $validated['title'],
-                    'location_details' => $validated['location_details'],
-                    'description' => $validated['description'],
-                    'priority' => $validated['priority'],
-                    'status' => 'in_progress',
-                    'assigned_at' => now(),
-                    'due_at' => $dueAt,
-                ]);
-
-                // Sync team technicians
-                $ticket->technicians()->sync($validated['technician_ids']);
-
-                // Status History
-                $ticket->statusHistories()->create([
-                    'changed_by' => $user->id,
-                    'previous_status' => null,
-                    'new_status' => 'in_progress',
-                    'comment' => 'Tiket dibuat mewakili OPD oleh Admin dan langsung ditugaskan ke Tim Teknisi.',
-                    'created_at' => now(),
-                ]);
-
-                $activityAction = 'ticket.created_on_behalf';
-            } else {
-                // OPD User Mode: Initial Pending Admin Verification (No Category/Network/Priority yet)
-                $ticket = Ticket::create([
-                    'ticket_number' => $ticketNumber,
-                    'department_id' => $user->department_id,
-                    'reporter_id' => $user->id,
-                    'assigned_to' => null,
-                    'category_id' => null,
-                    'network_type' => null,
-                    'title' => $validated['title'],
-                    'location_details' => $validated['location_details'],
-                    'description' => $validated['description'],
-                    'priority' => null,
-                    'status' => 'pending_admin',
-                    'assigned_at' => null,
-                    'due_at' => null,
-                ]);
-
-                // Status History
-                $ticket->statusHistories()->create([
-                    'changed_by' => $user->id,
-                    'previous_status' => null,
-                    'new_status' => 'pending_admin',
-                    'comment' => 'Laporan gangguan didaftarkan oleh OPD (Menunggu Verifikasi Admin).',
-                    'created_at' => now(),
-                ]);
-
-                $activityAction = 'ticket.created';
-            }
-
-            // Handle Attachments
-            if ($request->hasFile('attachments')) {
-                foreach ($request->file('attachments') as $file) {
-                    $path = $file->store('ticket-attachments', 'public');
-                    
-                    $ticket->attachments()->create([
-                        'uploaded_by' => $user->id,
-                        'attachment_type' => 'issue_proof',
-                        'file_path' => $path,
-                        'file_name' => $file->getClientOriginalName(),
-                        'file_size' => $file->getSize(),
-                    ]);
-                }
-            }
-
-            // Log Activity
-            ActivityLogger::log($activityAction, $ticket, [
-                'ticket_number' => $ticket->ticket_number,
-                'title' => $ticket->title,
-                'status' => $ticket->status,
-            ], $user->id);
-
-            DB::commit();
-
-            // Dispatch Notification
-            NotificationDispatcher::ticketCreated($ticket);
-
-            return redirect()->route('tickets.index')->with('success', "Tiket #{$ticketNumber} berhasil didaftarkan.");
-
+            return redirect()->route('tickets.index')->with('success', "Tiket #{$ticket->ticket_number} berhasil didaftarkan.");
         } catch (\Exception $e) {
-            DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat menyimpan tiket: ' . $e->getMessage())->withInput();
         }
     }
@@ -372,29 +264,5 @@ class TicketController extends Controller
             'technicians' => $technicians,
             'initialUnreadCount' => $unreadRepliesCount,
         ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        abort(404);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        abort(404);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        abort(404);
     }
 }

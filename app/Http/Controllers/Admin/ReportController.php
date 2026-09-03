@@ -30,7 +30,7 @@ class ReportController extends Controller
             'tickets' => $tickets,
             'departments' => $departments,
             'technicians' => $technicians,
-            'filters' => $request->only(['start_date', 'end_date', 'department_id', 'network_type', 'status', 'assigned_to']),
+            'filters' => $request->only(['search', 'start_date', 'end_date', 'department_id', 'network_type', 'status', 'assigned_to']),
         ]);
     }
 
@@ -198,6 +198,22 @@ class ReportController extends Controller
             'technicians:id,name',
             'reporter:id,name'
         ]);
+
+        // Search keyword filter
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('ticket_number', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('location_details', 'like', "%{$search}%")
+                  ->orWhereHas('department', fn($qd) => $qd->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('category', fn($qc) => $qc->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('reporter', fn($qr) => $qr->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('assignee', fn($qa) => $qa->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('technicians', fn($qt) => $qt->where('name', 'like', "%{$search}%"));
+            });
+        }
 
         // Filter date range
         if ($request->filled('start_date')) {

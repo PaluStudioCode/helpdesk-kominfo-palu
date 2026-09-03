@@ -1,0 +1,218 @@
+import type { Ticket, TicketStatus, TicketPriority, NetworkType, UserRole } from '@/types';
+
+/**
+ * Format tanggal dan waktu standar Indonesia (WITA / Asia/Makassar).
+ */
+export const formatDateTime = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Makassar',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+/**
+ * Format tanggal dan waktu dengan suffix WITA.
+ */
+export const formatDateWithWita = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleString('id-ID', {
+        timeZone: 'Asia/Makassar',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    }) + ' WITA';
+};
+
+/**
+ * Label teks status tiket.
+ */
+export const getStatusLabel = (status: TicketStatus | string): string => {
+    const labels: Record<string, string> = {
+        pending_admin: 'Menunggu Verifikasi',
+        in_progress: 'Sedang Dikerjakan',
+        pending_approval: 'Menunggu Review',
+        closed: 'Selesai',
+        cancelled: 'Dibatalkan',
+    };
+    return labels[status] || status || '-';
+};
+
+/**
+ * Warna teks status tiket (clean formal typography).
+ */
+export const getStatusColor = (status: TicketStatus | string): string => {
+    const colors: Record<string, string> = {
+        pending_admin: 'text-blue-600 font-semibold',
+        in_progress: 'text-amber-600 font-semibold',
+        pending_approval: 'text-purple-600 font-semibold',
+        closed: 'text-emerald-600 font-semibold',
+        cancelled: 'text-rose-600 font-semibold',
+    };
+    return colors[status] || 'text-slate-600 font-semibold';
+};
+
+/**
+ * Label tingkat prioritas tiket.
+ */
+export const getPriorityLabel = (priority: TicketPriority | string | null | undefined): string => {
+    if (!priority) return '-';
+    const labels: Record<string, string> = {
+        low: 'Rendah',
+        medium: 'Sedang',
+        high: 'Tinggi',
+        emergency: 'Darurat',
+    };
+    return labels[priority] || priority;
+};
+
+/**
+ * Warna teks tingkat prioritas.
+ */
+export const getPriorityColor = (priority: TicketPriority | string | null | undefined): string => {
+    if (!priority) return 'text-slate-600';
+    const colors: Record<string, string> = {
+        emergency: 'text-rose-600 font-bold',
+        high: 'text-amber-600 font-semibold',
+        medium: 'text-blue-600 font-medium',
+        low: 'text-slate-500 font-normal',
+    };
+    return colors[priority] || 'text-slate-600';
+};
+
+/**
+ * Label tipe infrastruktur jaringan.
+ */
+export const getNetworkLabel = (network: NetworkType | string | null | undefined): string => {
+    if (!network) return '-';
+    const labels: Record<string, string> = {
+        fiber_optic: 'Fiber Optic',
+        lan: 'Jaringan LAN',
+        wifi: 'WiFi Nirkabel',
+    };
+    return labels[network] || network;
+};
+
+/**
+ * Warna teks tipe infrastruktur jaringan.
+ */
+export const getNetworkColor = (network: NetworkType | string | null | undefined): string => {
+    if (!network) return 'text-slate-400';
+    const colors: Record<string, string> = {
+        fiber_optic: 'text-cyan-700 font-semibold',
+        lan: 'text-indigo-700 font-semibold',
+        wifi: 'text-violet-700 font-semibold',
+    };
+    return colors[network] || 'text-slate-700';
+};
+
+/**
+ * Label peran pengguna (Role).
+ */
+export const getRoleLabel = (role: UserRole | string | null | undefined): string => {
+    switch (role) {
+        case 'admin': return 'Administrator';
+        case 'technician': return 'Teknisi';
+        case 'opd_user': return 'Pelapor OPD';
+        default: return role || 'User';
+    }
+};
+
+/**
+ * Warna teks peran pengguna.
+ */
+export const getRoleColor = (role: UserRole | string | null | undefined): string => {
+    switch (role) {
+        case 'admin': return 'text-purple-600 font-semibold';
+        case 'technician': return 'text-amber-600 font-semibold';
+        case 'opd_user': return 'text-blue-600 font-semibold';
+        default: return 'text-slate-600 font-semibold';
+    }
+};
+
+/**
+ * Hitung durasi penanganan tiket (contoh: 2h 4j 15m).
+ */
+export const getHandlingDuration = (ticket: Partial<Ticket>): string => {
+    if (!ticket.created_at || ticket.status === 'cancelled') return '-';
+
+    const start = new Date(ticket.created_at).getTime();
+    let end: number;
+
+    if (ticket.status && ['resolved', 'closed'].includes(ticket.status)) {
+        if (ticket.resolved_at) {
+            end = new Date(ticket.resolved_at).getTime();
+        } else if (ticket.closed_at) {
+            end = new Date(ticket.closed_at).getTime();
+        } else {
+            return '-';
+        }
+    } else {
+        end = new Date().getTime();
+    }
+
+    const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+    const days = Math.floor(diffMinutes / (60 * 24));
+    const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
+    const minutes = diffMinutes % 60;
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}h`);
+    if (hours > 0) parts.push(`${hours}j`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+    const formattedDuration = parts.join(' ');
+
+    if (ticket.status && !['resolved', 'closed'].includes(ticket.status)) {
+        return `${formattedDuration} (berjalan)`;
+    }
+
+    return formattedDuration;
+};
+
+/**
+ * Status kepatuhan SLA tiket.
+ */
+export const getSlaStatus = (ticket: Partial<Ticket>): { label: string; color: string; status: string } => {
+    if (ticket.status === 'cancelled') {
+        return { status: 'cancelled', label: 'Dibatalkan', color: 'text-slate-400' };
+    }
+
+    if (ticket.status === 'pending_admin') {
+        return { status: 'pending_admin', label: '⏱ SLA ditangguhkan (Menunggu Verifikasi)', color: 'text-blue-700 font-medium' };
+    }
+
+    if (!ticket.due_at) {
+        return { status: 'none', label: '-', color: 'text-slate-400' };
+    }
+
+    const dueAt = new Date(ticket.due_at).getTime();
+    const completionTime = ticket.resolved_at 
+        ? new Date(ticket.resolved_at).getTime() 
+        : (ticket.closed_at ? new Date(ticket.closed_at).getTime() : null);
+
+    if (ticket.status && ['resolved', 'closed'].includes(ticket.status) && completionTime) {
+        if (completionTime <= dueAt) {
+            return { status: 'on_time', label: 'Tepat Waktu', color: 'text-emerald-600 font-semibold' };
+        } else {
+            return { status: 'late', label: 'Terlambat', color: 'text-rose-600 font-semibold' };
+        }
+    }
+
+    const now = new Date().getTime();
+    const diffHours = (dueAt - now) / (1000 * 60 * 60);
+
+    if (diffHours < 0) {
+        return { status: 'overdue', label: 'Overdue SLA', color: 'text-rose-600 font-bold' };
+    } else if (diffHours <= 2) {
+        return { status: 'approaching', label: 'Mendekati Batas', color: 'text-amber-600 font-semibold' };
+    } else {
+        return { status: 'on_track', label: 'Dalam Target', color: 'text-emerald-600 font-medium' };
+    }
+};

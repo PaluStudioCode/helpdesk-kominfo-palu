@@ -21,7 +21,6 @@ import {
   Table,
   TableHeader,
   TableBody,
-  TableFooter,
   TableRow,
   TableHead,
   TableCell,
@@ -52,11 +51,7 @@ import {
   Star,
   MapPin,
   Plus,
-  PlusCircle,
-  Headphones,
-  PhoneCall,
   MessageSquare,
-  Info,
   ExternalLink,
 } from 'lucide-vue-next';
 

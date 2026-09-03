@@ -35,6 +35,12 @@ const emit = defineEmits<{
 const searchQuery = ref(props.modelValue || '');
 let searchTimeout: any = null;
 
+watch(() => props.modelValue, (val) => {
+    if (val !== undefined && val !== searchQuery.value) {
+        searchQuery.value = val || '';
+    }
+});
+
 watch(searchQuery, (val) => {
     if (searchTimeout) clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {

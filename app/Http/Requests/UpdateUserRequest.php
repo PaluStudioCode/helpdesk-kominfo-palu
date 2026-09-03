@@ -12,7 +12,9 @@ class UpdateUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('update', $this->user_model); // will alias in controller
+        $targetUser = $this->route('user');
+        $userModel = $targetUser instanceof \App\Models\User ? $targetUser : \App\Models\User::findOrFail($targetUser);
+        return $this->user()->can('update', $userModel);
     }
 
     /**

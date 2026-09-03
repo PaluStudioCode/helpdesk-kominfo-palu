@@ -3,6 +3,17 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { 
+    formatDateWithWita as formatDate,
+    getStatusLabel,
+    getStatusColor,
+    getPriorityLabel,
+    getPriorityColor,
+    getNetworkLabel,
+    getNetworkColor,
+    getRoleLabel,
+    getRoleColor
+} from '@/lib/ticket-helpers';
 import FileUpload from '@/Components/FileUpload.vue';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
 import { Button } from '@/components/ui/button';
@@ -25,14 +36,11 @@ import {
     Send,
     ArrowLeft,
     Shield,
-    ShieldCheck,
     Lock,
     Users,
     Star,
     AlertTriangle,
-    Info,
     Check,
-    FileText,
     Cable,
     Network,
     Wifi
@@ -109,93 +117,7 @@ const canReply = computed(() => {
     return false;
 });
 
-const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString('id-ID', {
-        timeZone: 'Asia/Makassar',
-        day: 'numeric', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-    }) + ' WITA';
-};
 
-// Text color helpers (Clean formal typography without bg badge)
-const getStatusLabel = (status: string) => {
-    switch (status) {
-        case 'pending_admin': return 'Menunggu Verifikasi';
-        case 'in_progress': return 'Sedang Dikerjakan';
-        case 'pending_approval': return 'Menunggu Review';
-        case 'closed': return 'Selesai';
-        case 'cancelled': return 'Ditolak';
-        default: return status || '-';
-    }
-};
-
-const getStatusColor = (status: string) => {
-    switch (status) {
-        case 'pending_admin': return 'text-blue-600 font-semibold';
-        case 'in_progress': return 'text-amber-600 font-semibold';
-        case 'pending_approval': return 'text-purple-600 font-semibold';
-        case 'closed': return 'text-emerald-600 font-semibold';
-        case 'cancelled': return 'text-rose-600 font-semibold';
-        default: return 'text-slate-600 font-semibold';
-    }
-};
-
-const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-        case 'low': return 'Rendah';
-        case 'medium': return 'Sedang';
-        case 'high': return 'Tinggi';
-        case 'emergency': return 'Darurat';
-        default: return priority || '-';
-    }
-};
-
-const getPriorityColor = (priority: string) => {
-    switch (priority) {
-        case 'low': return 'text-slate-500 font-semibold';
-        case 'medium': return 'text-blue-600 font-semibold';
-        case 'high': return 'text-amber-600 font-semibold';
-        case 'emergency': return 'text-rose-600 font-semibold';
-        default: return 'text-slate-600 font-semibold';
-    }
-};
-
-const getNetworkLabel = (type: string) => {
-    switch (type) {
-        case 'fiber_optic': return 'Fiber Optic';
-        case 'lan': return 'LAN';
-        case 'wifi': return 'WiFi';
-        default: return type || '-';
-    }
-};
-
-const getNetworkColor = (type: string) => {
-    switch (type) {
-        case 'fiber_optic': return 'text-purple-600 font-semibold';
-        case 'lan': return 'text-cyan-600 font-semibold';
-        case 'wifi': return 'text-sky-600 font-semibold';
-        default: return 'text-slate-600 font-semibold';
-    }
-};
-
-const getRoleLabel = (userRole: string) => {
-    switch (userRole) {
-        case 'admin': return 'Administrator';
-        case 'technician': return 'Teknisi';
-        case 'opd_user': return 'Pelapor OPD';
-        default: return userRole || 'User';
-    }
-};
-
-const getRoleColor = (userRole: string) => {
-    switch (userRole) {
-        case 'admin': return 'text-purple-600 font-semibold';
-        case 'technician': return 'text-amber-600 font-semibold';
-        case 'opd_user': return 'text-blue-600 font-semibold';
-        default: return 'text-slate-600 font-semibold';
-    }
-};
 
 const getSlaStatus = (ticket: any) => {
     if (ticket.status === 'closed') {

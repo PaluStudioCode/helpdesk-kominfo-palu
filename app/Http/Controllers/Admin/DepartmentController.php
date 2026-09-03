@@ -78,6 +78,15 @@ class DepartmentController extends Controller
     {
         $this->authorize('delete', $department);
         
+        $activeTicketsCount = $department->tickets()
+            ->whereIn('status', ['pending_admin', 'in_progress', 'pending_approval'])
+            ->count();
+
+        if ($activeTicketsCount > 0) {
+            return redirect()->back()
+                ->with('error', "Tidak dapat menghapus instansi ini karena masih memiliki {$activeTicketsCount} tiket aktif yang sedang berjalan.");
+        }
+
         $department->delete();
 
         return redirect()->back()

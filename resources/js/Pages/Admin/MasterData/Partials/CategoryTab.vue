@@ -255,9 +255,12 @@ const confirmDelete = () => {
                         Apakah Anda yakin ingin menghapus kategori gangguan ini? Data yang terhapus tidak bisa dipilih untuk tiket laporan baru.
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter class="mt-4">
-                    <Button variant="outline" @click="isDeleteDialogOpen = false">Batal</Button>
-                    <Button variant="destructive" @click="confirmDelete">Ya, Hapus Kategori</Button>
+                <DialogFooter class="mt-5 flex flex-row justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="isDeleteDialogOpen = false">Batal</Button>
+                    <Button type="button" variant="destructive" size="sm" class="bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center gap-1.5" @click="confirmDelete">
+                        <Trash2 class="w-4 h-4" />
+                        Ya, Hapus Kategori
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

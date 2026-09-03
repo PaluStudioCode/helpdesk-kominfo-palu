@@ -101,7 +101,7 @@ const navigation = computed(() => {
                 </button>
                 <div class="flex items-center gap-2.5 font-bold text-base">
                     <div class="h-7 w-7 rounded-md bg-white p-0.5 flex items-center justify-center shrink-0">
-                        <img src="/storage/logo.png" alt="Logo Kominfo" class="h-full w-full object-contain" />
+                        <img src="/storage/logo-only.png" alt="Logo Kominfo" class="h-full w-full object-contain" />
                     </div>
                     <span>Helpdesk Kominfo</span>
                 </div>
@@ -125,7 +125,7 @@ const navigation = computed(() => {
             <div class="flex h-16 items-center justify-between px-4 bg-slate-950 border-b border-slate-800/60">
                 <Link :href="route('dashboard')" class="flex items-center gap-3 overflow-hidden">
                     <div class="h-9 w-9 shrink-0 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm">
-                        <img src="/storage/logo.png" alt="Logo Kominfo" class="h-full w-full object-contain" />
+                        <img src="/storage/logo-only.png" alt="Logo Kominfo" class="h-full w-full object-contain" />
                     </div>
                     <div 
                         class="flex flex-col transition-opacity duration-300"

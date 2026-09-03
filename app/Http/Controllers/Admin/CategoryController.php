@@ -70,6 +70,15 @@ class CategoryController extends Controller
     {
         $this->authorize('delete', $category);
         
+        $activeTicketsCount = $category->tickets()
+            ->whereIn('status', ['pending_admin', 'in_progress', 'pending_approval'])
+            ->count();
+
+        if ($activeTicketsCount > 0) {
+            return redirect()->back()
+                ->with('error', "Tidak dapat menghapus kategori ini karena masih digunakan oleh {$activeTicketsCount} tiket aktif.");
+        }
+
         $category->delete();
 
         return redirect()->back()
