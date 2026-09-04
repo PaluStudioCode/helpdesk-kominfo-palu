@@ -173,6 +173,52 @@ class TicketLifecycleTest extends TestCase
         $this->assertEquals('cancelled', $ticket->status);
     }
 
+    public function test_assigned_technician_can_view_resolve_page(): void
+    {
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $response = $this->actingAs($tech)->get("/tickets/{$ticket->id}/resolve");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Tickets/Resolve')
+            ->has('ticket')
+            ->has('categoriesMap')
+            ->has('availableDevices')
+            ->has('availableMaterials')
+        );
+    }
+
+    public function test_authorized_user_can_view_berita_acara_page(): void
+    {
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'pending_approval',
+            'assigned_to' => $tech->id,
+            'action_taken' => 'Splicing FO dan penggantian dropcore',
+        ]);
+
+        $response = $this->actingAs($tech)->get("/tickets/{$ticket->id}/berita-acara");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Tickets/BeritaAcara')
+            ->has('ticket')
+        );
+
+        $admin = $this->createAdmin();
+        $adminResponse = $this->actingAs($admin)->get("/tickets/{$ticket->id}/berita-acara");
+        $adminResponse->assertOk();
+        $adminResponse->assertInertia(fn ($page) => $page
+            ->component('Tickets/BeritaAcara')
+            ->has('ticket')
+        );
+    }
+
     public function test_assigned_technician_can_submit_resolution(): void
     {
         $tech = $this->createTechnician();
@@ -318,6 +364,34 @@ class TicketLifecycleTest extends TestCase
 
         $this->assertEquals('closed', $ticket->status);
         $this->assertNotNull($ticket->closed_at);
+        $this->assertDatabaseHas('ticket_status_histories', [
+            'ticket_id' => $ticket->id,
+            'new_status' => 'closed',
+            'comment' => 'Admin memverifikasi mutu hasil perbaikan dan menutup tiket secara resmi.',
+        ]);
+    }
+
+    public function test_admin_can_approve_with_custom_admin_note(): void
+    {
+        $admin = $this->createAdmin();
+        $ticket = $this->createTicket([
+            'status' => 'pending_approval',
+            'resolution_note' => 'Solusi perbaikan selesai.',
+        ]);
+
+        $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/approve-resolution", [
+            'admin_note' => 'Pekerjaan telah diverifikasi di lokasi dan koneksi Bappeda sudah normal kembali.',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('closed', $ticket->status);
+        $this->assertDatabaseHas('ticket_status_histories', [
+            'ticket_id' => $ticket->id,
+            'new_status' => 'closed',
+            'comment' => 'Pekerjaan telah diverifikasi di lokasi dan koneksi Bappeda sudah normal kembali.',
+        ]);
     }
 
     public function test_admin_can_request_revision(): void

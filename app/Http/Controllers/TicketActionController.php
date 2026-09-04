@@ -442,7 +442,7 @@ class TicketActionController extends Controller
             // Dispatch Notification
             NotificationDispatcher::pendingApproval($lockedTicket);
 
-            return back()->with('success', 'Laporan perbaikan berhasil dikirim ke Admin untuk ditinjau.');
+            return redirect()->route('tickets.show', $lockedTicket->id)->with('success', 'Laporan penyelesaian dan berita acara perbaikan berhasil dikirim ke Admin untuk ditinjau.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -456,6 +456,10 @@ class TicketActionController extends Controller
     public function approveResolution(Request $request, Ticket $ticket)
     {
         $this->authorize('approveResolution', $ticket);
+
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
 
         $user = $request->user();
 
@@ -474,18 +478,23 @@ class TicketActionController extends Controller
                 'closed_at' => now(),
             ]);
 
+            $comment = !empty($validated['admin_note']) && trim($validated['admin_note']) !== ''
+                ? trim($validated['admin_note'])
+                : 'Admin memverifikasi mutu hasil perbaikan dan menutup tiket secara resmi.';
+
             // Status History
             $history = $lockedTicket->statusHistories()->create([
                 'changed_by' => $user->id,
                 'previous_status' => 'pending_approval',
                 'new_status' => 'closed',
-                'comment' => 'Admin memverifikasi mutu hasil perbaikan dan menutup tiket secara resmi.',
+                'comment' => $comment,
                 'created_at' => now(),
             ]);
 
             // Activity Log
             ActivityLogger::log('ticket.approved', $lockedTicket, [
                 'closed_at' => now()->toDateTimeString(),
+                'admin_note' => $validated['admin_note'] ?? null,
             ], $user->id);
 
             DB::commit();

@@ -231,4 +231,69 @@ class TicketController extends Controller
             'initialUnreadCount' => $unreadRepliesCount,
         ]);
     }
+
+    /**
+     * Show the dedicated resolution & berita acara form page for technician.
+     */
+    public function resolve(Ticket $ticket)
+    {
+        $this->authorize('submitResolution', $ticket);
+
+        $ticket->load([
+            'department:id,name',
+            'reporter:id,name,phone_number',
+            'assignee:id,name,phone_number',
+            'technicians:id,name,phone_number',
+            'category:id,name,infrastructure_type',
+            'attachments',
+        ]);
+
+        $categories = TicketCategory::where('status', 'active')
+            ->select('id', 'name', 'infrastructure_type')
+            ->get()
+            ->groupBy('infrastructure_type');
+
+        $availableDevices = NetworkDevice::where('status', 'active')
+            ->orderBy('name')
+            ->pluck('name');
+
+        $availableMaterials = Material::where('status', 'active')
+            ->orderBy('name')
+            ->select('name', 'default_unit')
+            ->get();
+
+        return Inertia::render('Tickets/Resolve', [
+            'ticket' => $ticket,
+            'categoriesMap' => $categories,
+            'availableDevices' => $availableDevices,
+            'availableMaterials' => $availableMaterials,
+        ]);
+    }
+
+    /**
+     * Show the dedicated read-only Berita Acara & technical details document page.
+     */
+    public function beritaAcara(Ticket $ticket)
+    {
+        $this->authorize('view', $ticket);
+
+        $user = auth()->user();
+        if (!in_array($user->role, ['admin', 'technician'])) {
+            abort(403, 'Hanya Administrator dan Tim Teknisi yang dapat mengakses Berita Acara teknis.');
+        }
+
+        $ticket->load([
+            'department:id,name',
+            'reporter:id,name,phone_number',
+            'assignee:id,name,phone_number',
+            'technicians:id,name,phone_number',
+            'category:id,name,infrastructure_type',
+            'attachments',
+            'statusHistories.changer:id,name,role',
+        ]);
+
+        return Inertia::render('Tickets/BeritaAcara', [
+            'ticket' => $ticket,
+        ]);
+    }
 }

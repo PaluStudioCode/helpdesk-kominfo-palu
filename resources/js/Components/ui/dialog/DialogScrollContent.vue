@@ -34,9 +34,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         "
         v-bind="forwarded"
         @pointer-down-outside="(event) => {
-          const originalEvent = event.detail.originalEvent;
-          const target = originalEvent.target as HTMLElement;
-          if (originalEvent.offsetX > target.clientWidth || originalEvent.offsetY > target.clientHeight) {
+          const originalEvent = event.detail?.originalEvent;
+          const target = originalEvent?.target as HTMLElement;
+          if (originalEvent && target && (originalEvent.offsetX > target.clientWidth || originalEvent.offsetY > target.clientHeight)) {
             event.preventDefault();
           }
         }"
@@ -44,9 +44,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         <slot />
 
         <DialogClose
-          class="absolute top-3 right-3 p-0.5 transition-colors rounded-md hover:bg-secondary"
+          class="absolute top-3.5 right-3.5 p-1 rounded-md opacity-70 ring-offset-background transition-opacity hover:opacity-100 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none z-10"
         >
-          <X class="w-4 h-4" />
+          <X class="w-4 h-4 text-slate-500" />
           <span class="sr-only">Close</span>
         </DialogClose>
       </DialogContent>

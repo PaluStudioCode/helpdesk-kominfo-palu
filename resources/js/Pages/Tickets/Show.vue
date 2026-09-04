@@ -37,6 +37,7 @@ import {
     Send,
     ArrowLeft,
     Shield,
+    ShieldCheck,
     Lock,
     Users,
     Star,
@@ -66,6 +67,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogScrollContent,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -100,6 +102,16 @@ const isAssignedTechnician = computed(() => {
     return false;
 });
 
+const isTicketAssigned = computed(() => {
+    if (props.ticket.status === 'pending_admin') return false;
+    if (props.ticket.status === 'cancelled' && !props.ticket.assigned_to && (!props.ticket.technicians || props.ticket.technicians.length === 0)) return false;
+    return Boolean(
+        props.ticket.assigned_to || 
+        (props.ticket.technicians && props.ticket.technicians.length > 0) ||
+        ['in_progress', 'on_hold', 'pending_approval', 'closed'].includes(props.ticket.status)
+    );
+});
+
 // 72 Hours Resubmit Constraint
 const isWithin72Hours = computed(() => {
     if (props.ticket.status !== 'cancelled') return false;
@@ -128,6 +140,10 @@ const canSubmitResolution = computed(() => props.ticket.status === 'in_progress'
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
+const canViewBeritaAcara = computed(() => {
+    if (role.value !== 'admin' && !(role.value === 'technician' && isAssignedTechnician.value)) return false;
+    return Boolean(props.ticket.resolved_at || props.ticket.action_taken || props.ticket.resolution_note || props.ticket.status === 'pending_approval' || props.ticket.status === 'closed');
+});
 const canReply = computed(() => {
     if (['closed', 'cancelled'].includes(props.ticket.status)) return false;
     if (role.value === 'admin') return true;
@@ -143,6 +159,21 @@ const cancellationInfo = computed(() => {
     return {
         isCancelledByReporter,
         comment: cancelledHistory?.comment || 'Laporan telah dibatalkan / ditolak.',
+    };
+});
+
+const approvalInfo = computed(() => {
+    if (props.ticket.status !== 'closed' || !props.ticket.status_histories) return null;
+    const closedHistories = props.ticket.status_histories.filter((h: any) => h.new_status === 'closed');
+    if (closedHistories.length === 0) return null;
+    const latestClosed = closedHistories.reduce((prev: any, curr: any) => {
+        return (new Date(curr.created_at).getTime() > new Date(prev.created_at).getTime()) ? curr : prev;
+    }, closedHistories[0]);
+
+    return {
+        adminName: latestClosed.changer?.name || 'Administrator Diskominfo',
+        comment: latestClosed.comment || 'Admin memverifikasi mutu hasil perbaikan dan menutup tiket secara resmi.',
+        approvedAt: latestClosed.created_at,
     };
 });
 
@@ -224,7 +255,6 @@ const isRejectModalOpen = ref(false);
 const isCancelModalOpen = ref(false);
 const isResubmitModalOpen = ref(false);
 const isHoldModalOpen = ref(false);
-const isResolutionModalOpen = ref(false);
 const isApproveModalOpen = ref(false);
 const isRevisionModalOpen = ref(false);
 const isDrawerOpen = ref(false);
@@ -353,157 +383,58 @@ const submitResubmit = () => {
     });
 };
 
-// 4. Submit Resolution Form (Technician)
-const defaultAffectedDeviceOptions = [
-    'Router / Gateway',
-    'Switch Core / Distribution',
-    'Switch Access',
-    'Access Point (AP) / WiFi Indoor',
-    'Access Point (AP) / WiFi Outdoor',
-    'Optical Termination Box (OTB) / Joint Closure',
-    'Optical Distribution Point (ODP) / Splitter',
-    'Media Converter / SFP Transceiver',
-    'Kabel Fiber Optic (Drop Core / Feeder)',
-    'Kabel UTP / Patch Cord / LAN RJ45',
-    'Power Supply / PoE Injector / UPS',
-    'Server / OLT / Rack Server',
-];
-
-const affectedDeviceOptions = computed(() => {
-    return (props.availableDevices && props.availableDevices.length > 0)
-        ? [...props.availableDevices]
-        : [...defaultAffectedDeviceOptions];
-});
-
-const selectedAffectedDevice = ref<string>('');
-
-const resolutionForm = useForm({
-    affected_device: props.ticket.affected_device || '',
-    actual_repair_location: props.ticket.actual_repair_location || props.ticket.location_details || '',
-    infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
-    network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
-    category_id: props.ticket.category_id ? props.ticket.category_id.toString() : '',
-    inspection_result: props.ticket.inspection_result || '',
-    root_cause: props.ticket.root_cause || '',
-    action_taken: props.ticket.action_taken || '',
-    materials_used: props.ticket.materials_used || '',
-    test_result: props.ticket.test_result || '',
-    test_parameters: props.ticket.test_parameters || '',
-    notes: props.ticket.resolution_note || '',
-    resolution_proofs: [] as File[],
-});
-
-const syncAffectedDevice = () => {
-    resolutionForm.affected_device = selectedAffectedDevice.value;
-};
-
-watch(selectedAffectedDevice, () => {
-    syncAffectedDevice();
-});
-
-const resolutionCategories = computed(() => {
-    const infraType = resolutionForm.infrastructure_type || resolutionForm.network_type;
-    if (!infraType || !props.categoriesMap) return [];
-    return props.categoriesMap[infraType] || [];
-});
-
+// Material & Berita Acara Read Helpers
 const defaultMaterialList = [
-    'Konektor RJ-45 Cat6',
-    'Patch Cord UTP Cat6',
-    'Kabel UTP / LAN Cat6',
-    'Kabel Drop Core Fiber Optic (1-Core / 2-Core)',
-    'Patch Cord Fiber Optic (SC-SC / LC-SC)',
-    'Pigtail Fiber Optic SC/UPC',
-    'Fast Connector SC/UPC',
-    'Fast Connector SC/APC',
-    'Protection Sleeve FO (Splicing)',
-    'Optical Termination Box (OTB)',
-    'Optical Distribution Point (ODP)',
-    'Adaptor Fiber Optic SC/UPC',
-    'SFP Transceiver Module (1.25G / 10G)',
-    'Media Converter FO to LAN',
-    'PoE Injector (24V / 48V)',
-    'Power Supply / Adaptor (12V / 24V)',
-    'Access Point (AP)',
-    'Switch Hub (8-Port / 16-Port / 24-Port)',
-    'Router Board / Mikrotik',
-    'Stop Kontak / Steker Listrik',
-    'Kabel Ties / Velcro',
-    'Pipa Conduit / Cable Protector Duct',
-    'Isolasi Listrik / Heat Shrink',
+    { name: 'Konektor RJ-45 Cat6', unit: 'pcs' },
+    { name: 'Patch Cord UTP Cat6', unit: 'pcs' },
+    { name: 'Kabel UTP / LAN Cat6', unit: 'meter' },
+    { name: 'Kabel Drop Core Fiber Optic (1-Core / 2-Core)', unit: 'meter' },
+    { name: 'Patch Cord Fiber Optic (SC-SC / LC-SC)', unit: 'pcs' },
+    { name: 'Pigtail Fiber Optic SC/UPC', unit: 'pcs' },
+    { name: 'Fast Connector SC/UPC', unit: 'pcs' },
+    { name: 'Fast Connector SC/APC', unit: 'pcs' },
+    { name: 'Protection Sleeve FO (Splicing)', unit: 'pcs' },
+    { name: 'Optical Termination Box (OTB)', unit: 'unit' },
+    { name: 'Optical Distribution Point (ODP)', unit: 'unit' },
+    { name: 'Adaptor Fiber Optic SC/UPC', unit: 'pcs' },
+    { name: 'SFP Transceiver Module (1.25G / 10G)', unit: 'pcs' },
+    { name: 'Media Converter FO to LAN', unit: 'unit' },
+    { name: 'PoE Injector (24V / 48V)', unit: 'pcs' },
+    { name: 'Power Supply / Adaptor (12V / 24V)', unit: 'pcs' },
+    { name: 'Access Point (AP)', unit: 'unit' },
+    { name: 'Switch Hub (8-Port / 16-Port / 24-Port)', unit: 'unit' },
+    { name: 'Router Board / Mikrotik', unit: 'unit' },
+    { name: 'Stop Kontak / Steker Listrik', unit: 'pcs' },
+    { name: 'Kabel Ties / Velcro', unit: 'pack' },
+    { name: 'Pipa Conduit / Cable Protector Duct', unit: 'batang' },
+    { name: 'Isolasi Listrik / Heat Shrink', unit: 'roll' },
 ];
 
 const materialOptions = computed(() => {
-    return (props.availableMaterials && props.availableMaterials.length > 0)
-        ? props.availableMaterials.map((m: any) => m.name)
-        : [...defaultMaterialList];
+    if (props.availableMaterials && props.availableMaterials.length > 0) {
+        return props.availableMaterials.map((m: any, idx: number) => ({
+            id: idx + 1,
+            name: m.name,
+            unit: m.default_unit || 'pcs',
+        }));
+    }
+    return defaultMaterialList.map((m, idx) => ({
+        id: idx + 1,
+        name: m.name,
+        unit: m.unit,
+    }));
 });
-
-const handleMaterialChange = (row: MaterialRow) => {
-    if (row.material === 'none') {
-        row.quantity = null;
-        row.unit = 'pcs';
-        return;
-    }
-    if (!row.quantity || row.quantity < 1) {
-        row.quantity = 1;
-    }
-    if (row.material) {
-        if (props.availableMaterials && props.availableMaterials.length > 0) {
-            const found = props.availableMaterials.find((m: any) => m.name.toLowerCase() === row.material.toLowerCase());
-            if (found && found.default_unit) {
-                row.unit = found.default_unit;
-                return;
-            }
-        }
-        if (row.material.toLowerCase().includes('kabel') || row.material.toLowerCase().includes('drop core')) {
-            row.unit = 'meter';
-        } else if (row.material.toLowerCase().includes('isolasi')) {
-            row.unit = 'roll';
-        } else if (row.material.toLowerCase().includes('pipa')) {
-            row.unit = 'batang';
-        } else if (row.material.toLowerCase().includes('ties')) {
-            row.unit = 'pack';
-        } else if (
-            row.material.toLowerCase().includes('switch') || 
-            row.material.toLowerCase().includes('router') || 
-            row.material.toLowerCase().includes('converter') || 
-            row.material.toLowerCase().includes('module') || 
-            row.material.toLowerCase().includes('access point') ||
-            row.material.toLowerCase().includes('box') ||
-            row.material.toLowerCase().includes('supply') ||
-            row.material.toLowerCase().includes('injector') ||
-            row.material.toLowerCase().includes('modem') ||
-            row.material.toLowerCase().includes('ont')
-        ) {
-            row.unit = 'unit';
-        } else {
-            row.unit = 'pcs';
-        }
-    }
-};
-
-const unitOptions = [
-    'pcs',
-    'meter',
-    'unit',
-    'roll',
-    'set',
-    'batang',
-    'buah',
-    'pack',
-    'box',
-];
 
 interface MaterialRow {
     material: string;
     quantity: number | null;
     unit: string;
+    isCustom?: boolean;
 }
 
 const parseExistingMaterials = (str: string | null | undefined): MaterialRow[] => {
     if (!str || !str.trim()) {
-        return [{ material: '', quantity: 1, unit: 'pcs' }];
+        return [];
     }
     
     const items = str.split(/,|\n/).map(s => s.trim()).filter(Boolean);
@@ -541,142 +472,44 @@ const parseExistingMaterials = (str: string | null | undefined): MaterialRow[] =
             unit = 'pcs';
         }
 
-        const matchedMat = materialOptions.value.find(m => m.toLowerCase() === rawName.toLowerCase());
+        const matchedMat = materialOptions.value.find(m => m.name.toLowerCase() === rawName.toLowerCase());
         
         let finalUnit = unit;
-        if (props.availableMaterials && props.availableMaterials.length > 0) {
-            const found = props.availableMaterials.find((m: any) => m.name.toLowerCase() === (matchedMat || rawName).toLowerCase());
-            if (found && found.default_unit) {
-                finalUnit = found.default_unit;
-            }
-        }
-        if (!finalUnit || !unitOptions.includes(finalUnit)) {
-            finalUnit = unitOptions.includes(unit) ? unit : 'pcs';
-        }
-
         if (matchedMat) {
+            finalUnit = matchedMat.unit;
             rows.push({
-                material: matchedMat,
+                material: matchedMat.name,
                 quantity: isNaN(qty) ? 1 : qty,
                 unit: finalUnit,
+                isCustom: false,
+            });
+        } else {
+            rows.push({
+                material: rawName,
+                quantity: isNaN(qty) ? 1 : qty,
+                unit: finalUnit || 'pcs',
+                isCustom: true,
             });
         }
     }
 
-    return rows.length > 0 ? rows : [{ material: '', quantity: 1, unit: 'pcs' }];
+    return rows;
 };
 
-const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.materials_used));
-
-const syncMaterialsUsed = () => {
-    const validRows = materialRows.value.filter(r => r.material && r.material !== 'none' && (r.quantity ?? 0) > 0);
-    if (validRows.length > 0) {
-        resolutionForm.materials_used = validRows.map(r => {
-            return `${r.material} (${r.quantity} ${r.unit})`;
-        }).join(', ');
-    } else {
-        resolutionForm.materials_used = '';
-    }
-};
-
-const addMaterialRow = () => {
-    materialRows.value.push({
-        material: '',
-        quantity: 1,
-        unit: 'pcs',
-    });
-};
-
-const removeMaterialRow = (index: number) => {
-    if (materialRows.value.length > 1) {
-        materialRows.value.splice(index, 1);
-    } else {
-        materialRows.value[0] = {
-            material: '',
-            quantity: 1,
-            unit: 'pcs',
-        };
-    }
-    syncMaterialsUsed();
-};
-
-const testResultOptions = [
-    'Normal',
-    'Normal / Berfungsi Baik',
-    'Stabil / Link Up',
-    'Optimal',
-    'Normal dengan Pemantauan',
-];
-
-const selectedTestResult = ref<string>(
-    props.ticket.test_result && testResultOptions.includes(props.ticket.test_result)
-        ? props.ticket.test_result
-        : 'Normal'
-);
-
-const syncTestResult = () => {
-    resolutionForm.test_result = selectedTestResult.value;
-};
-
-watch(selectedTestResult, () => {
-    syncTestResult();
+const parsedMaterialsList = computed(() => {
+    if (!props.ticket.materials_used) return [];
+    return parseExistingMaterials(props.ticket.materials_used).filter(r => r.material && r.material !== 'none');
 });
-
-watch(materialRows, () => {
-    syncMaterialsUsed();
-}, { deep: true });
-
-watch(isResolutionModalOpen, (open) => {
-    if (open) {
-        resolutionForm.clearErrors();
-        resolutionForm.actual_repair_location = props.ticket.actual_repair_location || props.ticket.location_details || '';
-        resolutionForm.infrastructure_type = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
-        resolutionForm.network_type = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
-        resolutionForm.category_id = props.ticket.category_id ? props.ticket.category_id.toString() : '';
-        resolutionForm.inspection_result = props.ticket.inspection_result || '';
-        resolutionForm.root_cause = props.ticket.root_cause || '';
-        resolutionForm.action_taken = props.ticket.action_taken || '';
-        resolutionForm.test_parameters = props.ticket.test_parameters || '';
-        resolutionForm.notes = props.ticket.resolution_note || '';
-
-        // Handle affected device
-        if (props.ticket.affected_device && affectedDeviceOptions.value.includes(props.ticket.affected_device)) {
-            selectedAffectedDevice.value = props.ticket.affected_device;
-        } else {
-            selectedAffectedDevice.value = '';
-        }
-        syncAffectedDevice();
-
-        materialRows.value = parseExistingMaterials(props.ticket.materials_used);
-        syncMaterialsUsed();
-
-        if (props.ticket.test_result && testResultOptions.includes(props.ticket.test_result)) {
-            selectedTestResult.value = props.ticket.test_result;
-        } else {
-            selectedTestResult.value = 'Normal';
-        }
-        syncTestResult();
-    }
-});
-
-const submitResolution = () => {
-    syncAffectedDevice();
-    syncMaterialsUsed();
-    syncTestResult();
-    resolutionForm.post(route('tickets.submit-resolution', props.ticket.id), {
-        onSuccess: () => {
-            isResolutionModalOpen.value = false;
-            resolutionForm.reset();
-        }
-    });
-};
 
 // 5. Approve Resolution Form (Admin)
-const approveForm = useForm({});
+const approveForm = useForm({
+    admin_note: '',
+});
 const submitApprove = () => {
     approveForm.post(route('tickets.approve-resolution', props.ticket.id), {
         onSuccess: () => {
             isApproveModalOpen.value = false;
+            approveForm.reset();
         }
     });
 };
@@ -950,18 +783,18 @@ onUnmounted(() => {
         <div class="max-w-6xl mx-auto space-y-5">
             
             <!-- Ticket Action Bar (Formal, Rapi, Dimensi Stabil) -->
-            <div class="bg-white rounded-xl border border-slate-200 px-4 sm:px-6 py-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[64px]">
+            <div class="bg-white rounded-xl border border-slate-200 px-4 sm:px-5 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-h-[58px]">
                 <!-- Kiri: Tombol Kembali + Nomor Tiket + Status -->
                 <div class="flex items-center gap-3 min-w-0">
                     <Link 
                         :href="route('tickets.index')" 
-                        class="h-9 w-9 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 transition-colors shrink-0" 
+                        class="h-8.5 w-8.5 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 transition-colors shrink-0" 
                         title="Kembali ke Antrean"
                     >
                         <ArrowLeft class="w-4 h-4" />
                     </Link>
                     <div class="flex items-center gap-2.5 min-w-0 flex-wrap">
-                        <span class="text-lg sm:text-xl font-bold text-slate-900 font-mono tracking-tight shrink-0">{{ ticket.ticket_number }}</span>
+                        <span class="text-base sm:text-lg font-bold text-slate-900 font-mono tracking-tight shrink-0">{{ ticket.ticket_number }}</span>
                         <span class="text-slate-300 font-light hidden sm:inline">•</span>
                         <div class="flex items-center gap-1.5 text-xs sm:text-sm shrink-0">
                             <span class="text-slate-400 font-medium">Status:</span>
@@ -973,13 +806,13 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Kanan: Action Buttons (Selalu Flex, Overflow Visible agar Animasi Bebas) -->
-                <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap overflow-visible py-1">
+                <div class="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap overflow-visible py-0.5">
                     <!-- Tombol Diskusi & Riwayat -->
                     <Button 
                         @click="isDrawerOpen = true" 
                         size="sm" 
                         variant="outline" 
-                        class="h-9 px-3.5 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-xs sm:text-sm font-medium relative overflow-visible whitespace-nowrap"
+                        class="border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium relative overflow-visible whitespace-nowrap"
                     >
                         <MessageSquare class="w-4 h-4 mr-1.5 text-kominfo-primary" />
                         <span>Diskusi & Riwayat</span>
@@ -991,12 +824,27 @@ onUnmounted(() => {
                         </span>
                     </Button>
 
+                    <!-- Tombol Rincian Teknis (Berita Acara) Khusus Admin & Teknisi -->
+                    <Link 
+                        v-if="canViewBeritaAcara" 
+                        :href="route('tickets.berita-acara', ticket.id)"
+                    >
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            class="border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium whitespace-nowrap cursor-pointer"
+                        >
+                            <FileText class="w-4 h-4 mr-1.5 text-slate-600" />
+                            <span>Rincian Teknis</span>
+                        </Button>
+                    </Link>
+
                     <!-- Admin Actions: Pending Admin -->
                     <Button 
                         v-if="canVerifyAndAssign" 
                         @click="isVerifyModalOpen = true" 
                         size="sm" 
-                        class="h-9 px-3.5 bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white font-medium whitespace-nowrap"
                     >
                         <ShieldCheck class="w-4 h-4 mr-1.5" /> Verifikasi & Tugaskan
                     </Button>
@@ -1006,7 +854,7 @@ onUnmounted(() => {
                         @click="isRejectModalOpen = true" 
                         size="sm" 
                         variant="destructive" 
-                        class="h-9 px-3.5 text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="font-medium whitespace-nowrap"
                     >
                         <XCircle class="w-4 h-4 mr-1.5" /> Tolak Laporan
                     </Button>
@@ -1017,7 +865,7 @@ onUnmounted(() => {
                         @click="isCancelModalOpen = true" 
                         size="sm" 
                         variant="destructive" 
-                        class="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="bg-rose-600 hover:bg-rose-700 text-white font-medium whitespace-nowrap"
                     >
                         <XCircle class="w-4 h-4 mr-1.5" /> Batalkan Laporan
                     </Button>
@@ -1028,7 +876,7 @@ onUnmounted(() => {
                         @click="isHoldModalOpen = true" 
                         size="sm" 
                         variant="outline" 
-                        class="h-9 px-3.5 border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 font-medium whitespace-nowrap"
                     >
                         <PauseCircle class="w-4 h-4 mr-1.5 text-amber-700" /> Tunda (On-Hold)
                     </Button>
@@ -1038,26 +886,29 @@ onUnmounted(() => {
                         @click="submitResume" 
                         size="sm" 
                         :disabled="resumeForm.processing"
-                        class="h-9 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="bg-amber-600 hover:bg-amber-700 text-white font-medium whitespace-nowrap"
                     >
                         <PlayCircle class="w-4 h-4 mr-1.5" /> {{ resumeForm.processing ? 'Melanjutkan...' : 'Lanjutkan Pengerjaan (Resume)' }}
                     </Button>
 
-                    <Button 
+                    <Link 
                         v-if="canSubmitResolution" 
-                        @click="isResolutionModalOpen = true" 
-                        size="sm" 
-                        class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        :href="route('tickets.resolve', ticket.id)"
                     >
-                        <CheckCircle2 class="w-4 h-4 mr-1.5" /> Selesaikan Perbaikan
-                    </Button>
+                        <Button 
+                            size="sm" 
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium whitespace-nowrap cursor-pointer"
+                        >
+                            <CheckCircle2 class="w-4 h-4 mr-1.5" /> Selesaikan Perbaikan
+                        </Button>
+                    </Link>
 
                     <!-- Admin Actions: Pending Approval (Quality Gate) -->
                     <Button 
                         v-if="canApproveResolution" 
                         @click="isApproveModalOpen = true" 
                         size="sm" 
-                        class="h-9 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium whitespace-nowrap"
                     >
                         <CheckCircle2 class="w-4 h-4 mr-1.5" /> Setujui Hasil Kerja
                     </Button>
@@ -1067,7 +918,7 @@ onUnmounted(() => {
                         @click="isRevisionModalOpen = true" 
                         size="sm" 
                         variant="outline" 
-                        class="h-9 px-3.5 border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 font-medium whitespace-nowrap"
                     >
                         <RotateCcw class="w-4 h-4 mr-1.5 text-amber-700" /> Minta Revisi
                     </Button>
@@ -1077,7 +928,7 @@ onUnmounted(() => {
                         v-if="canResubmit" 
                         @click="isResubmitModalOpen = true" 
                         size="sm" 
-                        class="h-9 px-3.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                        class="bg-rose-600 hover:bg-rose-700 text-white font-medium whitespace-nowrap"
                     >
                         <RotateCcw class="w-4 h-4 mr-1.5" /> Perbaiki & Ajukan Kembali
                     </Button>
@@ -1087,12 +938,13 @@ onUnmounted(() => {
             <!-- Contextual Workflow Status Banners -->
             
             <!-- 0. On-Hold Status Banner -->
-            <div v-if="ticket.status === 'on_hold'" class="p-5 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+            <div v-if="ticket.status === 'on_hold'" class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5">
                 <div class="flex items-start gap-3">
-                    <PauseCircle class="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
-                    <div class="space-y-1 text-sm text-amber-950 flex-1">
+                    <PauseCircle class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <!-- Tampilan Khusus Admin & Teknisi (Full Technical Detail) -->
+                    <div v-if="role === 'admin' || role === 'technician'" class="space-y-1 text-sm text-amber-950 flex-1">
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <p class="font-bold text-amber-950 text-base">
+                            <p class="font-bold text-amber-950 text-sm sm:text-base">
                                 Penanganan Lapangan Ditunda Sementara (On-Hold)
                             </p>
                             <span v-if="ticket.hold_started_at" class="text-xs text-amber-700 font-medium">
@@ -1102,13 +954,33 @@ onUnmounted(() => {
                         <p class="text-amber-900 text-xs sm:text-sm font-medium">
                             Kategori Hambatan: <span class="font-bold text-amber-950">{{ getHoldCategoryLabel(ticket.hold_reason_category) }}</span>
                         </p>
-                        <p v-if="ticket.hold_reason_note" class="text-amber-800 text-xs sm:text-sm leading-relaxed bg-amber-100/60 p-3 rounded-lg border border-amber-200/70 mt-2">
+                        <p v-if="ticket.hold_reason_note" class="text-amber-800 text-xs sm:text-sm leading-relaxed bg-amber-100/60 p-2.5 rounded-lg border border-amber-200/70 mt-1.5">
                             <span class="font-semibold text-amber-900">Catatan Kendala:</span> {{ ticket.hold_reason_note }}
                         </p>
-                        <div class="pt-2 border-t border-amber-200/80 mt-2">
+                        <div class="pt-1.5 border-t border-amber-200/80 mt-1.5">
                             <span class="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
-                                <Clock class="w-4 h-4 text-amber-600" />
+                                <Clock class="w-3.5 h-3.5 text-amber-600" />
                                 Timer batas target SLA dijeda otomatis dan akan disesuaikan saat penanganan dilanjutkan.
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Tampilan Khusus Pelapor OPD (Ringkas & Informatif) -->
+                    <div v-else class="space-y-1 text-sm text-amber-950 flex-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="font-bold text-amber-950 text-sm sm:text-base">
+                                Penanganan Lapangan Sedang Ditunda (On-Hold)
+                            </p>
+                            <span v-if="ticket.hold_started_at" class="text-xs text-amber-700 font-medium">
+                                Sejak: {{ formatDate(ticket.hold_started_at) }}
+                            </span>
+                        </div>
+                        <p class="text-amber-900 text-xs sm:text-sm leading-relaxed mt-1">
+                            Pengerjaan di lokasi sedang dijeda sementara oleh Tim Teknisi karena adanya kendala teknis di lapangan atau ketergantungan pihak ketiga (ISP/suku cadang/izin akses).
+                        </p>
+                        <div class="pt-1.5 border-t border-amber-200/80 mt-1.5">
+                            <span class="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                                <Clock class="w-3.5 h-3.5 text-amber-600" />
+                                Target batas waktu penyelesaian (SLA) dijeda otomatis selama proses penundaan.
                             </span>
                         </div>
                     </div>
@@ -1116,23 +988,23 @@ onUnmounted(() => {
             </div>
 
             <!-- 1. Cancelled / Rejection Banner -->
-            <div v-if="ticket.status === 'cancelled'" class="p-5 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
+            <div v-if="ticket.status === 'cancelled'" class="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-2.5">
                 <div class="flex items-start gap-3">
-                    <AlertTriangle class="w-6 h-6 text-rose-600 shrink-0 mt-0.5" />
+                    <AlertTriangle class="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                     <div class="space-y-1 text-sm text-rose-900 flex-1">
                         <p class="font-bold text-rose-950">
                             {{ cancellationInfo?.isCancelledByReporter ? 'Laporan Dibatalkan oleh Pelapor OPD' : 'Laporan Tiket Ditolak oleh Admin Diskominfo' }}
                         </p>
-                        <p class="text-rose-800 leading-relaxed font-normal">
+                        <p class="text-rose-800 leading-relaxed font-normal text-xs sm:text-sm">
                             {{ cancellationInfo?.comment }}
                         </p>
-                        <div v-if="!cancellationInfo?.isCancelledByReporter && isWithin72Hours" class="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 mt-2">
+                        <div v-if="!cancellationInfo?.isCancelledByReporter && isWithin72Hours" class="pt-1.5 flex flex-wrap items-center justify-between gap-3 border-t border-rose-200 mt-1.5">
                             <span class="text-xs font-semibold text-rose-900 flex items-center gap-1.5">
-                                <Clock class="w-4 h-4 text-rose-600" />
+                                <Clock class="w-3.5 h-3.5 text-rose-600" />
                                 Masa perbaikan laporan aktif: Tersisa {{ remainingResubmitHours }} jam
                             </span>
-                            <Button v-if="canResubmit" @click="isResubmitModalOpen = true" size="sm" class="bg-rose-600 hover:bg-rose-700 text-white text-xs">
-                                Perbaiki Laporan Sekarang
+                            <Button v-if="canResubmit" @click="isResubmitModalOpen = true" size="sm" class="bg-rose-600 hover:bg-rose-700 text-white font-medium">
+                                <RotateCcw class="w-4 h-4 mr-1.5" /> Perbaiki Laporan Sekarang
                             </Button>
                         </div>
                         <div v-else-if="!cancellationInfo?.isCancelledByReporter" class="text-xs text-rose-700 pt-1 font-medium italic">
@@ -1143,7 +1015,7 @@ onUnmounted(() => {
             </div>
 
             <!-- 2. Pending Admin Banner -->
-            <div v-if="ticket.status === 'pending_admin'" class="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-sm text-blue-900">
+            <div v-if="ticket.status === 'pending_admin'" class="p-3.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-sm text-blue-900">
                 <Info class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                 <div>
                     <p class="font-bold text-blue-950">Menunggu Verifikasi & Disposisi Admin</p>
@@ -1154,7 +1026,7 @@ onUnmounted(() => {
             </div>
 
             <!-- 3. Pending Approval Banner -->
-            <div v-if="ticket.status === 'pending_approval'" class="p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-start gap-3 text-sm text-purple-900">
+            <div v-if="ticket.status === 'pending_approval'" class="p-3.5 sm:p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-start gap-3 text-sm text-purple-900">
                 <ShieldCheck class="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
                 <div>
                     <p class="font-bold text-purple-950">Pekerjaan Lapangan Selesai (Menunggu Review Mutu Admin)</p>
@@ -1164,289 +1036,211 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- Main Ticket Docket Card -->
-            <Card class="border-slate-200 shadow-xs bg-white overflow-hidden rounded-xl">
+            <!-- Main Ticket Docket Card (Format Formal & Standar) -->
+            <Card class="border-slate-200 shadow-xs bg-white rounded-xl">
                 <!-- Header Kartu: Judul Kendala -->
-                <div class="p-6 sm:p-7 border-b border-slate-100 bg-slate-50/40">
-                    <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+                <div class="px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-200 bg-slate-50/50">
+                    <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-snug">
                         {{ ticket.title }}
                     </h1>
                 </div>
 
                 <!-- Main Content Body -->
-                <CardContent class="p-6 sm:p-7 space-y-8">
-                    <!-- SEKSI 1: INFORMASI PENGADUAN KENDALA (Pelapor OPD) -->
+                <CardContent class="p-5 sm:p-6 space-y-5">
+                    <!-- SEKSI 1: INFORMASI PENGADUAN -->
                     <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                            <FileText class="w-4 h-4 text-slate-400" /> Informasi Pengaduan Kendala
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
+                            Informasi Pengaduan
                         </h3>
 
-                        <!-- Grid Data Pengaduan -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
+                        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-5 mb-3">
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Instansi (OPD)</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.department.name }}</p>
+                                <dt class="text-xs text-slate-500 font-medium">Instansi Pelapor</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">{{ ticket.department.name }}</dd>
                             </div>
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lokasi / Ruangan</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ ticket.location_details || '-' }}</p>
+                                <dt class="text-xs text-slate-500 font-medium">Nama Pelapor</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">{{ ticket.reporter.name }}</dd>
                             </div>
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nama Pelapor</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.reporter.name }}</p>
+                                <dt class="text-xs text-slate-500 font-medium">Lokasi / Ruangan</dt>
+                                <dd class="text-sm text-slate-800 mt-0.5">{{ ticket.location_details || '-' }}</dd>
                             </div>
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Pengajuan</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ formatDate(ticket.created_at) }}</p>
+                                <dt class="text-xs text-slate-500 font-medium">Waktu Pengajuan</dt>
+                                <dd class="text-sm text-slate-800 mt-0.5">{{ formatDate(ticket.created_at) }}</dd>
                             </div>
-                        </div>
+                        </dl>
 
-                        <!-- Rincian Deskripsi Masalah -->
-                        <div>
-                            <p class="text-xs font-semibold text-slate-700 mb-1.5">Deskripsi Gangguan:</p>
-                            <div class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-slate-200">
-                                {{ ticket.description }}
+                        <div class="space-y-2.5">
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium mb-0.5">Deskripsi Gangguan</dt>
+                                <dd class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.description }}</dd>
                             </div>
-                        </div>
 
-                        <!-- Foto Bukti Gangguan Awal -->
-                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0" class="mt-4">
-                            <p class="text-xs font-semibold text-slate-700 mb-2.5">Foto Bukti Gangguan Awal:</p>
-                            <div class="flex flex-wrap gap-3">
-                                <button 
-                                    type="button"
-                                    v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
-                                    :key="att.id"
-                                    @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                    class="flex items-center gap-3 px-3.5 py-2.5 border border-slate-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/40 bg-white text-xs text-slate-800 transition-all shadow-xs group cursor-pointer"
-                                >
-                                    <div class="w-8 h-8 rounded bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
-                                        <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
-                                    </div>
-                                    <span class="truncate max-w-[200px] font-medium group-hover:text-blue-600">{{ att.file_name }}</span>
-                                </button>
+                            <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').length > 0">
+                                <dt class="text-xs text-slate-500 font-medium mb-1.5">Foto Bukti Gangguan</dt>
+                                <div class="flex flex-wrap gap-2">
+                                    <button 
+                                        type="button"
+                                        v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof')" 
+                                        :key="att.id"
+                                        @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'issue_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
+                                        class="inline-flex items-center gap-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:text-kominfo-primary hover:border-slate-300 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
+                                    >
+                                        <Paperclip class="w-3.5 h-3.5 text-slate-400" />
+                                        <span class="truncate max-w-[200px]">{{ att.file_name }}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- SEKSI 2: DISPOSISI & SPESIFIKASI TEKNIS (Diskominfo) -->
-                    <div>
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                            <Shield class="w-4 h-4 text-slate-400" /> Disposisi & Parameter Penanganan Teknis
+                    <!-- SEKSI 2: DISPOSISI PENANGANAN (Hanya Tampil Bila Tiket Sudah Ditugaskan) -->
+                    <div v-if="isTicketAssigned">
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
+                            Disposisi Penanganan
                         </h3>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80">
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur & Kategori</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">
+                        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-5">
+                            <!-- Khusus Admin & Teknisi: Tampilkan Detail Infrastruktur Jaringan & Kategori Riil -->
+                            <div v-if="role === 'admin' || role === 'technician'">
+                                <dt class="text-xs text-slate-500 font-medium">Infrastruktur & Kategori</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
                                     {{ (ticket.infrastructure_type || ticket.network_type) ? getNetworkLabel(ticket.infrastructure_type || ticket.network_type) : 'Menunggu diagnosa teknisi' }}
-                                </p>
-                                <p class="text-xs text-slate-600 mt-0.5">
+                                </dd>
+                                <dd class="text-xs text-slate-500 mt-0.5">
                                     {{ ticket.category ? ticket.category.name : ((ticket.infrastructure_type || ticket.network_type) ? 'Kategori belum ditentukan' : 'Diidentifikasi di lokasi') }}
-                                </p>
+                                </dd>
+                            </div>
+                            <!-- Khusus Pelapor OPD: Tampilkan Kategori Kendala yang Mudah Dipahami -->
+                            <div v-else>
+                                <dt class="text-xs text-slate-500 font-medium">Kategori Gangguan</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ ticket.category ? ticket.category.name : 'Gangguan Jaringan OPD' }}
+                                </dd>
                             </div>
 
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tingkat Prioritas</p>
-                                <p class="text-sm mt-0.5 font-bold" :class="getPriorityColor(ticket.priority)">
+                                <dt class="text-xs text-slate-500 font-medium">Tingkat Prioritas</dt>
+                                <dd class="text-sm font-semibold mt-0.5" :class="getPriorityColor(ticket.priority)">
                                     {{ getPriorityLabel(ticket.priority) }}
-                                </p>
+                                </dd>
                             </div>
 
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Target Waktu SLA</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">
+                                <dt class="text-xs text-slate-500 font-medium">Target Waktu SLA</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
                                     {{ ticket.due_at ? formatDate(ticket.due_at) : '-' }}
-                                </p>
-                                <div class="mt-1">
+                                </dd>
+                                <dd class="mt-0.5">
                                     <LiveTicketTimer :ticket="ticket" variant="inline" />
-                                </div>
+                                </dd>
                             </div>
 
                             <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tim Teknisi Lapangan</p>
-                                <div v-if="ticket.technicians && ticket.technicians.length > 0" class="flex flex-wrap gap-1.5 mt-1">
-                                    <span 
-                                        v-for="tech in ticket.technicians" 
-                                        :key="tech.id"
-                                        class="text-xs font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded"
-                                    >
-                                        {{ tech.name }}
+                                <dt class="text-xs text-slate-500 font-medium">Tim Teknisi Lapangan</dt>
+                                <dd class="text-sm text-slate-900 mt-0.5">
+                                    <span v-if="ticket.technicians && ticket.technicians.length > 0">
+                                        {{ ticket.technicians.map((t: any) => t.name).join(', ') }}
                                     </span>
-                                </div>
-                                <div v-else-if="ticket.assignee" class="mt-0.5">
-                                    <p class="font-bold text-slate-900 text-sm">{{ ticket.assignee.name }}</p>
-                                </div>
-                                <p v-else class="text-xs text-slate-400 italic mt-0.5">
-                                    Belum ditugaskan
-                                </p>
+                                    <span v-else-if="ticket.assignee">
+                                        {{ ticket.assignee.name }}
+                                    </span>
+                                    <span v-else class="text-slate-400 italic">
+                                        Belum ditugaskan
+                                    </span>
+                                </dd>
                             </div>
-                        </div>
+                        </dl>
                     </div>
 
-                    <!-- SEKSI 3: CATATAN SOLUSI & BUKTI PERBAIKAN (Jika ada) -->
+                    <!-- SEKSI 3: HASIL PENANGANAN (Bila Tersedia) -->
                     <div v-if="ticket.resolution_note || ticket.action_taken || ticket.resolved_at">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                            <CheckCircle2 class="w-4 h-4 text-emerald-500" /> Hasil Penanganan & Berita Acara Perbaikan Lapangan
-                        </h3>
-
-                        <!-- Grid Data Penyelesaian -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status Pengerjaan</p>
-                                <p class="font-bold text-emerald-600 text-sm mt-0.5">Selesai Ditangani</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Penyelesaian</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</p>
-                            </div>
-                            <div v-if="ticket.affected_device">
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Perangkat / Node Terdampak</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.affected_device }}</p>
-                            </div>
-                            <div v-if="ticket.actual_repair_location">
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Titik Lokasi Real Perbaikan</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.actual_repair_location }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Klasifikasi Riil</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">
-                                    {{ ticket.infrastructure_type ? getNetworkLabel(ticket.infrastructure_type) : '-' }}
-                                </p>
-                                <p class="text-xs text-slate-600 mt-0.5">
-                                    {{ ticket.category ? ticket.category.name : '-' }}
-                                </p>
-                            </div>
+                        <div class="pb-1.5 mb-3 border-b border-slate-200">
+                            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                                Hasil Penanganan
+                            </h3>
                         </div>
 
-                        <!-- Detail Diagnosa & Penyebab -->
-                        <div v-if="ticket.inspection_result || ticket.root_cause" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div v-if="ticket.inspection_result" class="bg-white p-4 rounded-lg border border-slate-200 space-y-1">
-                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Search class="w-3.5 h-3.5 text-blue-500" /> Hasil Pemeriksaan
-                                </p>
-                                <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.inspection_result }}</p>
+                        <dl class="grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-5 mb-3">
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Status Penanganan</dt>
+                                <dd class="text-sm font-semibold text-emerald-700 mt-0.5">Selesai Ditangani</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Waktu Selesai</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Teknisi Pelaksana</dt>
+                                <dd class="text-sm text-slate-900 mt-0.5">
+                                    {{ ticket.assignee ? ticket.assignee.name : (ticket.technicians && ticket.technicians.length > 0 ? ticket.technicians.map((t: any) => t.name).join(', ') : '-') }}
+                                </dd>
+                            </div>
+                        </dl>
+
+                        <div class="space-y-2.5">
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium mb-0.5">Tindakan Perbaikan yang Dilakukan</dt>
+                                <dd class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.action_taken || ticket.resolution_note }}</dd>
                             </div>
 
-                            <div v-if="ticket.root_cause" class="bg-white p-4 rounded-lg border border-slate-200 space-y-1">
-                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                    <AlertTriangle class="w-3.5 h-3.5 text-amber-500" /> Penyebab Gangguan
-                                </p>
-                                <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.root_cause }}</p>
-                            </div>
-                        </div>
-
-                        <!-- Tindakan yang Dilakukan -->
-                        <div v-if="ticket.action_taken || ticket.resolution_note" class="bg-white p-4 rounded-lg border border-slate-200 mb-4 space-y-1">
-                            <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <Wrench class="w-3.5 h-3.5 text-emerald-500" /> Tindakan yang Dilakukan
-                            </p>
-                            <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.action_taken || ticket.resolution_note }}</p>
-                        </div>
-
-                        <!-- Material & Parameter Pengujian -->
-                        <div v-if="ticket.materials_used || ticket.test_result || ticket.test_parameters" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <!-- Material / Perangkat -->
-                            <div v-if="ticket.materials_used" class="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Boxes class="w-3.5 h-3.5 text-indigo-500" /> Material / Perangkat Digunakan
-                                </p>
-                                <div class="flex flex-wrap gap-1.5 pt-0.5">
-                                    <span 
-                                        v-for="(item, idx) in ticket.materials_used.split(',').map((s: string) => s.trim()).filter(Boolean)" 
-                                        :key="idx"
-                                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs"
+                            <!-- Foto Dokumentasi Perbaikan Khusus Pelapor OPD (Admin & Teknisi melihat di Modal Berita Acara) -->
+                            <div v-if="role === 'opd_user' && ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0">
+                                <dt class="text-xs text-slate-500 font-medium mb-1.5">Foto Dokumentasi Perbaikan</dt>
+                                <div class="flex flex-wrap gap-2">
+                                    <button 
+                                        type="button"
+                                        v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
+                                        :key="att.id"
+                                        @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
+                                        class="inline-flex items-center gap-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:text-emerald-700 hover:border-slate-300 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
                                     >
-                                        {{ item }}
-                                    </span>
+                                        <Paperclip class="w-3.5 h-3.5 text-slate-400" />
+                                        <span class="truncate max-w-[200px]">{{ att.file_name }}</span>
+                                    </button>
                                 </div>
-                            </div>
-
-                            <!-- Hasil Pengujian & Parameter -->
-                            <div v-if="ticket.test_result || ticket.test_parameters" class="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
-                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                    <Activity class="w-3.5 h-3.5 text-emerald-600" /> Hasil Pengujian & Parameter Mutu
-                                </p>
-                                <div v-if="ticket.test_result">
-                                    <p class="text-[11px] font-semibold text-slate-500">Hasil Uji:</p>
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 mt-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        <CheckCircle2 class="w-3.5 h-3.5 text-emerald-600" />
-                                        {{ ticket.test_result }}
-                                    </span>
-                                </div>
-                                <div v-if="ticket.test_parameters">
-                                    <p class="text-[11px] font-semibold text-slate-500">Parameter Uji:</p>
-                                    <div class="text-xs font-mono bg-slate-50 p-2 rounded text-slate-800 border border-slate-200 mt-1 whitespace-pre-wrap leading-relaxed">
-                                        {{ ticket.test_parameters }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Catatan Tambahan (jika ada dan beda dari action_taken) -->
-                        <div v-if="ticket.resolution_note && ticket.action_taken && ticket.resolution_note !== ticket.action_taken" class="bg-white p-4 rounded-lg border border-slate-200 mb-4 space-y-1">
-                            <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <FileText class="w-3.5 h-3.5 text-slate-500" /> Catatan Tambahan
-                            </p>
-                            <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.resolution_note }}</p>
-                        </div>
-
-                        <!-- Foto Bukti Solusi Perbaikan -->
-                        <div v-if="ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0" class="mt-4">
-                            <p class="text-xs font-semibold text-slate-700 mb-2.5">Foto Bukti Hasil Perbaikan:</p>
-                            <div class="flex flex-wrap gap-3">
-                                <button 
-                                    type="button"
-                                    v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
-                                    :key="att.id"
-                                    @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                    class="flex items-center gap-3 px-3.5 py-2.5 border border-slate-200 rounded-lg hover:border-emerald-500 hover:bg-emerald-50/40 bg-white text-xs text-slate-800 transition-all shadow-xs group cursor-pointer"
-                                >
-                                    <div class="w-8 h-8 rounded bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200">
-                                        <img :src="`/storage/${att.file_path}`" :alt="att.file_name" class="w-full h-full object-cover" />
-                                    </div>
-                                    <span class="truncate max-w-[200px] font-medium group-hover:text-emerald-700">{{ att.file_name }}</span>
-                                </button>
                             </div>
                         </div>
                     </div>
 
                     <!-- SEKSI 4: EVALUASI KEPUASAN LAYANAN (CSAT) (Bila status Closed) -->
                     <div v-if="ticket.status === 'closed'">
-                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                            <Star class="w-4 h-4 text-slate-400" /> Evaluasi Kepuasan Layanan (CSAT)
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
+                            Evaluasi Kepuasan Layanan (CSAT)
                         </h3>
 
                         <!-- If already rated -->
-                        <div v-if="ticket.rating" class="p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 space-y-3">
+                        <div v-if="ticket.rating" class="space-y-2">
                             <div class="flex items-center justify-between flex-wrap gap-2">
                                 <div class="flex items-center gap-1.5">
                                     <Star 
                                         v-for="star in 5" 
                                         :key="star" 
-                                        class="w-5 h-5"
+                                        class="w-4 h-4"
                                         :class="star <= ticket.rating ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
                                     />
-                                    <span class="ml-2 font-bold text-slate-800 text-sm">({{ ticket.rating }} / 5 Bintang)</span>
+                                    <span class="ml-1.5 font-bold text-slate-900 text-sm">({{ ticket.rating }} / 5 Bintang)</span>
                                 </div>
                                 <span v-if="ticket.rated_at" class="text-xs text-slate-400">
                                     Dinilai pada: {{ formatDate(ticket.rated_at) }}
                                 </span>
                             </div>
-                            <p v-if="ticket.feedback_comment" class="text-sm text-slate-700 italic bg-white p-3.5 rounded-lg border border-slate-200">
+                            <p v-if="ticket.feedback_comment" class="text-sm text-slate-700 italic bg-slate-50 p-2.5 rounded-lg border border-slate-200 mt-2">
                                 "{{ ticket.feedback_comment }}"
                             </p>
                         </div>
 
                         <!-- If not rated yet and user can rate -->
-                        <div v-else-if="canRate" class="p-5 rounded-lg bg-slate-50/60 border border-slate-200/80">
-                            <form @submit.prevent="submitRating" class="space-y-4">
-                                <p class="text-xs text-slate-700 leading-relaxed">
-                                    Mohon berikan penilaian atas kecepatan dan kualitas layanan perbaikan tim teknisi Diskominfo Palu:
+                        <div v-else-if="canRate">
+                            <form @submit.prevent="submitRating" class="space-y-3">
+                                <p class="text-xs text-slate-600">
+                                    Mohon berikan penilaian atas kecepatan dan kualitas penanganan teknisi:
                                 </p>
 
                                 <!-- Interactive Star Selection -->
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-1.5">
                                     <button
                                         type="button"
                                         v-for="star in 5"
@@ -1454,10 +1248,10 @@ onUnmounted(() => {
                                         @mouseenter="ratingHover = star"
                                         @mouseleave="ratingHover = 0"
                                         @click="ratingForm.rating = star"
-                                        class="p-1 hover:scale-110 transition-transform focus:outline-none cursor-pointer"
+                                        class="p-0.5 hover:scale-110 transition-transform focus:outline-none cursor-pointer"
                                     >
                                         <Star 
-                                            class="w-7 h-7 transition-colors"
+                                            class="w-6 h-6 transition-colors"
                                             :class="(ratingHover ? star <= ratingHover : star <= ratingForm.rating) ? 'text-amber-500 fill-amber-500' : 'text-slate-300'"
                                         />
                                     </button>
@@ -1467,18 +1261,17 @@ onUnmounted(() => {
                                 </div>
 
                                 <div>
-                                    <InputLabel for="feedback_comment" value="Ulasan atau Catatan Tambahan (Opsional)" class="text-slate-700 text-xs font-medium" />
                                     <Textarea 
                                         id="feedback_comment"
                                         v-model="ratingForm.feedback_comment"
-                                        placeholder="Tuliskan pengalaman atau saran Anda terhadap penanganan tiket ini..."
+                                        placeholder="Tuliskan ulasan atau saran Anda (opsional)..."
                                         rows="2"
-                                        class="bg-white mt-1 text-sm border-slate-200"
+                                        class="bg-white text-sm border-slate-200"
                                     />
                                 </div>
 
-                                <Button type="submit" :disabled="ratingForm.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs font-semibold">
-                                    {{ ratingForm.processing ? 'Menyimpan...' : 'Kirim Penilaian Kepuasan' }}
+                                <Button type="submit" :disabled="ratingForm.processing" size="sm" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs font-medium">
+                                    {{ ratingForm.processing ? 'Menyimpan...' : 'Kirim Penilaian' }}
                                 </Button>
                             </form>
                         </div>
@@ -1495,7 +1288,7 @@ onUnmounted(() => {
 
         <!-- 1. Verify & Assign Modal (Admin) -->
         <Dialog v-model:open="isVerifyModalOpen">
-            <DialogContent class="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+            <DialogScrollContent class="sm:max-w-[550px]">
                 <DialogHeader>
                     <DialogTitle>Verifikasi & Disposisi Tim Teknisi</DialogTitle>
                     <DialogDescription>
@@ -1559,7 +1352,7 @@ onUnmounted(() => {
                         <div class="border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-1.5 bg-slate-50/50">
                             <label 
                                 v-for="tech in technicians" 
-                                :key="tech.id"
+                                :key="tech.id" 
                                 class="flex items-center justify-between text-xs text-slate-800 cursor-pointer hover:bg-white p-2 rounded transition-colors border border-transparent hover:border-slate-200"
                             >
                                 <div class="flex items-center gap-2">
@@ -1591,7 +1384,7 @@ onUnmounted(() => {
                         </Button>
                     </DialogFooter>
                 </form>
-            </DialogContent>
+            </DialogScrollContent>
         </Dialog>
 
         <!-- 2. Reject Modal (Admin) -->
@@ -1698,7 +1491,12 @@ onUnmounted(() => {
 
         <!-- 3. Resubmit Modal (OPD) -->
         <Dialog v-model:open="isResubmitModalOpen">
-            <DialogContent class="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogScrollContent 
+                class="sm:max-w-[600px]"
+                @pointerDownOutside="(e: CustomEvent) => { if (previewModalOpen) e.preventDefault(); }"
+                @interactOutside="(e: CustomEvent) => { if (previewModalOpen) e.preventDefault(); }"
+                @escapeKeyDown="(e: CustomEvent) => { if (previewModalOpen) e.preventDefault(); }"
+            >
                 <DialogHeader>
                     <DialogTitle>Perbaiki & Ajukan Kembali Laporan</DialogTitle>
                     <DialogDescription>
@@ -1744,338 +1542,36 @@ onUnmounted(() => {
                         </Button>
                     </DialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
-
-        <!-- 4. Submit Resolution Modal (Technician) -->
-        <Dialog v-model:open="isResolutionModalOpen">
-            <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Laporan Penyelesaian & Berita Acara Perbaikan</DialogTitle>
-                    <DialogDescription>
-                        Lengkapi rincian berita acara hasil pekerjaan teknisi secara terperinci untuk peninjauan mutu oleh Admin Diskominfo.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <form @submit.prevent="submitResolution" class="space-y-4 pt-1">
-                    <!-- Seksi 1: Perangkat & Klasifikasi Teknis Lapangan -->
-                    <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-                        <div class="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                            Perangkat & Klasifikasi Infrastruktur
-                        </div>
-
-                        <!-- Perangkat/Node Terdampak & Titik Lokasi Real Perbaikan -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <InputLabel value="Perangkat / Node Terdampak *" class="text-xs font-semibold text-slate-700" />
-                                <Select v-model="selectedAffectedDevice">
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Perangkat / Node Terdampak" />
-                                    </SelectTrigger>
-                                    <SelectContent class="max-h-56">
-                                        <SelectItem v-for="dev in affectedDeviceOptions" :key="dev" :value="dev">
-                                            {{ dev }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="resolutionForm.errors.affected_device" class="mt-1" />
-                            </div>
-
-                            <div>
-                                <InputLabel for="actual_repair_location" value="Titik Lokasi Real Perbaikan *" class="text-xs font-semibold text-slate-700" />
-                                <Input 
-                                    id="actual_repair_location"
-                                    type="text" 
-                                    v-model="resolutionForm.actual_repair_location" 
-                                    placeholder="Cth: Ruang Server Lt. 1 / Tiang ODP-PAL-04"
-                                    class="bg-white mt-1 text-sm"
-                                    required
-                                />
-                                <InputError :message="resolutionForm.errors.actual_repair_location" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <!-- Jenis Infrastruktur & Kategori Masalah -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <InputLabel value="Jenis Infrastruktur Riil *" class="text-xs font-semibold text-slate-700" />
-                                <Select 
-                                    :modelValue="resolutionForm.infrastructure_type || resolutionForm.network_type"
-                                    @update:modelValue="(val: any) => {
-                                        resolutionForm.infrastructure_type = val;
-                                        resolutionForm.network_type = val;
-                                        resolutionForm.category_id = '';
-                                    }"
-                                >
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Infrastruktur" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Fiber optic">Fiber optic</SelectItem>
-                                        <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
-                                        <SelectItem value="Power/poe">Power/poe</SelectItem>
-                                        <SelectItem value="Converter">Converter</SelectItem>
-                                        <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="resolutionForm.errors.infrastructure_type" class="mt-1" />
-                            </div>
-
-                            <div>
-                                <InputLabel value="Kategori Masalah Riil *" class="text-xs font-semibold text-slate-700" />
-                                <Select v-model="resolutionForm.category_id">
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Kategori Riil" />
-                                    </SelectTrigger>
-                                    <SelectContent class="max-h-56">
-                                        <SelectItem v-for="cat in resolutionCategories" :key="cat.id" :value="cat.id.toString()">
-                                            {{ cat.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="resolutionForm.errors.category_id" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <p class="text-[11px] text-slate-500">
-                            Penetapan kategori riil akan menyesuaikan target SLA berdasarkan standar durasi perbaikan fisik.
-                        </p>
-                    </div>
-
-                    <!-- Seksi 2: Diagnosa & Tindakan Teknis -->
-                    <div class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <!-- Hasil Pemeriksaan -->
-                            <div>
-                                <InputLabel for="inspection_result" value="Hasil Pemeriksaan Awal *" class="text-xs font-semibold text-slate-700" />
-                                <Textarea 
-                                    id="inspection_result"
-                                    v-model="resolutionForm.inspection_result"
-                                    placeholder="Cth: Lampu indikator LOS merah berkedip, port switch tidak aktif..."
-                                    rows="2"
-                                    class="mt-1 text-sm bg-white"
-                                    required
-                                />
-                                <InputError :message="resolutionForm.errors.inspection_result" class="mt-1" />
-                            </div>
-
-                            <!-- Penyebab -->
-                            <div>
-                                <InputLabel for="root_cause" value="Penyebab Gangguan / Kerusakan *" class="text-xs font-semibold text-slate-700" />
-                                <Textarea 
-                                    id="root_cause"
-                                    v-model="resolutionForm.root_cause"
-                                    placeholder="Cth: Konektor RJ-45 korosi dan kabel patch cord tertekuk..."
-                                    rows="2"
-                                    class="mt-1 text-sm bg-white"
-                                    required
-                                />
-                                <InputError :message="resolutionForm.errors.root_cause" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <!-- Tindakan yang Dilakukan -->
-                        <div>
-                            <InputLabel for="action_taken" value="Tindakan yang Dilakukan *" class="text-xs font-semibold text-slate-700" />
-                            <Textarea 
-                                id="action_taken"
-                                v-model="resolutionForm.action_taken"
-                                placeholder="Cth: Mengganti kabel patch cord baru sepanjang 3 meter, melakukan crimping ulang RJ-45, dan konfigurasi port..."
-                                rows="3"
-                                class="mt-1 text-sm bg-white"
-                                required
-                            />
-                            <InputError :message="resolutionForm.errors.action_taken" class="mt-1" />
-                        </div>
-
-                        <!-- Material / Perangkat yang Digunakan -->
-                        <div class="space-y-2 pt-2 border-t border-slate-100">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <InputLabel value="Material / Perangkat yang Digunakan" class="text-xs font-semibold text-slate-700" />
-                                    <p class="text-[11px] text-slate-500">Pilih material dan tentukan jumlah. Satuan otomatis terisi sesuai master data.</p>
-                                </div>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm" 
-                                    class="h-7 px-2.5 text-xs font-medium cursor-pointer"
-                                    @click="addMaterialRow"
-                                >
-                                    + Tambah Material
-                                </Button>
-                            </div>
-
-                            <div class="space-y-2">
-                                <div 
-                                    v-for="(row, index) in materialRows" 
-                                    :key="index" 
-                                    class="p-2.5 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2"
-                                >
-                                    <div class="grid grid-cols-12 gap-2 items-center">
-                                        <!-- Dropdown Material / Perangkat -->
-                                        <div :class="row.material === 'none' ? 'col-span-10 sm:col-span-6' : 'col-span-12 sm:col-span-6'">
-                                            <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                                Material / Perangkat
-                                            </label>
-                                            <Select v-model="row.material" @update:model-value="() => handleMaterialChange(row)">
-                                                <SelectTrigger class="bg-white h-9 text-xs">
-                                                    <SelectValue placeholder="-- Pilih Material / Perangkat --" />
-                                                </SelectTrigger>
-                                                <SelectContent class="max-h-56">
-                                                    <SelectItem value="none">-- Tanpa Penggantian Material --</SelectItem>
-                                                    <SelectItem v-for="mat in materialOptions" :key="mat" :value="mat">
-                                                        {{ mat }}
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <!-- Jika Tanpa Penggantian Material -->
-                                        <div v-if="row.material === 'none'" class="col-span-10 sm:col-span-5 flex items-center text-xs text-slate-500 py-1.5">
-                                            <span class="inline-flex items-center px-2.5 py-1 bg-slate-100 rounded text-[11px] text-slate-600 border border-slate-200">
-                                                Tidak memerlukan penggantian material fisik
-                                            </span>
-                                        </div>
-
-                                        <!-- Jika Ada Material -->
-                                        <template v-else>
-                                            <!-- Input Number Jumlah -->
-                                            <div class="col-span-6 sm:col-span-3">
-                                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                                    Jumlah
-                                                </label>
-                                                <Input 
-                                                    type="number" 
-                                                    min="1" 
-                                                    step="1"
-                                                    v-model.number="row.quantity" 
-                                                    placeholder="1"
-                                                    class="bg-white h-9 text-xs"
-                                                />
-                                            </div>
-
-                                            <!-- Display Satuan (Non-Editable) -->
-                                            <div class="col-span-4 sm:col-span-2">
-                                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                                    Satuan
-                                                </label>
-                                                <div 
-                                                    class="h-9 px-3 flex items-center justify-center bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 select-none cursor-not-allowed text-center"
-                                                    title="Satuan otomatis terisi sesuai master data material"
-                                                >
-                                                    {{ row.unit || 'pcs' }}
-                                                </div>
-                                            </div>
-                                        </template>
-
-                                        <!-- Tombol Hapus Row -->
-                                        <div class="col-span-2 sm:col-span-1 flex items-end justify-center pt-4">
-                                            <Button 
-                                                type="button" 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                class="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
-                                                title="Hapus baris material"
-                                                @click="removeMaterialRow(index)"
-                                            >
-                                                <Trash2 class="w-3.5 h-3.5" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <InputError :message="resolutionForm.errors.materials_used" class="mt-1" />
-                        </div>
-                    </div>
-
-                    <!-- Seksi 3: Hasil Pengujian & Parameter Mutu -->
-                    <div class="space-y-3 pt-2 border-t border-slate-100">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <!-- Hasil Pengujian -->
-                            <div>
-                                <InputLabel value="Hasil Pengujian Akhir *" class="text-xs font-semibold text-slate-700" />
-                                <Select v-model="selectedTestResult">
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Hasil Pengujian" />
-                                    </SelectTrigger>
-                                    <SelectContent class="max-h-56">
-                                        <SelectItem v-for="opt in testResultOptions" :key="opt" :value="opt">
-                                            {{ opt }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="resolutionForm.errors.test_result" class="mt-1" />
-                            </div>
-
-                            <!-- Parameter Uji -->
-                            <div>
-                                <InputLabel for="test_parameters" value="Parameter Uji (Opsional)" class="text-xs font-semibold text-slate-700" />
-                                <Textarea 
-                                    id="test_parameters"
-                                    v-model="resolutionForm.test_parameters"
-                                    placeholder="Cth: Ping 8.8.8.8 (1ms, loss 0%), Redaman -19 dBm"
-                                    rows="2"
-                                    class="mt-1 text-sm bg-white"
-                                />
-                                <p class="text-[11px] text-slate-400 mt-1">Hasil ping jaringan atau nilai ukur alat lainnya.</p>
-                                <InputError :message="resolutionForm.errors.test_parameters" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <!-- Catatan Tambahan -->
-                        <div>
-                            <InputLabel for="notes" value="Catatan / Rekomendasi Tambahan" class="text-xs font-semibold text-slate-700" />
-                            <Textarea 
-                                id="notes"
-                                v-model="resolutionForm.notes"
-                                placeholder="Cth: Disarankan merapikan kabel stopkontak di ruang rapat agar tidak mudah tersenggol staf..."
-                                rows="2"
-                                class="mt-1 text-sm bg-white"
-                            />
-                            <InputError :message="resolutionForm.errors.notes" class="mt-1" />
-                        </div>
-                    </div>
-
-                    <!-- Seksi 4: Foto Bukti Hasil Perbaikan -->
-                    <div class="pt-2 border-t border-slate-100">
-                        <InputLabel value="Foto Bukti Hasil Perbaikan" class="text-xs font-semibold text-slate-700 mb-1" />
-                        <p class="text-[11px] text-slate-500 mb-2">Unggah foto bukti fisik hasil perbaikan (maks. 3 file foto, JPG/PNG, maks. 5MB per file).</p>
-                        <FileUpload 
-                            v-model="resolutionForm.resolution_proofs"
-                            :multiple="true"
-                            :maxFiles="3"
-                            :maxSizeMB="5"
-                            @error="(msg) => resolutionForm.errors.resolution_proofs = msg"
-                        />
-                        <InputError :message="resolutionForm.errors.resolution_proofs" class="mt-1" />
-                    </div>
-
-                    <DialogFooter class="pt-3 border-t border-slate-100">
-                        <Button type="button" variant="outline" @click="isResolutionModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="resolutionForm.processing || !resolutionForm.action_taken || !resolutionForm.affected_device || !resolutionForm.actual_repair_location" class="bg-emerald-600 hover:bg-emerald-700 text-white">
-                            {{ resolutionForm.processing ? 'Mengirim...' : 'Kirim Laporan Perbaikan' }}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
+            </DialogScrollContent>
         </Dialog>
 
         <!-- 5. Approve Resolution Modal (Admin) -->
         <Dialog v-model:open="isApproveModalOpen">
-            <DialogContent class="sm:max-w-[440px]">
+            <DialogContent class="sm:max-w-[480px]">
                 <DialogHeader>
                     <DialogTitle>Setujui Hasil Kerja & Tutup Tiket</DialogTitle>
                     <DialogDescription>
-                        Apakah Anda telah memeriksa catatan solusi dan bukti foto dari tim teknisi? Tiket ini akan resmi berstatus Closed (Selesai).
+                        Konfirmasi bahwa hasil pekerjaan teknisi telah memenuhi standar mutu dan tiket akan ditutup secara resmi.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitApprove">
-                    <DialogFooter class="mt-4">
-                        <Button type="button" variant="outline" @click="isApproveModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="approveForm.processing" class="bg-emerald-600 hover:bg-emerald-700 text-white">
-                            {{ approveForm.processing ? 'Memproses...' : 'Ya, Setujui & Tutup Tiket' }}
+                <form @submit.prevent="submitApprove" class="space-y-4">
+                    <div>
+                        <InputLabel for="approve_admin_note" value="Catatan Penutupan Admin (Opsional)" class="text-xs font-semibold text-slate-700" />
+                        <Textarea 
+                            id="approve_admin_note" 
+                            v-model="approveForm.admin_note" 
+                            placeholder="Cth: Hasil penanganan telah dikonfirmasi dan layanan sudah normal kembali..." 
+                            rows="3" 
+                            class="mt-1.5 text-sm bg-white" 
+                        />
+                        <InputError :message="approveForm.errors.admin_note" class="mt-1" />
+                    </div>
+
+                    <DialogFooter class="gap-2">
+                        <Button type="button" variant="outline" @click="isApproveModalOpen = false" class="cursor-pointer">Batal</Button>
+                        <Button type="submit" :disabled="approveForm.processing" class="bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer">
+                            {{ approveForm.processing ? 'Memproses...' : 'Setujui & Tutup Tiket' }}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -19,6 +19,7 @@ const emit = defineEmits<{
 }>();
 
 const currentIndex = ref(props.initialIndex || 0);
+let previousBodyOverflow = '';
 
 watch(
     () => props.initialIndex,
@@ -33,12 +34,13 @@ watch(
     () => props.open,
     (isOpen) => {
         if (isOpen) {
+            previousBodyOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
             if (typeof props.initialIndex === 'number') {
                 currentIndex.value = props.initialIndex;
             }
         } else {
-            document.body.style.overflow = '';
+            document.body.style.overflow = previousBodyOverflow;
         }
     }
 );
@@ -51,7 +53,10 @@ const currentImage = computed(() => {
 
 const hasMultiple = computed(() => (props.images?.length || 0) > 1);
 
-const prev = () => {
+const prev = (e?: Event) => {
+    if (e) {
+        e.stopPropagation();
+    }
     if (!props.images || props.images.length <= 1) return;
     if (currentIndex.value > 0) {
         currentIndex.value--;
@@ -60,7 +65,10 @@ const prev = () => {
     }
 };
 
-const next = () => {
+const next = (e?: Event) => {
+    if (e) {
+        e.stopPropagation();
+    }
     if (!props.images || props.images.length <= 1) return;
     if (currentIndex.value < props.images.length - 1) {
         currentIndex.value++;
@@ -69,7 +77,14 @@ const next = () => {
     }
 };
 
-const close = () => {
+const close = (e?: Event) => {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (typeof (e as any).stopImmediatePropagation === 'function') {
+            (e as any).stopImmediatePropagation();
+        }
+    }
     emit('update:open', false);
     emit('close');
 };
@@ -77,21 +92,30 @@ const close = () => {
 const handleKeyDown = (e: KeyboardEvent) => {
     if (!props.open) return;
     if (e.key === 'Escape') {
-        close();
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        close(e);
     } else if (e.key === 'ArrowLeft') {
-        prev();
+        e.preventDefault();
+        e.stopPropagation();
+        prev(e);
     } else if (e.key === 'ArrowRight') {
-        next();
+        e.preventDefault();
+        e.stopPropagation();
+        next(e);
     }
 };
 
 onMounted(() => {
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
 });
 
 onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = '';
+    window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    if (props.open) {
+        document.body.style.overflow = previousBodyOverflow;
+    }
 });
 </script>
 
@@ -107,11 +131,15 @@ onUnmounted(() => {
         >
             <div 
                 v-if="open && currentImage" 
-                class="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-950/85 backdrop-blur-md select-none"
+                class="fixed inset-0 z-[99999] flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-950/90 backdrop-blur-md select-none pointer-events-auto cursor-default"
+                style="pointer-events: auto !important;"
                 @click.self="close"
             >
                 <!-- Top Toolbar -->
-                <div class="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-3 z-20">
+                <div 
+                    class="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-3 z-30 pointer-events-auto"
+                    @click.stop
+                >
                     <!-- Counter -->
                     <div v-if="hasMultiple" class="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm text-xs font-semibold text-white tracking-wide border border-white/10 shadow-sm">
                         {{ currentIndex + 1 }} / {{ images.length }}
@@ -121,7 +149,7 @@ onUnmounted(() => {
                         v-if="currentImage.url"
                         :href="currentImage.url" 
                         :download="currentImage.name || 'download-image'"
-                        class="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-sm shadow-md"
+                        class="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-sm shadow-md cursor-pointer"
                         title="Unduh Gambar Asli"
                         @click.stop
                     >
@@ -129,8 +157,8 @@ onUnmounted(() => {
                     </a>
                     <button 
                         type="button" 
-                        @click="close"
-                        class="p-2.5 rounded-full bg-white/10 hover:bg-rose-600/80 text-white transition-colors backdrop-blur-sm shadow-md cursor-pointer"
+                        @click.stop="close"
+                        class="p-2.5 rounded-full bg-white/10 hover:bg-rose-600 text-white transition-colors backdrop-blur-sm shadow-md cursor-pointer pointer-events-auto"
                         title="Tutup (Esc)"
                     >
                         <X class="w-5 h-5" />
@@ -142,7 +170,7 @@ onUnmounted(() => {
                     v-if="hasMultiple"
                     type="button"
                     @click.stop="prev"
-                    class="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all backdrop-blur-sm z-20 shadow-lg cursor-pointer hover:scale-105 active:scale-95"
+                    class="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all backdrop-blur-sm z-30 shadow-lg cursor-pointer hover:scale-105 active:scale-95 pointer-events-auto"
                     title="Sebelumnya (Panah Kiri)"
                 >
                     <ChevronLeft class="w-6 h-6" />
@@ -152,34 +180,27 @@ onUnmounted(() => {
                     v-if="hasMultiple"
                     type="button"
                     @click.stop="next"
-                    class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all backdrop-blur-sm z-20 shadow-lg cursor-pointer hover:scale-105 active:scale-95"
+                    class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all backdrop-blur-sm z-30 shadow-lg cursor-pointer hover:scale-105 active:scale-95 pointer-events-auto"
                     title="Berikutnya (Panah Kanan)"
                 >
                     <ChevronRight class="w-6 h-6" />
                 </button>
 
                 <!-- Main Image Container -->
-                <Transition
-                    name="fade-slide"
-                    mode="out-in"
-                    enter-active-class="transition duration-150 ease-out"
-                    enter-from-class="opacity-0 scale-95"
-                    enter-to-class="opacity-100 scale-100"
-                    leave-active-class="transition duration-100 ease-in"
-                    leave-from-class="opacity-100 scale-100"
-                    leave-to-class="opacity-0 scale-95"
+                <div 
+                    :key="currentImage.url" 
+                    class="relative max-w-full max-h-[85vh] flex flex-col items-center z-20 pointer-events-auto" 
+                    @click.stop
                 >
-                    <div :key="currentImage.url" class="relative max-w-full max-h-[85vh] flex flex-col items-center" @click.stop>
-                        <img 
-                            :src="currentImage.url" 
-                            :alt="currentImage.name || 'Preview Gambar'" 
-                            class="max-w-[92vw] max-h-[78vh] sm:max-w-[85vw] sm:max-h-[80vh] object-contain rounded-xl shadow-2xl ring-1 ring-white/15"
-                        />
-                        <div v-if="currentImage.name" class="mt-3 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-xs font-medium text-slate-200 max-w-md truncate text-center shadow">
-                            {{ currentImage.name }}
-                        </div>
+                    <img 
+                        :src="currentImage.url" 
+                        :alt="currentImage.name || 'Preview Gambar'" 
+                        class="max-w-[92vw] max-h-[78vh] sm:max-w-[85vw] sm:max-h-[80vh] object-contain rounded-xl shadow-2xl ring-1 ring-white/15"
+                    />
+                    <div v-if="currentImage.name" class="mt-3 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-xs font-medium text-slate-200 max-w-md truncate text-center shadow">
+                        {{ currentImage.name }}
                     </div>
-                </Transition>
+                </div>
             </div>
         </Transition>
     </Teleport>
