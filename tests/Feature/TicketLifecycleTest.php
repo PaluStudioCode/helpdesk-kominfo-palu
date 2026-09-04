@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Ticket;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TicketLifecycleTest extends TestCase
@@ -62,7 +64,38 @@ class TicketLifecycleTest extends TestCase
         $this->assertTrue($ticket->technicians()->where('users.id', $secondTech->id)->exists());
     }
 
-    public function test_admin_can_verify_and_assign_ticket(): void
+    public function test_admin_can_verify_and_assign_ticket_without_technical_inputs(): void
+    {
+        $admin = $this->createAdmin();
+        $ticket = $this->createTicket([
+            'status' => 'pending_admin',
+            'category_id' => null,
+            'infrastructure_type' => null,
+        ]);
+        $leadTech = $this->createTechnician();
+
+        // Admin only inputs priority and technician_ids (no infrastructure_type or category_id)
+        $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/verify-assign", [
+            'priority' => 'emergency',
+            'technician_ids' => [$leadTech->id],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('in_progress', $ticket->status);
+        $this->assertNull($ticket->category_id);
+        $this->assertNull($ticket->infrastructure_type);
+        $this->assertEquals($leadTech->id, $ticket->assigned_to);
+        $this->assertNotNull($ticket->due_at);
+        // Emergency SLA = 4 hours from assigned_at
+        $this->assertEquals(
+            $ticket->assigned_at->copy()->addHours(4)->toDateTimeString(),
+            $ticket->due_at->toDateTimeString()
+        );
+    }
+
+    public function test_admin_can_verify_and_assign_ticket_with_category_if_provided(): void
     {
         $admin = $this->createAdmin();
         $ticket = $this->createTicket(['status' => 'pending_admin']);
@@ -164,6 +197,117 @@ class TicketLifecycleTest extends TestCase
 
         $this->assertEquals('pending_approval', $ticket->status);
         $this->assertEquals('Kabel LAN RJ-45 telah di-crimping ulang dan link speed kembali gigabit 1 Gbps.', $ticket->resolution_note);
+    }
+
+    public function test_technician_can_set_real_infrastructure_and_category_on_resolution(): void
+    {
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+            'assigned_at' => now(),
+            'category_id' => null,
+            'infrastructure_type' => null,
+            'priority' => 'medium',
+        ]);
+        $category = $this->createCategory(['sla_hours' => 6, 'network_type' => 'Fiber optic']);
+
+        $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/submit-resolution", [
+            'resolution_note' => 'Kabel FO putus di tiang nomor 12 telah disambung menggunakan fusion splicer.',
+            'infrastructure_type' => 'Fiber optic',
+            'category_id' => $category->id,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('pending_approval', $ticket->status);
+        $this->assertEquals('Fiber optic', $ticket->infrastructure_type);
+        $this->assertEquals($category->id, $ticket->category_id);
+        $this->assertEquals(
+            $ticket->assigned_at->copy()->addHours(6)->toDateTimeString(),
+            $ticket->due_at->toDateTimeString()
+        );
+    }
+
+    public function test_technician_can_submit_full_structured_resolution_details(): void
+    {
+        Storage::fake('public');
+
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+            'assigned_at' => now(),
+        ]);
+        $category = $this->createCategory(['sla_hours' => 4, 'network_type' => 'Fiber optic']);
+
+        $proofFile = UploadedFile::fake()->image('bukti_perbaikan.jpg');
+
+        $payload = [
+            'affected_device' => 'Kabel Fiber Optic (Drop Core / Feeder)',
+            'actual_repair_location' => 'Tiang FO No. 14 Depan Kantor',
+            'infrastructure_type' => 'Fiber optic',
+            'category_id' => $category->id,
+            'inspection_result' => 'Core nomor 2 redaman tinggi -28 dBm akibat bending di tiang 14.',
+            'root_cause' => 'Kabel terjepit dahan pohon dan tertarik tiang.',
+            'action_taken' => 'Pemotongan dahan, penarikan ulang span 30m, dan splicing core FO.',
+            'materials_used' => 'Protection sleeve 2 pcs, pigtail SC 1 pcs',
+            'test_result' => 'Redaman normal kembali -18.5 dBm, link up stabil.',
+            'test_parameters' => '-18.5 dBm (OTDR & OPM)',
+            'notes' => 'Pekerjaan selesai bersama tim lapangan dan disaksikan perwakilan OPD.',
+            'resolution_proofs' => [$proofFile],
+        ];
+
+        $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/submit-resolution", $payload);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('pending_approval', $ticket->status);
+        $this->assertEquals('Kabel Fiber Optic (Drop Core / Feeder)', $ticket->affected_device);
+        $this->assertEquals('Tiang FO No. 14 Depan Kantor', $ticket->actual_repair_location);
+        $this->assertEquals('Fiber optic', $ticket->infrastructure_type);
+        $this->assertEquals($category->id, $ticket->category_id);
+        $this->assertEquals('Core nomor 2 redaman tinggi -28 dBm akibat bending di tiang 14.', $ticket->inspection_result);
+        $this->assertEquals('Kabel terjepit dahan pohon dan tertarik tiang.', $ticket->root_cause);
+        $this->assertEquals('Pemotongan dahan, penarikan ulang span 30m, dan splicing core FO.', $ticket->action_taken);
+        $this->assertEquals('Protection sleeve 2 pcs, pigtail SC 1 pcs', $ticket->materials_used);
+        $this->assertEquals('Redaman normal kembali -18.5 dBm, link up stabil.', $ticket->test_result);
+        $this->assertEquals('-18.5 dBm (OTDR & OPM)', $ticket->test_parameters);
+        $this->assertEquals('Pekerjaan selesai bersama tim lapangan dan disaksikan perwakilan OPD.', $ticket->resolution_note);
+
+        $this->assertCount(1, $ticket->resolutionProofs);
+        $this->assertEquals('resolution_proof', $ticket->resolutionProofs->first()->attachment_type);
+    }
+
+    public function test_technician_can_submit_materials_with_dropdown_array_format(): void
+    {
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $payload = [
+            'affected_device' => 'Switch Access',
+            'infrastructure_type' => 'Perangkat/Akses',
+            'action_taken' => 'Penggantian konektor RJ45 dan penarikan kabel LAN baru.',
+            'materials_used' => [
+                ['material' => 'Konektor RJ-45 Cat6', 'quantity' => 2, 'unit' => 'pcs'],
+                ['material' => 'Kabel UTP / LAN Cat6', 'quantity' => 15, 'unit' => 'meter'],
+                ['material' => 'Lainnya', 'custom_material' => 'Klem Kabel No 8', 'quantity' => 1, 'unit' => 'pack'],
+            ],
+            'test_result' => 'Speed gigabit 1 Gbps up full duplex.',
+        ];
+
+        $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/submit-resolution", $payload);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('pending_approval', $ticket->status);
+        $this->assertEquals('Konektor RJ-45 Cat6 (2 pcs), Kabel UTP / LAN Cat6 (15 meter), Klem Kabel No 8 (1 pack)', $ticket->materials_used);
     }
 
     public function test_admin_can_approve_resolution_and_close_ticket(): void

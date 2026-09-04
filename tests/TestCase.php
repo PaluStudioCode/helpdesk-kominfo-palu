@@ -104,7 +104,7 @@ abstract class TestCase extends BaseTestCase
         unset($attributes['network_type']);
 
         return Ticket::create(array_merge([
-            'ticket_number' => 'TKT-' . date('Ymd') . '-' . rand(1000, 9999),
+            'ticket_number' => 'TKT-' . date('Ymd') . '-' . rand(1000, 9999) . '-' . substr(uniqid(), -4),
             'department_id' => $department,
             'reporter_id' => $reporter,
             'assigned_to' => null,

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
+use App\Models\Material;
+use App\Models\NetworkDevice;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
-use App\Models\Department;
 use App\Models\User;
 use App\Services\TicketService;
 use App\Http\Requests\StoreTicketRequest;
@@ -260,10 +262,21 @@ class TicketController extends Controller
 
         $unreadRepliesCount = $unreadRepliesQuery->count();
 
+        $availableDevices = NetworkDevice::where('status', 'active')
+            ->orderBy('name')
+            ->pluck('name');
+
+        $availableMaterials = Material::where('status', 'active')
+            ->orderBy('name')
+            ->select('name', 'default_unit')
+            ->get();
+
         return Inertia::render('Tickets/Show', [
             'ticket' => $ticket,
             'categoriesMap' => $categories,
             'technicians' => $technicians,
+            'availableDevices' => $availableDevices,
+            'availableMaterials' => $availableMaterials,
             'initialUnreadCount' => $unreadRepliesCount,
         ]);
     }

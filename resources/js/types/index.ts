@@ -89,7 +89,15 @@ export interface Ticket {
     description?: string | null;
     priority?: TicketPriority | null;
     status: TicketStatus;
+    affected_device?: string | null;
+    actual_repair_location?: string | null;
     resolution_note?: string | null;
+    inspection_result?: string | null;
+    root_cause?: string | null;
+    action_taken?: string | null;
+    materials_used?: string | null;
+    test_result?: string | null;
+    test_parameters?: string | null;
     assigned_at?: string | null;
     cancelled_at?: string | null;
     due_at?: string | null;

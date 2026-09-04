@@ -80,6 +80,28 @@ const toggleTechnician = (techId: number) => {
     }
 };
 
+// Common non-technical issue options for OPD
+const opdIssueOptions = [
+    { value: 'Internet Mati Total (Tidak Ada Koneksi)', label: 'Internet Mati Total (Tidak Ada Koneksi)' },
+    { value: 'Koneksi Internet Sangat Lambat / Putus-Nyambung', label: 'Koneksi Internet Sangat Lambat / Putus-Nyambung' },
+    { value: 'WiFi Kantor Tidak Terdeteksi / Tidak Bisa Terhubung', label: 'WiFi Kantor Tidak Terdeteksi / Tidak Bisa Terhubung' },
+    { value: 'Komputer Tertentu Tidak Bisa Akses Internet', label: 'Komputer Tertentu Tidak Bisa Akses Internet' },
+    { value: 'Aplikasi / Website Pemerintah Daerah Tidak Bisa Dibuka', label: 'Aplikasi / Website Pemerintah Daerah Tidak Bisa Dibuka' },
+    { value: 'Perangkat / Kabel Jaringan Rusak Fisik atau Terlepas', label: 'Perangkat / Kabel Jaringan Rusak Fisik atau Terlepas' },
+    { value: 'other', label: 'Kendala Lainnya (Tuliskan Sendiri)' },
+];
+
+const selectedOpdIssueOption = ref<string>('');
+
+const onSelectOpdIssueOption = (val: any) => {
+    selectedOpdIssueOption.value = val;
+    if (val === 'other') {
+        form.title = '';
+    } else {
+        form.title = val;
+    }
+};
+
 const openCreateTicketModal = () => {
     form.clearErrors();
     form.title = '';
@@ -92,6 +114,7 @@ const openCreateTicketModal = () => {
     form.department_id = '';
     form.technician_ids = [];
     form.attachments = [];
+    selectedOpdIssueOption.value = '';
     isCreateModalOpen.value = true;
 };
 
@@ -539,8 +562,39 @@ const formatDate = (dateStr: string) => {
                         </div>
                     </div>
 
-                    <!-- Title -->
-                    <div>
+                    <!-- Jenis Kendala / Subjek Laporan (OPD) -->
+                    <div v-if="!canCreateOnBehalf">
+                        <InputLabel value="Jenis Kendala / Subjek Laporan *" class="text-xs font-semibold text-slate-700" />
+                        <Select :modelValue="selectedOpdIssueOption" @update:modelValue="onSelectOpdIssueOption">
+                            <SelectTrigger class="mt-1">
+                                <SelectValue placeholder="-- Pilih Jenis Kendala yang Dialami --" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem 
+                                    v-for="opt in opdIssueOptions" 
+                                    :key="opt.value" 
+                                    :value="opt.value"
+                                >
+                                    {{ opt.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="form.errors.title" class="mt-1" />
+
+                        <!-- Text input appears ONLY when 'other' is selected -->
+                        <div v-if="selectedOpdIssueOption === 'other'" class="mt-2">
+                            <Input 
+                                id="title" 
+                                v-model="form.title" 
+                                placeholder="Tuliskan ringkasan kendala yang dialami..." 
+                                class="mt-1" 
+                            />
+                            <p class="text-[11px] text-slate-500 mt-1">Tuliskan ringkasan kendala secara singkat (minimal 5 karakter).</p>
+                        </div>
+                    </div>
+
+                    <!-- Title (Admin On-Behalf Only) -->
+                    <div v-else>
                         <InputLabel for="title" value="Subjek / Ringkasan Kendala *" />
                         <Input id="title" v-model="form.title" placeholder="Cth: Internet mati di ruang bidang informasi" class="mt-1" />
                         <InputError :message="form.errors.title" class="mt-1" />

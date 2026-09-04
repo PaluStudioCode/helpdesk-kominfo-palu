@@ -62,6 +62,28 @@ const toggleTechnician = (techId: number) => {
     }
 };
 
+// Common non-technical issue options for OPD
+const opdIssueOptions = [
+    { value: 'Internet Mati Total (Tidak Ada Koneksi)', label: 'Internet Mati Total (Tidak Ada Koneksi)' },
+    { value: 'Koneksi Internet Sangat Lambat / Putus-Nyambung', label: 'Koneksi Internet Sangat Lambat / Putus-Nyambung' },
+    { value: 'WiFi Kantor Tidak Terdeteksi / Tidak Bisa Terhubung', label: 'WiFi Kantor Tidak Terdeteksi / Tidak Bisa Terhubung' },
+    { value: 'Komputer Tertentu Tidak Bisa Akses Internet', label: 'Komputer Tertentu Tidak Bisa Akses Internet' },
+    { value: 'Aplikasi / Website Pemerintah Daerah Tidak Bisa Dibuka', label: 'Aplikasi / Website Pemerintah Daerah Tidak Bisa Dibuka' },
+    { value: 'Perangkat / Kabel Jaringan Rusak Fisik atau Terlepas', label: 'Perangkat / Kabel Jaringan Rusak Fisik atau Terlepas' },
+    { value: 'other', label: 'Kendala Lainnya (Tuliskan Sendiri)' },
+];
+
+const selectedOpdIssueOption = ref<string>('');
+
+const onSelectOpdIssueOption = (val: any) => {
+    selectedOpdIssueOption.value = val;
+    if (val === 'other') {
+        form.title = '';
+    } else {
+        form.title = val;
+    }
+};
+
 const submitForm = () => {
     form.post(route('tickets.store'));
 };
@@ -250,9 +272,40 @@ const submitForm = () => {
 
                         <!-- ================= COMMON FIELDS SECTION (OPD & ADMIN) ================= -->
                         
-                        <!-- 1. Subjek & Lokasi Ruangan -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
+                        <!-- Jenis Kendala / Subjek Laporan (OPD Only) -->
+                        <div v-if="!isAdmin">
+                            <InputLabel value="Jenis Kendala / Subjek Laporan *" class="text-xs font-semibold text-slate-700" />
+                            <Select :modelValue="selectedOpdIssueOption" @update:modelValue="onSelectOpdIssueOption">
+                                <SelectTrigger class="bg-white mt-1.5">
+                                    <SelectValue placeholder="-- Pilih Jenis Kendala yang Dialami --" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem 
+                                        v-for="opt in opdIssueOptions" 
+                                        :key="opt.value" 
+                                        :value="opt.value"
+                                    >
+                                        {{ opt.label }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <InputError :message="form.errors.title" class="mt-1" />
+
+                            <!-- Text input appears ONLY when 'other' is selected -->
+                            <div v-if="selectedOpdIssueOption === 'other'" class="mt-2">
+                                <Input 
+                                    id="title" 
+                                    v-model="form.title" 
+                                    placeholder="Tuliskan ringkasan kendala yang Anda alami..." 
+                                    class="mt-1" 
+                                />
+                                <p class="text-[11px] text-slate-500 mt-1">Tuliskan ringkasan kendala secara singkat (minimal 5 karakter).</p>
+                            </div>
+                        </div>
+
+                        <!-- 1. Subjek (Admin) & Lokasi Ruangan -->
+                        <div :class="isAdmin ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : 'mt-4'">
+                            <div v-if="isAdmin">
                                 <InputLabel for="title" value="Subjek / Ringkasan Kendala *" />
                                 <Input 
                                     id="title" 

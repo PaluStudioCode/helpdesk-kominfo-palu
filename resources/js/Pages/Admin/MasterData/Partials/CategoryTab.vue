@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import DataTable from '@/Components/DataTable.vue';
 import { Button } from '@/components/ui/button';
-import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import { Plus, Edit2, Trash2 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -178,7 +177,7 @@ const confirmDelete = () => {
         >
             <template #filters>
                 <Select :modelValue="infrastructureFilter" @update:modelValue="handleInfrastructureFilter">
-                    <SelectTrigger class="w-full sm:w-[180px] bg-white text-xs h-9">
+                    <SelectTrigger class="w-full sm:w-[180px] bg-white text-sm h-10">
                         <SelectValue placeholder="Semua Jenis" />
                     </SelectTrigger>
                     <SelectContent>
@@ -193,34 +192,56 @@ const confirmDelete = () => {
             </template>
 
             <template #actions>
-                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                    <Plus class="w-4 h-4 mr-2" /> Tambah Kategori
+                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs sm:text-sm font-medium">
+                    <Plus class="w-4 h-4 mr-1.5" /> Tambah Kategori
                 </Button>
             </template>
 
-            <!-- Custom Cell Rendering -->
-            <template #cell-infrastructure_type="{ item }">
-                <StatusBadge type="infrastructure" :status="item.infrastructure_type || item.network_type" />
+            <!-- Custom Cell Rendering (No badges, consistent typography) -->
+            <template #cell-name="{ item }">
+                <span class="font-medium text-slate-900">{{ item.name }}</span>
             </template>
+
+            <template #cell-infrastructure_type="{ item }">
+                <span class="text-xs sm:text-sm text-slate-700">{{ item.infrastructure_type || item.network_type || '-' }}</span>
+            </template>
+
             <template #cell-network_type="{ item }">
-                <StatusBadge type="infrastructure" :status="item.infrastructure_type || item.network_type" />
+                <span class="text-xs sm:text-sm text-slate-700">{{ item.infrastructure_type || item.network_type || '-' }}</span>
             </template>
 
             <template #cell-sla_hours="{ item }">
-                <span class="font-medium">{{ item.sla_hours }} Jam</span>
+                <span class="text-xs sm:text-sm text-slate-700">{{ item.sla_hours }} Jam</span>
             </template>
 
             <template #cell-status="{ item }">
-                <StatusBadge :status="item.status" />
+                <span 
+                    class="text-xs sm:text-sm font-medium"
+                    :class="item.status === 'active' ? 'text-emerald-600' : 'text-slate-400'"
+                >
+                    {{ item.status === 'active' ? 'Aktif' : 'Nonaktif' }}
+                </span>
             </template>
 
             <template #actions-cell="{ item }">
-                <div class="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon" @click="openEditModal(item)">
-                        <Edit2 class="w-4 h-4 text-slate-500" />
+                <div class="flex items-center justify-end space-x-1">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-kominfo-primary hover:bg-slate-100" 
+                        title="Edit Kategori"
+                        @click="openEditModal(item)"
+                    >
+                        <Edit2 class="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
-                        <Trash2 class="w-4 h-4 text-red-500" />
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50" 
+                        title="Hapus Kategori"
+                        @click="openDeleteDialog(item.id)"
+                    >
+                        <Trash2 class="w-4 h-4" />
                     </Button>
                 </div>
             </template>

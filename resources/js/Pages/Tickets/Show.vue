@@ -46,7 +46,14 @@ import {
     Wifi,
     Zap,
     Repeat,
-    Globe
+    Globe,
+    Wrench,
+    Activity,
+    FileText,
+    Search,
+    Plus,
+    Trash2,
+    Boxes
 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -68,6 +75,8 @@ const props = defineProps<{
     ticket: any;
     categoriesMap?: Record<string, Array<{id: number, name: string, infrastructure_type?: string, network_type?: string}>>;
     technicians?: Array<{id: number, name: string, phone_number?: string}>;
+    availableDevices?: string[];
+    availableMaterials?: Array<{ name: string; default_unit: string }>;
     initialUnreadCount?: number;
 }>();
 
@@ -241,17 +250,8 @@ const openImagePreview = (imagesList: Array<{ url: string; name: string }>, inde
 
 // 1. Verify & Assign Form (Admin)
 const verifyForm = useForm({
-    infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
-    network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
-    category_id: props.ticket.category_id ? props.ticket.category_id.toString() : '',
     priority: props.ticket.priority || 'medium',
     technician_ids: [] as number[],
-});
-
-const verifyCategories = computed(() => {
-    const infraType = verifyForm.infrastructure_type || verifyForm.network_type;
-    if (!infraType || !props.categoriesMap) return [];
-    return props.categoriesMap[infraType] || [];
 });
 
 const toggleVerifyTechnician = (techId: number) => {
@@ -300,12 +300,51 @@ const submitResubmit = () => {
 };
 
 // 4. Submit Resolution Form (Technician)
+const defaultAffectedDeviceOptions = [
+    'Router / Gateway',
+    'Switch Core / Distribution',
+    'Switch Access',
+    'Access Point (AP) / WiFi Indoor',
+    'Access Point (AP) / WiFi Outdoor',
+    'Optical Termination Box (OTB) / Joint Closure',
+    'Optical Distribution Point (ODP) / Splitter',
+    'Media Converter / SFP Transceiver',
+    'Kabel Fiber Optic (Drop Core / Feeder)',
+    'Kabel UTP / Patch Cord / LAN RJ45',
+    'Power Supply / PoE Injector / UPS',
+    'Server / OLT / Rack Server',
+];
+
+const affectedDeviceOptions = computed(() => {
+    return (props.availableDevices && props.availableDevices.length > 0)
+        ? [...props.availableDevices]
+        : [...defaultAffectedDeviceOptions];
+});
+
+const selectedAffectedDevice = ref<string>('');
+
 const resolutionForm = useForm({
-    resolution_note: '',
+    affected_device: props.ticket.affected_device || '',
+    actual_repair_location: props.ticket.actual_repair_location || props.ticket.location_details || '',
     infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
     network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
     category_id: props.ticket.category_id ? props.ticket.category_id.toString() : '',
+    inspection_result: props.ticket.inspection_result || '',
+    root_cause: props.ticket.root_cause || '',
+    action_taken: props.ticket.action_taken || '',
+    materials_used: props.ticket.materials_used || '',
+    test_result: props.ticket.test_result || '',
+    test_parameters: props.ticket.test_parameters || '',
+    notes: props.ticket.resolution_note || '',
     resolution_proofs: [] as File[],
+});
+
+const syncAffectedDevice = () => {
+    resolutionForm.affected_device = selectedAffectedDevice.value;
+};
+
+watch(selectedAffectedDevice, () => {
+    syncAffectedDevice();
 });
 
 const resolutionCategories = computed(() => {
@@ -314,7 +353,262 @@ const resolutionCategories = computed(() => {
     return props.categoriesMap[infraType] || [];
 });
 
+const defaultMaterialList = [
+    'Konektor RJ-45 Cat6',
+    'Patch Cord UTP Cat6',
+    'Kabel UTP / LAN Cat6',
+    'Kabel Drop Core Fiber Optic (1-Core / 2-Core)',
+    'Patch Cord Fiber Optic (SC-SC / LC-SC)',
+    'Pigtail Fiber Optic SC/UPC',
+    'Fast Connector SC/UPC',
+    'Fast Connector SC/APC',
+    'Protection Sleeve FO (Splicing)',
+    'Optical Termination Box (OTB)',
+    'Optical Distribution Point (ODP)',
+    'Adaptor Fiber Optic SC/UPC',
+    'SFP Transceiver Module (1.25G / 10G)',
+    'Media Converter FO to LAN',
+    'PoE Injector (24V / 48V)',
+    'Power Supply / Adaptor (12V / 24V)',
+    'Access Point (AP)',
+    'Switch Hub (8-Port / 16-Port / 24-Port)',
+    'Router Board / Mikrotik',
+    'Stop Kontak / Steker Listrik',
+    'Kabel Ties / Velcro',
+    'Pipa Conduit / Cable Protector Duct',
+    'Isolasi Listrik / Heat Shrink',
+];
+
+const materialOptions = computed(() => {
+    return (props.availableMaterials && props.availableMaterials.length > 0)
+        ? props.availableMaterials.map((m: any) => m.name)
+        : [...defaultMaterialList];
+});
+
+const handleMaterialChange = (row: MaterialRow) => {
+    if (row.material === 'none') {
+        row.quantity = null;
+        row.unit = 'pcs';
+        return;
+    }
+    if (!row.quantity || row.quantity < 1) {
+        row.quantity = 1;
+    }
+    if (row.material) {
+        if (props.availableMaterials && props.availableMaterials.length > 0) {
+            const found = props.availableMaterials.find((m: any) => m.name.toLowerCase() === row.material.toLowerCase());
+            if (found && found.default_unit) {
+                row.unit = found.default_unit;
+                return;
+            }
+        }
+        if (row.material.toLowerCase().includes('kabel') || row.material.toLowerCase().includes('drop core')) {
+            row.unit = 'meter';
+        } else if (row.material.toLowerCase().includes('isolasi')) {
+            row.unit = 'roll';
+        } else if (row.material.toLowerCase().includes('pipa')) {
+            row.unit = 'batang';
+        } else if (row.material.toLowerCase().includes('ties')) {
+            row.unit = 'pack';
+        } else if (
+            row.material.toLowerCase().includes('switch') || 
+            row.material.toLowerCase().includes('router') || 
+            row.material.toLowerCase().includes('converter') || 
+            row.material.toLowerCase().includes('module') || 
+            row.material.toLowerCase().includes('access point') ||
+            row.material.toLowerCase().includes('box') ||
+            row.material.toLowerCase().includes('supply') ||
+            row.material.toLowerCase().includes('injector') ||
+            row.material.toLowerCase().includes('modem') ||
+            row.material.toLowerCase().includes('ont')
+        ) {
+            row.unit = 'unit';
+        } else {
+            row.unit = 'pcs';
+        }
+    }
+};
+
+const unitOptions = [
+    'pcs',
+    'meter',
+    'unit',
+    'roll',
+    'set',
+    'batang',
+    'buah',
+    'pack',
+    'box',
+];
+
+interface MaterialRow {
+    material: string;
+    quantity: number | null;
+    unit: string;
+}
+
+const parseExistingMaterials = (str: string | null | undefined): MaterialRow[] => {
+    if (!str || !str.trim()) {
+        return [{ material: '', quantity: 1, unit: 'pcs' }];
+    }
+    
+    const items = str.split(/,|\n/).map(s => s.trim()).filter(Boolean);
+    const rows: MaterialRow[] = [];
+
+    for (const item of items) {
+        const matchWithParen = item.match(/^(.*?)\s*\(([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)\)$/);
+        const matchWithColon = item.match(/^(.*?)\s*[:\-]\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)$/);
+        const matchLeadingQty = item.match(/^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)\s+(.*)$/);
+        const matchTrailingQty = item.match(/^(.*?)\s+([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)$/);
+
+        let rawName = '';
+        let qty = 1;
+        let unit = 'pcs';
+
+        if (matchWithParen) {
+            rawName = matchWithParen[1].trim();
+            qty = parseFloat(matchWithParen[2]);
+            unit = matchWithParen[3].toLowerCase();
+        } else if (matchWithColon) {
+            rawName = matchWithColon[1].trim();
+            qty = parseFloat(matchWithColon[2]);
+            unit = matchWithColon[3].toLowerCase();
+        } else if (matchLeadingQty) {
+            qty = parseFloat(matchLeadingQty[1]);
+            unit = matchLeadingQty[2].toLowerCase();
+            rawName = matchLeadingQty[3].trim();
+        } else if (matchTrailingQty) {
+            rawName = matchTrailingQty[1].trim();
+            qty = parseFloat(matchTrailingQty[2]);
+            unit = matchTrailingQty[3].toLowerCase();
+        } else {
+            rawName = item.trim();
+            qty = 1;
+            unit = 'pcs';
+        }
+
+        const matchedMat = materialOptions.value.find(m => m.toLowerCase() === rawName.toLowerCase());
+        
+        let finalUnit = unit;
+        if (props.availableMaterials && props.availableMaterials.length > 0) {
+            const found = props.availableMaterials.find((m: any) => m.name.toLowerCase() === (matchedMat || rawName).toLowerCase());
+            if (found && found.default_unit) {
+                finalUnit = found.default_unit;
+            }
+        }
+        if (!finalUnit || !unitOptions.includes(finalUnit)) {
+            finalUnit = unitOptions.includes(unit) ? unit : 'pcs';
+        }
+
+        if (matchedMat) {
+            rows.push({
+                material: matchedMat,
+                quantity: isNaN(qty) ? 1 : qty,
+                unit: finalUnit,
+            });
+        }
+    }
+
+    return rows.length > 0 ? rows : [{ material: '', quantity: 1, unit: 'pcs' }];
+};
+
+const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.materials_used));
+
+const syncMaterialsUsed = () => {
+    const validRows = materialRows.value.filter(r => r.material && r.material !== 'none' && (r.quantity ?? 0) > 0);
+    if (validRows.length > 0) {
+        resolutionForm.materials_used = validRows.map(r => {
+            return `${r.material} (${r.quantity} ${r.unit})`;
+        }).join(', ');
+    } else {
+        resolutionForm.materials_used = '';
+    }
+};
+
+const addMaterialRow = () => {
+    materialRows.value.push({
+        material: '',
+        quantity: 1,
+        unit: 'pcs',
+    });
+};
+
+const removeMaterialRow = (index: number) => {
+    if (materialRows.value.length > 1) {
+        materialRows.value.splice(index, 1);
+    } else {
+        materialRows.value[0] = {
+            material: '',
+            quantity: 1,
+            unit: 'pcs',
+        };
+    }
+    syncMaterialsUsed();
+};
+
+const testResultOptions = [
+    'Normal',
+    'Normal / Berfungsi Baik',
+    'Stabil / Link Up',
+    'Optimal',
+    'Normal dengan Pemantauan',
+];
+
+const selectedTestResult = ref<string>(
+    props.ticket.test_result && testResultOptions.includes(props.ticket.test_result)
+        ? props.ticket.test_result
+        : 'Normal'
+);
+
+const syncTestResult = () => {
+    resolutionForm.test_result = selectedTestResult.value;
+};
+
+watch(selectedTestResult, () => {
+    syncTestResult();
+});
+
+watch(materialRows, () => {
+    syncMaterialsUsed();
+}, { deep: true });
+
+watch(isResolutionModalOpen, (open) => {
+    if (open) {
+        resolutionForm.clearErrors();
+        resolutionForm.actual_repair_location = props.ticket.actual_repair_location || props.ticket.location_details || '';
+        resolutionForm.infrastructure_type = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
+        resolutionForm.network_type = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
+        resolutionForm.category_id = props.ticket.category_id ? props.ticket.category_id.toString() : '';
+        resolutionForm.inspection_result = props.ticket.inspection_result || '';
+        resolutionForm.root_cause = props.ticket.root_cause || '';
+        resolutionForm.action_taken = props.ticket.action_taken || '';
+        resolutionForm.test_parameters = props.ticket.test_parameters || '';
+        resolutionForm.notes = props.ticket.resolution_note || '';
+
+        // Handle affected device
+        if (props.ticket.affected_device && affectedDeviceOptions.value.includes(props.ticket.affected_device)) {
+            selectedAffectedDevice.value = props.ticket.affected_device;
+        } else {
+            selectedAffectedDevice.value = '';
+        }
+        syncAffectedDevice();
+
+        materialRows.value = parseExistingMaterials(props.ticket.materials_used);
+        syncMaterialsUsed();
+
+        if (props.ticket.test_result && testResultOptions.includes(props.ticket.test_result)) {
+            selectedTestResult.value = props.ticket.test_result;
+        } else {
+            selectedTestResult.value = 'Normal';
+        }
+        syncTestResult();
+    }
+});
+
 const submitResolution = () => {
+    syncAffectedDevice();
+    syncMaterialsUsed();
+    syncTestResult();
     resolutionForm.post(route('tickets.submit-resolution', props.ticket.id), {
         onSuccess: () => {
             isResolutionModalOpen.value = false;
@@ -842,10 +1136,10 @@ onUnmounted(() => {
                             <div>
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur & Kategori</p>
                                 <p class="font-bold text-slate-900 text-sm mt-0.5">
-                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getNetworkLabel(ticket.infrastructure_type || ticket.network_type) : '-' }}
+                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getNetworkLabel(ticket.infrastructure_type || ticket.network_type) : 'Menunggu diagnosa teknisi' }}
                                 </p>
                                 <p class="text-xs text-slate-600 mt-0.5">
-                                    {{ ticket.category ? ticket.category.name : 'Belum diverifikasi' }}
+                                    {{ ticket.category ? ticket.category.name : ((ticket.infrastructure_type || ticket.network_type) ? 'Kategori belum ditentukan' : 'Diidentifikasi di lokasi') }}
                                 </p>
                             </div>
 
@@ -892,13 +1186,13 @@ onUnmounted(() => {
                     </div>
 
                     <!-- SEKSI 3: CATATAN SOLUSI & BUKTI PERBAIKAN (Jika ada) -->
-                    <div v-if="ticket.resolution_note">
+                    <div v-if="ticket.resolution_note || ticket.action_taken || ticket.resolved_at">
                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
-                            <CheckCircle2 class="w-4 h-4 text-slate-400" /> Hasil Penanganan & Solusi Teknis
+                            <CheckCircle2 class="w-4 h-4 text-emerald-500" /> Hasil Penanganan & Berita Acara Perbaikan Lapangan
                         </h3>
 
                         <!-- Grid Data Penyelesaian -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 rounded-lg bg-slate-50/60 border border-slate-200/80 mb-5">
                             <div>
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status Pengerjaan</p>
                                 <p class="font-bold text-emerald-600 text-sm mt-0.5">Selesai Ditangani</p>
@@ -907,14 +1201,95 @@ onUnmounted(() => {
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Penyelesaian</p>
                                 <p class="font-medium text-slate-800 text-sm mt-0.5">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</p>
                             </div>
+                            <div v-if="ticket.affected_device">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Perangkat / Node Terdampak</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.affected_device }}</p>
+                            </div>
+                            <div v-if="ticket.actual_repair_location">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Titik Lokasi Real Perbaikan</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ ticket.actual_repair_location }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Klasifikasi Riil</p>
+                                <p class="font-bold text-slate-900 text-sm mt-0.5">
+                                    {{ ticket.infrastructure_type ? getNetworkLabel(ticket.infrastructure_type) : '-' }}
+                                </p>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    {{ ticket.category ? ticket.category.name : '-' }}
+                                </p>
+                            </div>
                         </div>
 
-                        <!-- Rincian Solusi Teknis -->
-                        <div>
-                            <p class="text-xs font-semibold text-slate-700 mb-1.5">Tindakan Solusi Teknis:</p>
-                            <div class="text-slate-800 text-sm leading-relaxed whitespace-pre-wrap bg-white p-4 rounded-lg border border-slate-200">
-                                {{ ticket.resolution_note }}
+                        <!-- Detail Diagnosa & Penyebab -->
+                        <div v-if="ticket.inspection_result || ticket.root_cause" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div v-if="ticket.inspection_result" class="bg-white p-4 rounded-lg border border-slate-200 space-y-1">
+                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Search class="w-3.5 h-3.5 text-blue-500" /> Hasil Pemeriksaan
+                                </p>
+                                <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.inspection_result }}</p>
                             </div>
+
+                            <div v-if="ticket.root_cause" class="bg-white p-4 rounded-lg border border-slate-200 space-y-1">
+                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <AlertTriangle class="w-3.5 h-3.5 text-amber-500" /> Penyebab Gangguan
+                                </p>
+                                <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.root_cause }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Tindakan yang Dilakukan -->
+                        <div v-if="ticket.action_taken || ticket.resolution_note" class="bg-white p-4 rounded-lg border border-slate-200 mb-4 space-y-1">
+                            <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <Wrench class="w-3.5 h-3.5 text-emerald-500" /> Tindakan yang Dilakukan
+                            </p>
+                            <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.action_taken || ticket.resolution_note }}</p>
+                        </div>
+
+                        <!-- Material & Parameter Pengujian -->
+                        <div v-if="ticket.materials_used || ticket.test_result || ticket.test_parameters" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- Material / Perangkat -->
+                            <div v-if="ticket.materials_used" class="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
+                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Boxes class="w-3.5 h-3.5 text-indigo-500" /> Material / Perangkat Digunakan
+                                </p>
+                                <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                    <span 
+                                        v-for="(item, idx) in ticket.materials_used.split(',').map((s: string) => s.trim()).filter(Boolean)" 
+                                        :key="idx"
+                                        class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs"
+                                    >
+                                        {{ item }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Hasil Pengujian & Parameter -->
+                            <div v-if="ticket.test_result || ticket.test_parameters" class="bg-white p-4 rounded-lg border border-slate-200 space-y-2">
+                                <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Activity class="w-3.5 h-3.5 text-emerald-600" /> Hasil Pengujian & Parameter Mutu
+                                </p>
+                                <div v-if="ticket.test_result">
+                                    <p class="text-[11px] font-semibold text-slate-500">Hasil Uji:</p>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 mt-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <CheckCircle2 class="w-3.5 h-3.5 text-emerald-600" />
+                                        {{ ticket.test_result }}
+                                    </span>
+                                </div>
+                                <div v-if="ticket.test_parameters">
+                                    <p class="text-[11px] font-semibold text-slate-500">Parameter Uji:</p>
+                                    <div class="text-xs font-mono bg-slate-50 p-2 rounded text-slate-800 border border-slate-200 mt-1 whitespace-pre-wrap leading-relaxed">
+                                        {{ ticket.test_parameters }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Catatan Tambahan (jika ada dan beda dari action_taken) -->
+                        <div v-if="ticket.resolution_note && ticket.action_taken && ticket.resolution_note !== ticket.action_taken" class="bg-white p-4 rounded-lg border border-slate-200 mb-4 space-y-1">
+                            <p class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <FileText class="w-3.5 h-3.5 text-slate-500" /> Catatan Tambahan
+                            </p>
+                            <p class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.resolution_note }}</p>
                         </div>
 
                         <!-- Foto Bukti Solusi Perbaikan -->
@@ -1021,137 +1396,98 @@ onUnmounted(() => {
 
         <!-- 1. Verify & Assign Modal (Admin) -->
         <Dialog v-model:open="isVerifyModalOpen">
-            <DialogContent class="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+            <DialogContent class="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Verifikasi & Disposisi Tim Teknisi</DialogTitle>
                     <DialogDescription>
-                        Validasi kelayakan laporan gangguan, tetapkan jenis infrastruktur, kategori dugaan awal, dan pilih Tim Teknisi penanggung jawab.
+                        Tentukan tingkat prioritas penanganan dan tugaskan Tim Teknisi. Jenis infrastruktur dan kategori masalah teknis akan diidentifikasi langsung oleh teknisi di lokasi.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitVerifyAndAssign" class="space-y-4">
-                    <!-- Infrastructure Type -->
+                <form @submit.prevent="submitVerifyAndAssign" class="space-y-4 pt-1">
+                    <!-- Priority Row -->
                     <div>
-                        <InputLabel value="Jenis Infrastruktur *" class="text-xs font-medium mb-1" />
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                            <button
-                                type="button"
-                                @click="verifyForm.infrastructure_type = 'Fiber optic'; verifyForm.network_type = 'Fiber optic'; verifyForm.category_id = ''"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
-                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Fiber optic' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
-                                ]"
-                            >
-                                <Cable class="w-4 h-4 mb-1 text-sky-600" />
-                                <span class="truncate">Fiber optic</span>
-                            </button>
-                            <button
-                                type="button"
-                                @click="verifyForm.infrastructure_type = 'Perangkat/Akses'; verifyForm.network_type = 'Perangkat/Akses'; verifyForm.category_id = ''"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
-                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Perangkat/Akses' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
-                                ]"
-                            >
-                                <Network class="w-4 h-4 mb-1 text-indigo-600" />
-                                <span class="truncate">Perangkat/Akses</span>
-                            </button>
-                            <button
-                                type="button"
-                                @click="verifyForm.infrastructure_type = 'Power/poe'; verifyForm.network_type = 'Power/poe'; verifyForm.category_id = ''"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
-                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Power/poe' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
-                                ]"
-                            >
-                                <Zap class="w-4 h-4 mb-1 text-amber-600" />
-                                <span class="truncate">Power/poe</span>
-                            </button>
-                            <button
-                                type="button"
-                                @click="verifyForm.infrastructure_type = 'Converter'; verifyForm.network_type = 'Converter'; verifyForm.category_id = ''"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
-                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Converter' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
-                                ]"
-                            >
-                                <Repeat class="w-4 h-4 mb-1 text-pink-600" />
-                                <span class="truncate">Converter</span>
-                            </button>
-                            <button
-                                type="button"
-                                @click="verifyForm.infrastructure_type = 'Layanan/jaringan'; verifyForm.network_type = 'Layanan/jaringan'; verifyForm.category_id = ''"
-                                :class="[
-                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
-                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Layanan/jaringan' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
-                                ]"
-                            >
-                                <Globe class="w-4 h-4 mb-1 text-emerald-600" />
-                                <span class="truncate">Layanan/jaringan</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Category & Priority Row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <InputLabel for="verify_category_id" value="Kategori Masalah / Dugaan Awal *" class="text-xs font-medium" />
-                            <Select v-model="verifyForm.category_id">
-                                <SelectTrigger class="mt-1">
-                                    <SelectValue placeholder="Pilih Kategori" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem v-for="cat in verifyCategories" :key="cat.id" :value="cat.id.toString()">
-                                        {{ cat.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <InputError :message="verifyForm.errors.category_id" class="mt-1" />
-                        </div>
-
-                        <div>
-                            <InputLabel for="verify_priority" value="Tingkat Prioritas *" class="text-xs font-medium" />
-                            <Select v-model="verifyForm.priority">
-                                <SelectTrigger class="mt-1">
-                                    <SelectValue placeholder="Pilih Prioritas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="low">Rendah (Low)</SelectItem>
-                                    <SelectItem value="medium">Sedang (Medium)</SelectItem>
-                                    <SelectItem value="high">Tinggi (High)</SelectItem>
-                                    <SelectItem value="emergency">Darurat (Emergency)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <InputError :message="verifyForm.errors.priority" class="mt-1" />
-                        </div>
+                        <InputLabel for="verify_priority" value="Tingkat Prioritas Urgensi *" class="text-xs font-semibold text-slate-700" />
+                        <Select v-model="verifyForm.priority">
+                            <SelectTrigger class="mt-1">
+                                <SelectValue placeholder="Pilih Prioritas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="emergency">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                        <span class="font-semibold text-rose-600">Darurat (Emergency)</span>
+                                        <span class="text-xs text-slate-500">- Target SLA 4 Jam</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="high">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        <span class="font-semibold text-amber-600">Tinggi (High)</span>
+                                        <span class="text-xs text-slate-500">- Target SLA 8 Jam</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="medium">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                        <span class="font-semibold text-blue-600">Sedang (Medium)</span>
+                                        <span class="text-xs text-slate-500">- Target SLA 24 Jam</span>
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="low">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+                                        <span class="font-semibold text-slate-600">Rendah (Low)</span>
+                                        <span class="text-xs text-slate-500">- Target SLA 48 Jam</span>
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p class="text-[11px] text-slate-500 mt-1">
+                            Target batas waktu penyelesaian (SLA) dihitung otomatis berdasarkan tingkat prioritas penanganan.
+                        </p>
+                        <InputError :message="verifyForm.errors.priority" class="mt-1" />
                     </div>
 
                     <!-- Multi-Technician Checkboxes -->
                     <div>
-                        <InputLabel value="Pilih Tim Teknisi Penanggung Jawab *" class="text-xs font-medium mb-1" />
-                        <div class="border border-slate-200 rounded-lg p-3 max-h-36 overflow-y-auto space-y-2 bg-slate-50/50">
+                        <div class="flex items-center justify-between mb-1">
+                            <InputLabel value="Pilih Tim Teknisi Penanggung Jawab *" class="text-xs font-semibold text-slate-700" />
+                            <span v-if="verifyForm.technician_ids.length > 0" class="text-[11px] font-semibold text-kominfo-primary">
+                                {{ verifyForm.technician_ids.length }} teknisi dipilih
+                            </span>
+                        </div>
+                        <div class="border border-slate-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-1.5 bg-slate-50/50">
                             <label 
                                 v-for="tech in technicians" 
                                 :key="tech.id"
-                                class="flex items-center gap-2 text-xs text-slate-800 cursor-pointer hover:bg-white p-1.5 rounded transition-colors"
+                                class="flex items-center justify-between text-xs text-slate-800 cursor-pointer hover:bg-white p-2 rounded transition-colors border border-transparent hover:border-slate-200"
                             >
-                                <input 
-                                    type="checkbox" 
-                                    :checked="verifyForm.technician_ids.includes(tech.id)"
-                                    @change="toggleVerifyTechnician(tech.id)"
-                                    class="rounded border-slate-300 text-kominfo-primary focus:ring-kominfo-primary w-4 h-4"
-                                />
-                                <span class="font-semibold">{{ tech.name }}</span>
-                                <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[10px]">({{ tech.phone_number }})</span>
+                                <div class="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        :checked="verifyForm.technician_ids.includes(tech.id)"
+                                        @change="toggleVerifyTechnician(tech.id)"
+                                        class="rounded border-slate-300 text-kominfo-primary focus:ring-kominfo-primary w-4 h-4"
+                                    />
+                                    <span :class="verifyForm.technician_ids.includes(tech.id) ? 'font-semibold text-slate-900' : 'text-slate-700'">{{ tech.name }}</span>
+                                    <span v-if="verifyForm.technician_ids[0] === tech.id" class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">
+                                        Lead
+                                    </span>
+                                </div>
+                                <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[11px]">({{ tech.phone_number }})</span>
                             </label>
+                            <div v-if="!technicians || technicians.length === 0" class="text-xs text-slate-400 italic text-center py-2">
+                                Tidak ada personil teknisi aktif.
+                            </div>
                         </div>
-                        <p class="text-[11px] text-slate-500 mt-1">Dapat memilih lebih dari 1 personil untuk penugasan tim kolaboratif.</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Dapat memilih lebih dari 1 personil untuk penugasan tim kolaboratif (teknisi pertama menjadi Lead).</p>
                         <InputError :message="verifyForm.errors.technician_ids" class="mt-1" />
                     </div>
 
                     <DialogFooter class="pt-3 border-t border-slate-100">
                         <Button type="button" variant="outline" @click="isVerifyModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="verifyForm.processing || verifyForm.technician_ids.length === 0 || !verifyForm.category_id" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
+                        <Button type="submit" :disabled="verifyForm.processing || verifyForm.technician_ids.length === 0" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                             {{ verifyForm.processing ? 'Memproses...' : 'Setujui & Tugaskan Tim' }}
                         </Button>
                     </DialogFooter>
@@ -1314,24 +1650,56 @@ onUnmounted(() => {
 
         <!-- 4. Submit Resolution Modal (Technician) -->
         <Dialog v-model:open="isResolutionModalOpen">
-            <DialogContent class="sm:max-w-[580px] max-h-[90vh] overflow-y-auto">
+            <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Lapor Selesai & Konfirmasi Kategori Riil</DialogTitle>
+                    <DialogTitle>Laporan Penyelesaian & Berita Acara Perbaikan</DialogTitle>
                     <DialogDescription>
-                        Isi catatan tindakan perbaikan lapangan dan konfirmasi jika ada perubahan jenis infrastruktur atau kategori gangguan sebenarnya di lokasi.
+                        Lengkapi rincian berita acara hasil pekerjaan teknisi secara terperinci untuk peninjauan mutu oleh Admin Diskominfo.
                     </DialogDescription>
                 </DialogHeader>
 
-                <form @submit.prevent="submitResolution" class="space-y-4">
-                    <!-- Confirm Real Category (Optional Correction) -->
+                <form @submit.prevent="submitResolution" class="space-y-4 pt-1">
+                    <!-- Seksi 1: Perangkat & Klasifikasi Teknis Lapangan -->
                     <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
                         <div class="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                            Konfirmasi Temuan Lapangan Sebenarnya
+                            Perangkat & Klasifikasi Infrastruktur
                         </div>
 
+                        <!-- Perangkat/Node Terdampak & Titik Lokasi Real Perbaikan -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <InputLabel value="Jenis Infrastruktur Riil" class="text-xs font-medium" />
+                                <InputLabel value="Perangkat / Node Terdampak *" class="text-xs font-semibold text-slate-700" />
+                                <Select v-model="selectedAffectedDevice">
+                                    <SelectTrigger class="bg-white mt-1">
+                                        <SelectValue placeholder="Pilih Perangkat / Node Terdampak" />
+                                    </SelectTrigger>
+                                    <SelectContent class="max-h-56">
+                                        <SelectItem v-for="dev in affectedDeviceOptions" :key="dev" :value="dev">
+                                            {{ dev }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="resolutionForm.errors.affected_device" class="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel for="actual_repair_location" value="Titik Lokasi Real Perbaikan *" class="text-xs font-semibold text-slate-700" />
+                                <Input 
+                                    id="actual_repair_location"
+                                    type="text" 
+                                    v-model="resolutionForm.actual_repair_location" 
+                                    placeholder="Cth: Ruang Server Lt. 1 / Tiang ODP-PAL-04"
+                                    class="bg-white mt-1 text-sm"
+                                    required
+                                />
+                                <InputError :message="resolutionForm.errors.actual_repair_location" class="mt-1" />
+                            </div>
+                        </div>
+
+                        <!-- Jenis Infrastruktur & Kategori Masalah -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <InputLabel value="Jenis Infrastruktur Riil *" class="text-xs font-semibold text-slate-700" />
                                 <Select 
                                     :modelValue="resolutionForm.infrastructure_type || resolutionForm.network_type"
                                     @update:modelValue="(val: any) => {
@@ -1351,42 +1719,229 @@ onUnmounted(() => {
                                         <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <InputError :message="resolutionForm.errors.infrastructure_type" class="mt-1" />
                             </div>
 
                             <div>
-                                <InputLabel value="Kategori Masalah Riil" class="text-xs font-medium" />
+                                <InputLabel value="Kategori Masalah Riil *" class="text-xs font-semibold text-slate-700" />
                                 <Select v-model="resolutionForm.category_id">
                                     <SelectTrigger class="bg-white mt-1">
                                         <SelectValue placeholder="Pilih Kategori Riil" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent class="max-h-56">
                                         <SelectItem v-for="cat in resolutionCategories" :key="cat.id" :value="cat.id.toString()">
                                             {{ cat.name }}
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <InputError :message="resolutionForm.errors.category_id" class="mt-1" />
                             </div>
                         </div>
-                        <p class="text-[11px] text-slate-500">Perubahan kategori riil akan mengalkulasi ulang target SLA otomatis.</p>
+
+                        <p class="text-[11px] text-slate-500">
+                            Penetapan kategori riil akan menyesuaikan target SLA berdasarkan standar durasi perbaikan fisik.
+                        </p>
                     </div>
 
-                    <!-- Resolution Note -->
-                    <div>
-                        <InputLabel for="resolution_note" value="Catatan Solusi Teknis Perbaikan *" class="text-xs font-medium" />
-                        <Textarea 
-                            id="resolution_note"
-                            v-model="resolutionForm.resolution_note"
-                            placeholder="Cth: Mengganti konektor RJ45 yang korosi dan mengonfigurasi VLAN port switch..."
-                            rows="4"
-                            class="mt-1 text-sm bg-white"
-                            required
-                        />
-                        <InputError :message="resolutionForm.errors.resolution_note" class="mt-1" />
+                    <!-- Seksi 2: Diagnosa & Tindakan Teknis -->
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Hasil Pemeriksaan -->
+                            <div>
+                                <InputLabel for="inspection_result" value="Hasil Pemeriksaan Awal *" class="text-xs font-semibold text-slate-700" />
+                                <Textarea 
+                                    id="inspection_result"
+                                    v-model="resolutionForm.inspection_result"
+                                    placeholder="Cth: Lampu indikator LOS merah berkedip, port switch tidak aktif..."
+                                    rows="2"
+                                    class="mt-1 text-sm bg-white"
+                                    required
+                                />
+                                <InputError :message="resolutionForm.errors.inspection_result" class="mt-1" />
+                            </div>
+
+                            <!-- Penyebab -->
+                            <div>
+                                <InputLabel for="root_cause" value="Penyebab Gangguan / Kerusakan *" class="text-xs font-semibold text-slate-700" />
+                                <Textarea 
+                                    id="root_cause"
+                                    v-model="resolutionForm.root_cause"
+                                    placeholder="Cth: Konektor RJ-45 korosi dan kabel patch cord tertekuk..."
+                                    rows="2"
+                                    class="mt-1 text-sm bg-white"
+                                    required
+                                />
+                                <InputError :message="resolutionForm.errors.root_cause" class="mt-1" />
+                            </div>
+                        </div>
+
+                        <!-- Tindakan yang Dilakukan -->
+                        <div>
+                            <InputLabel for="action_taken" value="Tindakan yang Dilakukan *" class="text-xs font-semibold text-slate-700" />
+                            <Textarea 
+                                id="action_taken"
+                                v-model="resolutionForm.action_taken"
+                                placeholder="Cth: Mengganti kabel patch cord baru sepanjang 3 meter, melakukan crimping ulang RJ-45, dan konfigurasi port..."
+                                rows="3"
+                                class="mt-1 text-sm bg-white"
+                                required
+                            />
+                            <InputError :message="resolutionForm.errors.action_taken" class="mt-1" />
+                        </div>
+
+                        <!-- Material / Perangkat yang Digunakan -->
+                        <div class="space-y-2 pt-2 border-t border-slate-100">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <InputLabel value="Material / Perangkat yang Digunakan" class="text-xs font-semibold text-slate-700" />
+                                    <p class="text-[11px] text-slate-500">Pilih material dan tentukan jumlah. Satuan otomatis terisi sesuai master data.</p>
+                                </div>
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    class="h-7 px-2.5 text-xs font-medium cursor-pointer"
+                                    @click="addMaterialRow"
+                                >
+                                    + Tambah Material
+                                </Button>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div 
+                                    v-for="(row, index) in materialRows" 
+                                    :key="index" 
+                                    class="p-2.5 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2"
+                                >
+                                    <div class="grid grid-cols-12 gap-2 items-center">
+                                        <!-- Dropdown Material / Perangkat -->
+                                        <div :class="row.material === 'none' ? 'col-span-10 sm:col-span-6' : 'col-span-12 sm:col-span-6'">
+                                            <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                                Material / Perangkat
+                                            </label>
+                                            <Select v-model="row.material" @update:model-value="() => handleMaterialChange(row)">
+                                                <SelectTrigger class="bg-white h-9 text-xs">
+                                                    <SelectValue placeholder="-- Pilih Material / Perangkat --" />
+                                                </SelectTrigger>
+                                                <SelectContent class="max-h-56">
+                                                    <SelectItem value="none">-- Tanpa Penggantian Material --</SelectItem>
+                                                    <SelectItem v-for="mat in materialOptions" :key="mat" :value="mat">
+                                                        {{ mat }}
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <!-- Jika Tanpa Penggantian Material -->
+                                        <div v-if="row.material === 'none'" class="col-span-10 sm:col-span-5 flex items-center text-xs text-slate-500 py-1.5">
+                                            <span class="inline-flex items-center px-2.5 py-1 bg-slate-100 rounded text-[11px] text-slate-600 border border-slate-200">
+                                                Tidak memerlukan penggantian material fisik
+                                            </span>
+                                        </div>
+
+                                        <!-- Jika Ada Material -->
+                                        <template v-else>
+                                            <!-- Input Number Jumlah -->
+                                            <div class="col-span-6 sm:col-span-3">
+                                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                                    Jumlah
+                                                </label>
+                                                <Input 
+                                                    type="number" 
+                                                    min="1" 
+                                                    step="1"
+                                                    v-model.number="row.quantity" 
+                                                    placeholder="1"
+                                                    class="bg-white h-9 text-xs"
+                                                />
+                                            </div>
+
+                                            <!-- Display Satuan (Non-Editable) -->
+                                            <div class="col-span-4 sm:col-span-2">
+                                                <label class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                                                    Satuan
+                                                </label>
+                                                <div 
+                                                    class="h-9 px-3 flex items-center justify-center bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-700 select-none cursor-not-allowed text-center"
+                                                    title="Satuan otomatis terisi sesuai master data material"
+                                                >
+                                                    {{ row.unit || 'pcs' }}
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <!-- Tombol Hapus Row -->
+                                        <div class="col-span-2 sm:col-span-1 flex items-end justify-center pt-4">
+                                            <Button 
+                                                type="button" 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                class="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                                title="Hapus baris material"
+                                                @click="removeMaterialRow(index)"
+                                            >
+                                                <Trash2 class="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <InputError :message="resolutionForm.errors.materials_used" class="mt-1" />
+                        </div>
                     </div>
 
-                    <!-- Resolution Proof Photos -->
-                    <div>
-                        <InputLabel value="Foto Bukti Hasil Perbaikan" class="text-xs font-medium mb-1" />
+                    <!-- Seksi 3: Hasil Pengujian & Parameter Mutu -->
+                    <div class="space-y-3 pt-2 border-t border-slate-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- Hasil Pengujian -->
+                            <div>
+                                <InputLabel value="Hasil Pengujian Akhir *" class="text-xs font-semibold text-slate-700" />
+                                <Select v-model="selectedTestResult">
+                                    <SelectTrigger class="bg-white mt-1">
+                                        <SelectValue placeholder="Pilih Hasil Pengujian" />
+                                    </SelectTrigger>
+                                    <SelectContent class="max-h-56">
+                                        <SelectItem v-for="opt in testResultOptions" :key="opt" :value="opt">
+                                            {{ opt }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="resolutionForm.errors.test_result" class="mt-1" />
+                            </div>
+
+                            <!-- Parameter Uji -->
+                            <div>
+                                <InputLabel for="test_parameters" value="Parameter Uji (Opsional)" class="text-xs font-semibold text-slate-700" />
+                                <Textarea 
+                                    id="test_parameters"
+                                    v-model="resolutionForm.test_parameters"
+                                    placeholder="Cth: Ping 8.8.8.8 (1ms, loss 0%), Redaman -19 dBm"
+                                    rows="2"
+                                    class="mt-1 text-sm bg-white"
+                                />
+                                <p class="text-[11px] text-slate-400 mt-1">Hasil ping jaringan atau nilai ukur alat lainnya.</p>
+                                <InputError :message="resolutionForm.errors.test_parameters" class="mt-1" />
+                            </div>
+                        </div>
+
+                        <!-- Catatan Tambahan -->
+                        <div>
+                            <InputLabel for="notes" value="Catatan / Rekomendasi Tambahan" class="text-xs font-semibold text-slate-700" />
+                            <Textarea 
+                                id="notes"
+                                v-model="resolutionForm.notes"
+                                placeholder="Cth: Disarankan merapikan kabel stopkontak di ruang rapat agar tidak mudah tersenggol staf..."
+                                rows="2"
+                                class="mt-1 text-sm bg-white"
+                            />
+                            <InputError :message="resolutionForm.errors.notes" class="mt-1" />
+                        </div>
+                    </div>
+
+                    <!-- Seksi 4: Foto Bukti Hasil Perbaikan -->
+                    <div class="pt-2 border-t border-slate-100">
+                        <InputLabel value="Foto Bukti Hasil Perbaikan" class="text-xs font-semibold text-slate-700 mb-1" />
+                        <p class="text-[11px] text-slate-500 mb-2">Unggah foto bukti fisik hasil perbaikan (maks. 3 file foto, JPG/PNG, maks. 5MB per file).</p>
                         <FileUpload 
                             v-model="resolutionForm.resolution_proofs"
                             :multiple="true"
@@ -1399,8 +1954,8 @@ onUnmounted(() => {
 
                     <DialogFooter class="pt-3 border-t border-slate-100">
                         <Button type="button" variant="outline" @click="isResolutionModalOpen = false">Batal</Button>
-                        <Button type="submit" :disabled="resolutionForm.processing || !resolutionForm.resolution_note" class="bg-emerald-600 hover:bg-emerald-700 text-white">
-                            {{ resolutionForm.processing ? 'Mengirim...' : 'Kirim untuk Review Mutu' }}
+                        <Button type="submit" :disabled="resolutionForm.processing || !resolutionForm.action_taken || !resolutionForm.affected_device || !resolutionForm.actual_repair_location" class="bg-emerald-600 hover:bg-emerald-700 text-white">
+                            {{ resolutionForm.processing ? 'Mengirim...' : 'Kirim Laporan Perbaikan' }}
                         </Button>
                     </DialogFooter>
                 </form>

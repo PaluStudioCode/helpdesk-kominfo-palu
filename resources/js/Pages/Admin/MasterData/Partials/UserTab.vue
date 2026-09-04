@@ -3,8 +3,6 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import DataTable from '@/Components/DataTable.vue';
 import { Button } from '@/components/ui/button';
-import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Edit2, Trash2 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -162,24 +160,6 @@ const confirmDelete = () => {
 
 <template>
     <div class="space-y-4">
-        <!-- Filter and Search Header -->
-        <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-                <span class="text-sm font-medium text-slate-700">Filter Peran:</span>
-                <Select :modelValue="roleFilter" @update:modelValue="handleRoleFilter">
-                    <SelectTrigger class="w-[180px]">
-                        <SelectValue placeholder="Pilih Role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Semua Peran</SelectItem>
-                        <SelectItem value="admin">Administrator</SelectItem>
-                        <SelectItem value="technician">Teknisi Jaringan</SelectItem>
-                        <SelectItem value="opd_user">Operator OPD</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-        </div>
-
         <!-- DataTable Component -->
         <DataTable 
             :columns="columns" 
@@ -190,13 +170,27 @@ const confirmDelete = () => {
             @page="handlePage"
             searchPlaceholder="Cari nama, email, no HP..."
         >
+            <template #filters>
+                <Select :modelValue="roleFilter" @update:modelValue="handleRoleFilter">
+                    <SelectTrigger class="w-full sm:w-[180px] bg-white text-sm h-10">
+                        <SelectValue placeholder="Semua Peran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Peran</SelectItem>
+                        <SelectItem value="admin">Administrator</SelectItem>
+                        <SelectItem value="technician">Teknisi Jaringan</SelectItem>
+                        <SelectItem value="opd_user">Operator OPD</SelectItem>
+                    </SelectContent>
+                </Select>
+            </template>
+
             <template #actions>
-                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                    <Plus class="w-4 h-4 mr-2" /> Tambah Pengguna
+                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs sm:text-sm font-medium">
+                    <Plus class="w-4 h-4 mr-1.5" /> Tambah Pengguna
                 </Button>
             </template>
 
-            <!-- Custom Cell Rendering -->
+            <!-- Custom Cell Rendering (No badges, consistent typography) -->
             <template #cell-name="{ item }">
                 <div>
                     <div class="font-medium text-slate-900">{{ item.name }}</div>
@@ -206,32 +200,45 @@ const confirmDelete = () => {
             </template>
 
             <template #cell-role="{ item }">
-                <Badge :variant="item.role === 'admin' ? 'default' : (item.role === 'technician' ? 'secondary' : 'outline')" class="capitalize">
-                    {{ item.role.replace('_', ' ') }}
-                </Badge>
+                <span class="text-xs sm:text-sm text-slate-700 font-medium">
+                    {{ item.role === 'admin' ? 'Administrator' : (item.role === 'technician' ? 'Teknisi Jaringan' : 'Operator OPD') }}
+                </span>
             </template>
 
             <template #cell-department="{ item }">
-                <span v-if="item.department" class="text-sm">{{ item.department.name }}</span>
+                <span v-if="item.department" class="text-xs sm:text-sm text-slate-700">{{ item.department.name }}</span>
                 <span v-else class="text-slate-400 italic">-</span>
             </template>
 
             <template #cell-status="{ item }">
-                <StatusBadge :status="item.status" />
+                <span 
+                    class="text-xs sm:text-sm font-medium"
+                    :class="item.status === 'active' ? 'text-emerald-600' : 'text-slate-400'"
+                >
+                    {{ item.status === 'active' ? 'Aktif' : 'Nonaktif' }}
+                </span>
             </template>
 
             <template #actions-cell="{ item }">
-                <div class="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon" @click="openEditModal(item)">
-                        <Edit2 class="w-4 h-4 text-slate-500" />
+                <div class="flex items-center justify-end space-x-1">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-kominfo-primary hover:bg-slate-100" 
+                        title="Edit Pengguna"
+                        @click="openEditModal(item)"
+                    >
+                        <Edit2 class="w-4 h-4" />
                     </Button>
                     <Button 
                         v-if="item.id !== $page.props.auth.user.id" 
                         variant="ghost" 
                         size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50" 
+                        title="Hapus Pengguna"
                         @click="openDeleteDialog(item.id)"
                     >
-                        <Trash2 class="w-4 h-4 text-red-500" />
+                        <Trash2 class="w-4 h-4" />
                     </Button>
                 </div>
             </template>

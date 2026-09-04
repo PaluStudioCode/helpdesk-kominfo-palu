@@ -21,12 +21,20 @@ class Ticket extends Model
         'category_id',
         'infrastructure_type',
         'network_type', // backward compatibility alias
+        'affected_device',
+        'actual_repair_location',
         'title',
         'location_details',
         'description',
         'priority',
         'status',
         'resolution_note',
+        'inspection_result',
+        'root_cause',
+        'action_taken',
+        'materials_used',
+        'test_result',
+        'test_parameters',
         'assigned_at',
         'cancelled_at',
         'due_at',
@@ -78,6 +86,16 @@ class Ticket extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(TicketAttachment::class);
+    }
+
+    public function resolutionProofs(): HasMany
+    {
+        return $this->hasMany(TicketAttachment::class)->where('attachment_type', 'resolution_proof');
+    }
+
+    public function issueProofs(): HasMany
+    {
+        return $this->hasMany(TicketAttachment::class)->where('attachment_type', 'issue_proof');
     }
 
     public function replies(): HasMany

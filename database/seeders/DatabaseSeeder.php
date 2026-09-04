@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             TicketCategorySeeder::class,
             DepartmentSeeder::class,
+            NetworkDeviceAndMaterialSeeder::class,
         ]);     
                
         // 10 Technicians

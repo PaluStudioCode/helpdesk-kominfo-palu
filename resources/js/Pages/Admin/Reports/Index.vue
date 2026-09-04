@@ -35,6 +35,14 @@ interface Ticket {
     description?: string;
     location_details?: string;
     resolution_note?: string;
+    affected_device?: string | null;
+    actual_repair_location?: string | null;
+    inspection_result?: string | null;
+    root_cause?: string | null;
+    action_taken?: string | null;
+    materials_used?: string | null;
+    test_result?: string | null;
+    test_parameters?: string | null;
     priority: string;
     status: string;
     created_at: string;
@@ -651,10 +659,63 @@ const formatDateTime = (dateStr: string | null) => {
                             </div>
                         </div>
 
-                        <div v-if="(selectedTicket as any).resolution_note" class="space-y-1">
-                            <p class="text-xs font-semibold text-slate-700">Tindakan Solusi Lapangan:</p>
-                            <div class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-3 rounded-lg border border-slate-200">
-                                {{ (selectedTicket as any).resolution_note }}
+                        <div v-if="selectedTicket.action_taken || selectedTicket.resolution_note || selectedTicket.affected_device || selectedTicket.actual_repair_location" class="space-y-2.5">
+                            <div v-if="selectedTicket.affected_device" class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between">
+                                <span class="font-medium text-slate-500">Perangkat / Node Terdampak:</span>
+                                <span class="text-slate-900 font-semibold">{{ selectedTicket.affected_device }}</span>
+                            </div>
+
+                            <div v-if="selectedTicket.actual_repair_location" class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between">
+                                <span class="font-medium text-slate-500">Titik Lokasi Real Perbaikan:</span>
+                                <span class="text-slate-900 font-semibold">{{ selectedTicket.actual_repair_location }}</span>
+                            </div>
+
+                            <div v-if="selectedTicket.inspection_result" class="space-y-1">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Hasil Pemeriksaan Lapangan:</p>
+                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
+                                    {{ selectedTicket.inspection_result }}
+                                </div>
+                            </div>
+
+                            <div v-if="selectedTicket.root_cause" class="space-y-1">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Penyebab / Akar Masalah:</p>
+                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
+                                    {{ selectedTicket.root_cause }}
+                                </div>
+                            </div>
+
+                            <div v-if="selectedTicket.action_taken || selectedTicket.resolution_note" class="space-y-1">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tindakan Penanganan yang Dilakukan:</p>
+                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
+                                    {{ selectedTicket.action_taken || selectedTicket.resolution_note }}
+                                </div>
+                            </div>
+
+                            <div v-if="selectedTicket.materials_used" class="space-y-1">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Material / Perangkat yang Digunakan:</p>
+                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200 font-mono text-[11px]">
+                                    {{ selectedTicket.materials_used }}
+                                </div>
+                            </div>
+
+                            <div v-if="selectedTicket.test_result || selectedTicket.test_parameters" class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 text-xs">
+                                <div v-if="selectedTicket.test_result">
+                                    <span class="font-bold text-emerald-800 uppercase tracking-wider text-[10px] block mb-1">Hasil Pengujian:</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                        {{ selectedTicket.test_result }}
+                                    </span>
+                                </div>
+                                <div v-if="selectedTicket.test_parameters">
+                                    <span class="font-bold text-emerald-800 uppercase tracking-wider text-[10px] block mb-1">Parameter Uji:</span>
+                                    <p class="text-emerald-950 whitespace-pre-wrap font-mono font-medium text-xs">{{ selectedTicket.test_parameters }}</p>
+                                </div>
+                            </div>
+
+                            <div v-if="selectedTicket.resolution_note && selectedTicket.action_taken && selectedTicket.resolution_note !== selectedTicket.action_taken" class="space-y-1">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Catatan Tambahan:</p>
+                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
+                                    {{ selectedTicket.resolution_note }}
+                                </div>
                             </div>
                         </div>
                     </div>

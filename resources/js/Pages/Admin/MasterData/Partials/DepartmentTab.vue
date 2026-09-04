@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import DataTable from '@/Components/DataTable.vue';
 import { Button } from '@/components/ui/button';
-import StatusBadge from '@/components/ui/status-badge/StatusBadge.vue';
 import { Plus, Edit2, Trash2 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -149,14 +148,18 @@ const confirmDelete = () => {
             searchPlaceholder="Cari OPD atau kode singkatan..."
         >
             <template #actions>
-                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                    <Plus class="w-4 h-4 mr-2" /> Tambah OPD
+                <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs sm:text-sm font-medium">
+                    <Plus class="w-4 h-4 mr-1.5" /> Tambah OPD
                 </Button>
             </template>
 
-            <!-- Custom Cell Rendering -->
-            <template #cell-status="{ item }">
-                <StatusBadge :status="item.status" />
+            <!-- Custom Cell Rendering (No badges, consistent typography) -->
+            <template #cell-code="{ item }">
+                <span class="font-mono text-xs text-slate-700">{{ item.code }}</span>
+            </template>
+
+            <template #cell-name="{ item }">
+                <span class="font-medium text-slate-900">{{ item.name }}</span>
             </template>
 
             <template #cell-operator="{ item }">
@@ -164,16 +167,37 @@ const confirmDelete = () => {
                     <div class="font-medium text-slate-900">{{ item.operator.name }}</div>
                     <div class="text-xs text-slate-500">{{ item.operator.phone_number || '-' }}</div>
                 </div>
-                <span v-else class="text-slate-400 italic">Belum ada operator</span>
+                <span v-else class="text-slate-400 italic">-</span>
+            </template>
+
+            <template #cell-status="{ item }">
+                <span 
+                    class="text-xs sm:text-sm font-medium"
+                    :class="item.status === 'active' ? 'text-emerald-600' : 'text-slate-400'"
+                >
+                    {{ item.status === 'active' ? 'Aktif' : 'Nonaktif' }}
+                </span>
             </template>
 
             <template #actions-cell="{ item }">
-                <div class="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon" @click="openEditModal(item)">
-                        <Edit2 class="w-4 h-4 text-slate-500" />
+                <div class="flex items-center justify-end space-x-1">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-kominfo-primary hover:bg-slate-100" 
+                        title="Edit OPD"
+                        @click="openEditModal(item)"
+                    >
+                        <Edit2 class="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" @click="openDeleteDialog(item.id)">
-                        <Trash2 class="w-4 h-4 text-red-500" />
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        class="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50" 
+                        title="Hapus OPD"
+                        @click="openDeleteDialog(item.id)"
+                    >
+                        <Trash2 class="w-4 h-4" />
                     </Button>
                 </div>
             </template>

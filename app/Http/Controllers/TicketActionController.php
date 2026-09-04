@@ -30,9 +30,9 @@ class TicketActionController extends Controller
         }
 
         $validated = $request->validate([
-            'infrastructure_type' => ['required', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
+            'infrastructure_type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
             'network_type' => ['nullable', 'string'],
-            'category_id' => ['required', 'exists:ticket_categories,id'],
+            'category_id' => ['nullable', 'exists:ticket_categories,id'],
             'priority' => ['required', 'in:low,medium,high,emergency'],
             'technician_ids' => ['required', 'array', 'min:1'],
             'technician_ids.*' => ['exists:users,id'],
@@ -49,20 +49,40 @@ class TicketActionController extends Controller
                 return back()->with('error', 'Status tiket sudah berubah atau tidak valid untuk diverifikasi.');
             }
 
-            $category = TicketCategory::findOrFail($validated['category_id']);
+            $category = !empty($validated['category_id']) ? TicketCategory::find($validated['category_id']) : null;
             $assignedAt = now();
-            $dueAt = (clone $assignedAt)->addHours($category->sla_hours);
+
+            if ($category) {
+                $dueAt = (clone $assignedAt)->addHours($category->sla_hours);
+            } else {
+                $slaHours = match ($validated['priority']) {
+                    'emergency' => 4,
+                    'high' => 8,
+                    'medium' => 24,
+                    'low' => 48,
+                    default => 24,
+                };
+                $dueAt = (clone $assignedAt)->addHours($slaHours);
+            }
+
             $leadTechnicianId = $validated['technician_ids'][0];
 
-            $lockedTicket->update([
-                'infrastructure_type' => $validated['infrastructure_type'],
-                'category_id' => $category->id,
+            $updateData = [
                 'priority' => $validated['priority'],
                 'assigned_to' => $leadTechnicianId,
                 'assigned_at' => $assignedAt,
                 'due_at' => $dueAt,
                 'status' => 'in_progress',
-            ]);
+            ];
+
+            if (!empty($validated['infrastructure_type'])) {
+                $updateData['infrastructure_type'] = $validated['infrastructure_type'];
+            }
+            if ($category) {
+                $updateData['category_id'] = $category->id;
+            }
+
+            $lockedTicket->update($updateData);
 
             // Sync multi-technicians
             $lockedTicket->technicians()->sync($validated['technician_ids']);
@@ -306,11 +326,26 @@ class TicketActionController extends Controller
             $request->merge(['infrastructure_type' => $request->input('network_type')]);
         }
 
+        // If resolution_note is not explicitly provided, synthesize from notes or action_taken
+        if (!$request->filled('resolution_note')) {
+            $note = $request->input('notes') ?? $request->input('action_taken') ?? 'Tindakan perbaikan telah selesai dilaksanakan.';
+            $request->merge(['resolution_note' => $note]);
+        }
+
         $validated = $request->validate([
-            'resolution_note' => ['required', 'string', 'min:10'],
+            'affected_device' => ['nullable', 'string', 'max:150'],
+            'actual_repair_location' => ['nullable', 'string', 'max:255'],
             'infrastructure_type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
             'network_type' => ['nullable', 'string'],
             'category_id' => ['nullable', 'exists:ticket_categories,id'],
+            'inspection_result' => ['nullable', 'string'],
+            'root_cause' => ['nullable', 'string'],
+            'action_taken' => ['nullable', 'string'],
+            'materials_used' => ['nullable'],
+            'test_result' => ['nullable', 'string'],
+            'test_parameters' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string'],
+            'resolution_note' => ['nullable', 'string'],
             'resolution_proofs' => ['nullable', 'array', 'max:3'],
             'resolution_proofs.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
         ]);
@@ -326,21 +361,51 @@ class TicketActionController extends Controller
                 return back()->with('error', 'Tiket tidak sedang dalam status pengerjaan (In Progress).');
             }
 
+            $finalNote = $validated['notes'] ?? $validated['resolution_note'] ?? $validated['action_taken'] ?? 'Tindakan perbaikan selesai.';
+            $finalAction = $validated['action_taken'] ?? $validated['resolution_note'] ?? null;
+
+            $materialsUsed = null;
+            if ($request->has('materials_used')) {
+                $rawMaterials = $request->input('materials_used');
+                if (is_array($rawMaterials)) {
+                    $items = [];
+                    foreach ($rawMaterials as $item) {
+                        if (is_array($item) && !empty($item['material']) && $item['material'] !== 'none' && !empty($item['quantity'])) {
+                            $name = $item['material'] === 'Lainnya' ? ($item['custom_material'] ?? 'Lainnya') : $item['material'];
+                            $unit = $item['unit'] ?? 'pcs';
+                            $items[] = "{$name} ({$item['quantity']} {$unit})";
+                        }
+                    }
+                    $materialsUsed = !empty($items) ? implode(', ', $items) : null;
+                } elseif (is_string($rawMaterials)) {
+                    $trimmed = trim($rawMaterials);
+                    $materialsUsed = $trimmed !== '' ? $trimmed : null;
+                }
+            }
+
             $updateData = [
-                'resolution_note' => $validated['resolution_note'],
+                'affected_device' => $validated['affected_device'] ?? null,
+                'actual_repair_location' => $validated['actual_repair_location'] ?? null,
+                'inspection_result' => $validated['inspection_result'] ?? null,
+                'root_cause' => $validated['root_cause'] ?? null,
+                'action_taken' => $finalAction,
+                'materials_used' => $materialsUsed,
+                'test_result' => $validated['test_result'] ?? null,
+                'test_parameters' => $validated['test_parameters'] ?? null,
+                'resolution_note' => $finalNote,
                 'status' => 'pending_approval',
                 'resolved_at' => now(),
             ];
 
             // Dynamic SLA recalculation if technician updated real category
+            $infraType = $validated['infrastructure_type'] ?? $validated['network_type'] ?? null;
+            if (!empty($infraType)) {
+                $updateData['infrastructure_type'] = $infraType;
+            }
+
             if (!empty($validated['category_id']) && (int) $validated['category_id'] !== (int) $lockedTicket->category_id) {
                 $newCategory = TicketCategory::findOrFail($validated['category_id']);
                 $updateData['category_id'] = $newCategory->id;
-                
-                $infraType = $validated['infrastructure_type'] ?? $validated['network_type'] ?? null;
-                if (!empty($infraType)) {
-                    $updateData['infrastructure_type'] = $infraType;
-                }
 
                 // Recalculate SLA from assigned_at
                 $startPoint = $lockedTicket->assigned_at ?? $lockedTicket->created_at;

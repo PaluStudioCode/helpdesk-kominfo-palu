@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Department;
+use App\Models\Material;
+use App\Models\NetworkDevice;
 use App\Models\TicketCategory;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -78,6 +80,40 @@ class MasterDataController extends Controller
         }
         $users = $userQuery->paginate(10, ['*'], 'user_page')->withQueryString();
 
+        // 4. Devices Query
+        $deviceQuery = NetworkDevice::query();
+        if ($activeTab === 'devices' && $request->has('search')) {
+            $search = $request->input('search');
+            $deviceQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        if ($activeTab === 'devices' && $request->has('sort')) {
+            $deviceQuery->orderBy($request->input('sort'), $request->input('direction', 'asc'));
+        } else {
+            $deviceQuery->orderBy('name', 'asc');
+        }
+        $devices = $deviceQuery->paginate(10, ['*'], 'dev_page')->withQueryString();
+
+        // 5. Materials Query
+        $materialQuery = Material::query();
+        if ($activeTab === 'materials' && $request->has('search')) {
+            $search = $request->input('search');
+            $materialQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('default_unit', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+        if ($activeTab === 'materials' && $request->has('sort')) {
+            $materialQuery->orderBy($request->input('sort'), $request->input('direction', 'asc'));
+        } else {
+            $materialQuery->orderBy('name', 'asc');
+        }
+        $materials = $materialQuery->paginate(10, ['*'], 'mat_page')->withQueryString();
+
         // All active departments for User Create/Edit dropdown
         $allDepartments = Department::select('id', 'name')->where('status', 'active')->orderBy('name')->get();
 
@@ -86,6 +122,8 @@ class MasterDataController extends Controller
             'departments' => Department::count(),
             'categories' => TicketCategory::count(),
             'users' => User::count(),
+            'devices' => NetworkDevice::count(),
+            'materials' => Material::count(),
         ];
 
         return Inertia::render('Admin/MasterData/Index', [
@@ -93,6 +131,8 @@ class MasterDataController extends Controller
             'departments' => $departments,
             'categories' => $categories,
             'users' => $users,
+            'devices' => $devices,
+            'materials' => $materials,
             'counts' => $counts,
             'allDepartments' => $allDepartments,
             'filters' => $request->only(['tab', 'search', 'sort', 'direction', 'role', 'infrastructure_type', 'network_type']),
