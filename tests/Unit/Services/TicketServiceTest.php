@@ -49,13 +49,13 @@ class TicketServiceTest extends TestCase
     {
         $admin = $this->createAdmin();
         $dept = $this->createDepartment();
-        $category = $this->createCategory(['sla_hours' => 5, 'network_type' => 'fiber_optic']);
+        $category = $this->createCategory(['sla_hours' => 5, 'network_type' => 'Fiber optic']);
         $leadTech = $this->createTechnician();
         $teamTech = $this->createTechnician();
 
         $ticket = $this->ticketService->createTicket([
             'department_id' => $dept->id,
-            'network_type' => 'fiber_optic',
+            'network_type' => 'Fiber optic',
             'category_id' => $category->id,
             'priority' => 'high',
             'technician_ids' => [$leadTech->id, $teamTech->id],

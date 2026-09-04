@@ -126,8 +126,8 @@
                         <td class="value">{{ $ticket->department?->name ?? '-' }}</td>
                     </tr>
                     <tr>
-                        <td class="label">Jenis Jaringan</td>
-                        <td class="value">{{ strtoupper($ticket->network_type ?? '-') }}</td>
+                        <td class="label">Jenis Infrastruktur</td>
+                        <td class="value">{{ strtoupper($ticket->infrastructure_type ?? $ticket->network_type ?? '-') }}</td>
                     </tr>
                     <tr>
                         <td class="label">Prioritas / SLA</td>

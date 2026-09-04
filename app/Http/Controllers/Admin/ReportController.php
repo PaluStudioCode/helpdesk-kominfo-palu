@@ -30,7 +30,7 @@ class ReportController extends Controller
             'tickets' => $tickets,
             'departments' => $departments,
             'technicians' => $technicians,
-            'filters' => $request->only(['search', 'start_date', 'end_date', 'department_id', 'network_type', 'status', 'assigned_to']),
+            'filters' => $request->only(['search', 'start_date', 'end_date', 'department_id', 'infrastructure_type', 'network_type', 'status', 'assigned_to']),
         ]);
     }
 
@@ -85,28 +85,39 @@ class ReportController extends Controller
         $avgDurationText = $avgHours > 0 ? "{$avgHours}j {$avgRemainingMins}m" : "{$avgRemainingMins}m";
         $avgCsat = $csatCount > 0 ? round($csatSum / $csatCount, 1) : 0;
 
-        // Formal Monochrome Network Distribution
-        $networkStats = [
-            'fiber_optic' => [
-                'label' => 'Fiber Optic (FO)', 
-                'count' => $tickets->where('network_type', 'fiber_optic')->count(), 
-                'color' => '#1e293b'
+        // Formal Monochrome Infrastructure Distribution
+        $infrastructureStats = [
+            'Fiber optic' => [
+                'label' => 'Fiber optic', 
+                'count' => $tickets->where('infrastructure_type', 'Fiber optic')->count(), 
+                'color' => '#0f172a'
             ],
-            'lan' => [
-                'label' => 'Jaringan LAN', 
-                'count' => $tickets->where('network_type', 'lan')->count(), 
+            'Perangkat/Akses' => [
+                'label' => 'Perangkat/Akses', 
+                'count' => $tickets->where('infrastructure_type', 'Perangkat/Akses')->count(), 
+                'color' => '#334155'
+            ],
+            'Power/poe' => [
+                'label' => 'Power/poe', 
+                'count' => $tickets->where('infrastructure_type', 'Power/poe')->count(), 
                 'color' => '#475569'
             ],
-            'wifi' => [
-                'label' => 'WiFi / Nirkabel', 
-                'count' => $tickets->where('network_type', 'wifi')->count(), 
+            'Converter' => [
+                'label' => 'Converter', 
+                'count' => $tickets->where('infrastructure_type', 'Converter')->count(), 
+                'color' => '#64748b'
+            ],
+            'Layanan/jaringan' => [
+                'label' => 'Layanan/jaringan', 
+                'count' => $tickets->where('infrastructure_type', 'Layanan/jaringan')->count(), 
                 'color' => '#94a3b8'
             ],
         ];
 
-        foreach ($networkStats as $k => $v) {
-            $networkStats[$k]['percentage'] = $totalTickets > 0 ? round(($v['count'] / $totalTickets) * 100, 1) : 0;
+        foreach ($infrastructureStats as $k => $v) {
+            $infrastructureStats[$k]['percentage'] = $totalTickets > 0 ? round(($v['count'] / $totalTickets) * 100, 1) : 0;
         }
+        $networkStats = $infrastructureStats;
 
         // Department Breakdown (Rekapitulasi per OPD)
         $departmentBreakdown = $tickets->groupBy('department_id')->map(function ($deptTickets) {
@@ -158,6 +169,7 @@ class ReportController extends Controller
             'avgDurationText' => $avgDurationText,
             'avgCsat' => $avgCsat,
             'csatCount' => $csatCount,
+            'infrastructureStats' => $infrastructureStats,
             'networkStats' => $networkStats,
             'departmentBreakdown' => $departmentBreakdown,
             'topCategories' => $topCategories,
@@ -229,9 +241,10 @@ class ReportController extends Controller
             $query->where('department_id', $request->input('department_id'));
         }
 
-        // Filter network type
-        if ($request->filled('network_type') && $request->input('network_type') !== 'all') {
-            $query->where('network_type', $request->input('network_type'));
+        // Filter infrastructure / network type
+        $infraType = $request->input('infrastructure_type', $request->input('network_type'));
+        if (!empty($infraType) && $infraType !== 'all') {
+            $query->where('infrastructure_type', $infraType);
         }
 
         // Filter status

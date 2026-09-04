@@ -60,7 +60,7 @@ class SimpleExcelExport
                 'A' => ['title' => 'No', 'width' => 6, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
                 'B' => ['title' => 'No. Tiket', 'width' => 18, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
                 'C' => ['title' => 'Instansi / OPD', 'width' => 26, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
-                'D' => ['title' => 'Jaringan & Kategori', 'width' => 24, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
+                'D' => ['title' => 'Infrastruktur & Kategori', 'width' => 24, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
                 'E' => ['title' => 'Judul Masalah', 'width' => 32, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
                 'F' => ['title' => 'Prioritas', 'width' => 13, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
                 'G' => ['title' => 'Status', 'width' => 18, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
@@ -103,9 +103,14 @@ class SimpleExcelExport
             ]);
 
             $networkMap = [
-                'fiber_optic' => 'Fiber Optic',
-                'lan' => 'LAN',
-                'wifi' => 'WiFi',
+                'Fiber optic' => 'Fiber optic',
+                'Perangkat/Akses' => 'Perangkat/Akses',
+                'Power/poe' => 'Power/poe',
+                'Converter' => 'Converter',
+                'Layanan/jaringan' => 'Layanan/jaringan',
+                'fiber_optic' => 'Fiber optic',
+                'lan' => 'Perangkat/Akses',
+                'wifi' => 'Layanan/jaringan',
             ];
 
             $priorityMap = [
@@ -181,8 +186,9 @@ class SimpleExcelExport
                     ? $ticket->technicians->pluck('name')->implode(', ')
                     : ($ticket->assignee?->name ?? '-');
 
-                // Gabungan Jaringan & Kategori
-                $netName = $networkMap[$ticket->network_type] ?? ($ticket->network_type ? ucfirst($ticket->network_type) : '-');
+                // Gabungan Infrastruktur & Kategori
+                $infraType = $ticket->infrastructure_type ?? $ticket->network_type;
+                $netName = $networkMap[$infraType] ?? ($infraType ? ucfirst($infraType) : '-');
                 $catName = $ticket->category?->name ?? '-';
                 $netCategoryCombined = ($netName !== '-' && $catName !== '-') 
                     ? "{$netName} - {$catName}" 

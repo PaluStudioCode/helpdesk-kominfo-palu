@@ -30,10 +30,15 @@ const props = defineProps<{
 }>();
 
 const searchQuery = ref(props.filters?.tab === 'categories' ? (props.filters?.search || '') : '');
+const infrastructureFilter = ref(
+    (props.filters?.tab === 'categories' || !props.filters?.tab) 
+        ? (props.filters?.infrastructure_type || props.filters?.network_type || 'all') 
+        : 'all'
+);
 
 const columns = [
     { key: 'name', label: 'Nama Kategori', sortable: true },
-    { key: 'network_type', label: 'Tipe Jaringan', sortable: true },
+    { key: 'infrastructure_type', label: 'Jenis Infrastruktur', sortable: true },
     { key: 'sla_hours', label: 'Target SLA (Jam)', sortable: true },
     { key: 'status', label: 'Status', sortable: true },
 ];
@@ -46,6 +51,8 @@ const handleSort = (key: string) => {
     router.get(route('admin.master-data.index'), {
         tab: 'categories',
         search: searchQuery.value,
+        infrastructure_type: infrastructureFilter.value,
+        network_type: infrastructureFilter.value,
         sort: key,
         direction: newDir
     }, { preserveState: true });
@@ -55,6 +62,8 @@ const handlePage = (page: number) => {
     router.get(route('admin.master-data.index'), {
         tab: 'categories',
         search: searchQuery.value,
+        infrastructure_type: infrastructureFilter.value,
+        network_type: infrastructureFilter.value,
         sort: props.filters?.sort,
         direction: props.filters?.direction,
         cat_page: page
@@ -62,9 +71,23 @@ const handlePage = (page: number) => {
 };
 
 const handleSearch = (value: string) => {
+    searchQuery.value = value;
     router.get(route('admin.master-data.index'), {
         tab: 'categories',
         search: value,
+        infrastructure_type: infrastructureFilter.value,
+        network_type: infrastructureFilter.value,
+        cat_page: 1
+    }, { preserveState: true, preserveScroll: true });
+};
+
+const handleInfrastructureFilter = (value: string) => {
+    infrastructureFilter.value = value;
+    router.get(route('admin.master-data.index'), {
+        tab: 'categories',
+        search: searchQuery.value,
+        infrastructure_type: value,
+        network_type: value,
         cat_page: 1
     }, { preserveState: true, preserveScroll: true });
 };
@@ -78,7 +101,8 @@ const categoryToDelete = ref<number | null>(null);
 const form = useForm({
     id: null as number | null,
     name: '',
-    network_type: 'fiber_optic',
+    infrastructure_type: 'Fiber optic',
+    network_type: 'Fiber optic',
     sla_hours: 24,
     status: 'active'
 });
@@ -87,7 +111,8 @@ const openCreateModal = () => {
     isEditMode.value = false;
     form.reset();
     form.clearErrors();
-    form.network_type = 'fiber_optic';
+    form.infrastructure_type = 'Fiber optic';
+    form.network_type = 'Fiber optic';
     form.sla_hours = 24;
     form.status = 'active';
     isModalOpen.value = true;
@@ -99,7 +124,8 @@ const openEditModal = (category: any) => {
     form.clearErrors();
     form.id = category.id;
     form.name = category.name;
-    form.network_type = category.network_type;
+    form.infrastructure_type = category.infrastructure_type || category.network_type || 'Fiber optic';
+    form.network_type = form.infrastructure_type;
     form.sla_hours = category.sla_hours;
     form.status = category.status;
     isModalOpen.value = true;
@@ -150,6 +176,22 @@ const confirmDelete = () => {
             @page="handlePage"
             searchPlaceholder="Cari nama kategori..."
         >
+            <template #filters>
+                <Select :modelValue="infrastructureFilter" @update:modelValue="handleInfrastructureFilter">
+                    <SelectTrigger class="w-full sm:w-[180px] bg-white text-xs h-9">
+                        <SelectValue placeholder="Semua Jenis" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Jenis</SelectItem>
+                        <SelectItem value="Fiber optic">Fiber optic</SelectItem>
+                        <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
+                        <SelectItem value="Power/poe">Power/poe</SelectItem>
+                        <SelectItem value="Converter">Converter</SelectItem>
+                        <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
+                    </SelectContent>
+                </Select>
+            </template>
+
             <template #actions>
                 <Button @click="openCreateModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
                     <Plus class="w-4 h-4 mr-2" /> Tambah Kategori
@@ -157,8 +199,11 @@ const confirmDelete = () => {
             </template>
 
             <!-- Custom Cell Rendering -->
+            <template #cell-infrastructure_type="{ item }">
+                <StatusBadge type="infrastructure" :status="item.infrastructure_type || item.network_type" />
+            </template>
             <template #cell-network_type="{ item }">
-                <StatusBadge type="network" :status="item.network_type" />
+                <StatusBadge type="infrastructure" :status="item.infrastructure_type || item.network_type" />
             </template>
 
             <template #cell-sla_hours="{ item }">
@@ -200,18 +245,20 @@ const confirmDelete = () => {
                         </div>
                         
                         <div class="space-y-1">
-                            <InputLabel for="network_type" value="Tipe Jaringan" class="text-xs" />
-                            <Select v-model="form.network_type">
+                            <InputLabel for="infrastructure_type" value="Jenis Infrastruktur" class="text-xs" />
+                            <Select :modelValue="form.infrastructure_type" @update:modelValue="(v) => { form.infrastructure_type = v; form.network_type = v; }">
                                 <SelectTrigger class="h-9 text-sm">
-                                    <SelectValue placeholder="Pilih tipe jaringan" />
+                                    <SelectValue placeholder="Pilih jenis infrastruktur" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="fiber_optic">Fiber Optic</SelectItem>
-                                    <SelectItem value="lan">Jaringan Lokal (LAN)</SelectItem>
-                                    <SelectItem value="wifi">Akses Nirkabel (WiFi)</SelectItem>
+                                    <SelectItem value="Fiber optic">Fiber optic</SelectItem>
+                                    <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
+                                    <SelectItem value="Power/poe">Power/poe</SelectItem>
+                                    <SelectItem value="Converter">Converter</SelectItem>
+                                    <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <InputError :message="form.errors.network_type" />
+                            <InputError :message="form.errors.infrastructure_type || form.errors.network_type" />
                         </div>
                         
                         <div class="space-y-1">

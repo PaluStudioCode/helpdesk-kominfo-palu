@@ -30,7 +30,7 @@
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 50px;">No</th>
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 140px;">No. Tiket</th>
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 220px;">OPD / Instansi</th>
-                <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 100px;">Jenis Jaringan</th>
+                <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 100px;">Jenis Infrastruktur</th>
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 160px;">Kategori Masalah</th>
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 240px;">Judul Gangguan</th>
                 <th style="background-color: #0284c7; color: #ffffff; font-weight: bold; width: 180px;">Lokasi / Ruangan</th>
@@ -99,7 +99,7 @@
                     <td style="text-align: center;">{{ $index + 1 }}</td>
                     <td>{{ $ticket->ticket_number }}</td>
                     <td>{{ $ticket->department?->name ?? '-' }}</td>
-                    <td>{{ strtoupper($ticket->network_type) }}</td>
+                    <td>{{ strtoupper($ticket->infrastructure_type ?? $ticket->network_type) }}</td>
                     <td>{{ $ticket->category?->name ?? '-' }}</td>
                     <td>{{ $ticket->title }}</td>
                     <td>{{ $ticket->location_details }}</td>

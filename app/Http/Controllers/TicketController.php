@@ -55,9 +55,10 @@ class TicketController extends Controller
             });
         }
 
-        // Apply Network Type Filter
-        if ($request->has('network_type') && $request->input('network_type') !== 'all') {
-            $query->where('network_type', $request->input('network_type'));
+        // Apply Infrastructure / Network Type Filter
+        $infraTypeFilter = $request->input('infrastructure_type', $request->input('network_type'));
+        if (!empty($infraTypeFilter) && $infraTypeFilter !== 'all') {
+            $query->where('infrastructure_type', $infraTypeFilter);
         }
 
         // Apply Status Filter
@@ -108,7 +109,8 @@ class TicketController extends Controller
                 'category' => $t->category ? ['id' => $t->category->id, 'name' => $t->category->name] : null,
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
                 'technicians' => $t->technicians ? $t->technicians->map(fn($tech) => ['id' => $tech->id, 'name' => $tech->name]) : [],
-                'network_type' => $t->network_type,
+                'infrastructure_type' => $t->infrastructure_type,
+                'network_type' => $t->infrastructure_type,
                 'priority' => $t->priority,
                 'status' => $t->status,
                 'due_at' => $t->due_at ? $t->due_at->format('d M Y, H:i') : null,
@@ -119,9 +121,9 @@ class TicketController extends Controller
         });
 
         $categories = TicketCategory::where('status', 'active')
-                        ->select('id', 'name', 'network_type')
+                        ->select('id', 'name', 'infrastructure_type')
                         ->get()
-                        ->groupBy('network_type');
+                        ->groupBy('infrastructure_type');
 
         $departments = [];
         $technicians = [];
@@ -143,7 +145,7 @@ class TicketController extends Controller
             'categoriesMap' => $categories,
             'departments' => $departments,
             'technicians' => $technicians,
-            'filters' => $request->only(['search', 'status', 'priority', 'network_type', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'status', 'priority', 'infrastructure_type', 'network_type', 'sort', 'direction']),
             'canCreateOnBehalf' => $user->role === 'admin'
         ]);
     }
@@ -156,9 +158,9 @@ class TicketController extends Controller
         $this->authorize('create', Ticket::class);
 
         $categories = TicketCategory::where('status', 'active')
-                        ->select('id', 'name', 'network_type')
+                        ->select('id', 'name', 'infrastructure_type')
                         ->get()
-                        ->groupBy('network_type');
+                        ->groupBy('infrastructure_type');
 
         $departments = [];
         $technicians = [];
@@ -227,9 +229,9 @@ class TicketController extends Controller
         }]);
 
         $categories = TicketCategory::where('status', 'active')
-            ->select('id', 'name', 'network_type')
+            ->select('id', 'name', 'infrastructure_type')
             ->get()
-            ->groupBy('network_type');
+            ->groupBy('infrastructure_type');
 
         $technicians = [];
         if ($user->role === 'admin') {

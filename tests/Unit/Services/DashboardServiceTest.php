@@ -78,15 +78,16 @@ class DashboardServiceTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $this->createTicket(['status' => 'pending_admin', 'network_type' => 'fiber_optic', 'priority' => 'high']);
-        $this->createTicket(['status' => 'in_progress', 'network_type' => 'lan', 'priority' => 'medium']);
-        $this->createTicket(['status' => 'closed', 'network_type' => 'wifi', 'priority' => 'low']);
+        $this->createTicket(['status' => 'pending_admin', 'network_type' => 'Fiber optic', 'priority' => 'high']);
+        $this->createTicket(['status' => 'in_progress', 'network_type' => 'Perangkat/Akses', 'priority' => 'medium']);
+        $this->createTicket(['status' => 'closed', 'network_type' => 'Converter', 'priority' => 'low']);
 
         $request = Request::create('/dashboard', 'GET', ['filter_type' => 'year_month', 'year' => date('Y'), 'month' => 'all']);
         $data = $this->dashboardService->getDashboardData($request, $admin);
 
         $this->assertArrayHasKey('stats', $data);
         $this->assertArrayHasKey('statusDistribution', $data);
+        $this->assertArrayHasKey('infrastructureDistribution', $data);
         $this->assertArrayHasKey('networkTypeDistribution', $data);
         $this->assertArrayHasKey('priorityDistribution', $data);
         $this->assertArrayHasKey('monthlyReports', $data);

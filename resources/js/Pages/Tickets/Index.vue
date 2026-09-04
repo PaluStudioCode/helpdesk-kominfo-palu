@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
-import { Plus, Eye, Cable, Network, Wifi } from 'lucide-vue-next';
+import { Plus, Eye, Cable, Network, Wifi, Zap, Repeat, Globe } from 'lucide-vue-next';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,7 @@ const props = defineProps<{
     tickets: any;
     filters: any;
     canCreateOnBehalf: boolean;
-    categoriesMap?: Record<string, Array<{id: number, name: string, network_type: string}>>;
+    categoriesMap?: Record<string, Array<{id: number, name: string, infrastructure_type?: string, network_type?: string}>>;
     departments?: Array<{id: number, name: string}>;
     technicians?: Array<{id: number, name: string, phone_number?: string}>;
 }>();
@@ -39,7 +39,8 @@ const canCreateTicket = computed(() => ['admin', 'opd_user'].includes(currentUse
 
 const searchQuery = ref(props.filters?.search || '');
 const statusFilter = ref(props.filters?.status || 'all');
-const networkFilter = ref(props.filters?.network_type || 'all');
+const infrastructureFilter = ref(props.filters?.infrastructure_type || props.filters?.network_type || 'all');
+const networkFilter = infrastructureFilter;
 
 // Create Ticket Modal State & Form
 const isCreateModalOpen = ref(false);
@@ -50,6 +51,7 @@ const form = useForm({
     attachments: [] as File[],
     // Admin On-Behalf Fields
     department_id: '',
+    infrastructure_type: '',
     network_type: '',
     category_id: '',
     priority: 'medium',
@@ -57,14 +59,17 @@ const form = useForm({
 });
 
 const availableCategories = computed(() => {
-    if (!form.network_type || !props.categoriesMap) return [];
-    return props.categoriesMap[form.network_type] || [];
+    const infra = form.infrastructure_type || form.network_type;
+    if (!infra || !props.categoriesMap) return [];
+    return props.categoriesMap[infra] || [];
 });
 
-const handleNetworkChange = (type: string) => {
+const handleInfrastructureChange = (type: string) => {
+    form.infrastructure_type = type;
     form.network_type = type;
     form.category_id = '';
 };
+const handleNetworkChange = handleInfrastructureChange;
 
 const toggleTechnician = (techId: number) => {
     const index = form.technician_ids.indexOf(techId);
@@ -76,11 +81,11 @@ const toggleTechnician = (techId: number) => {
 };
 
 const openCreateTicketModal = () => {
-    form.reset();
     form.clearErrors();
     form.title = '';
     form.location_details = '';
     form.description = '';
+    form.infrastructure_type = '';
     form.network_type = '';
     form.category_id = '';
     form.priority = 'medium';
@@ -116,14 +121,16 @@ const handleStatusFilter = (value: string) => {
     }, { preserveState: true, preserveScroll: true });
 };
 
-const handleNetworkFilter = (value: string) => {
-    networkFilter.value = value;
+const handleInfrastructureFilter = (value: string) => {
+    infrastructureFilter.value = value;
     router.get(route('tickets.index'), {
         ...props.filters,
+        infrastructure_type: value,
         network_type: value,
         page: 1
     }, { preserveState: true, preserveScroll: true });
 };
+const handleNetworkFilter = handleInfrastructureFilter;
 
 const handleSort = (key: string) => {
     const currentSort = props.filters?.sort;
@@ -264,15 +271,17 @@ const formatDate = (dateStr: string) => {
                             </SelectContent>
                         </Select>
 
-                        <Select :modelValue="networkFilter" @update:modelValue="handleNetworkFilter">
+                        <Select :modelValue="infrastructureFilter" @update:modelValue="handleInfrastructureFilter">
                             <SelectTrigger class="w-full sm:w-[140px] bg-white text-xs h-9">
-                                <SelectValue placeholder="Tipe Jaringan" />
+                                <SelectValue placeholder="Semua Infrastruktur" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all">Semua Jaringan</SelectItem>
-                                <SelectItem value="fiber_optic">Fiber Optic</SelectItem>
-                                <SelectItem value="lan">Jaringan LAN</SelectItem>
-                                <SelectItem value="wifi">WiFi / Nirkabel</SelectItem>
+                                <SelectItem value="all">Semua Infrastruktur</SelectItem>
+                                <SelectItem value="Fiber optic">Fiber optic</SelectItem>
+                                <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
+                                <SelectItem value="Power/poe">Power/poe</SelectItem>
+                                <SelectItem value="Converter">Converter</SelectItem>
+                                <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -290,7 +299,7 @@ const formatDate = (dateStr: string) => {
                             {{ item.ticket_number }}
                         </div>
                         <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
-                            {{ item.network_type ? item.network_type.replace('_', ' ') : '-' }}
+                            {{ (item.infrastructure_type || item.network_type) ? (item.infrastructure_type || item.network_type).replace('_', ' ') : '-' }}
                         </div>
                     </Link>
                 </template>
@@ -373,53 +382,81 @@ const formatDate = (dateStr: string) => {
                             <InputError :message="form.errors.department_id" class="mt-1" />
                         </div>
 
-                        <!-- Network Type Card Selector -->
+                        <!-- Infrastructure Type Card Selector -->
                         <div>
-                            <InputLabel value="Tipe Infrastruktur Jaringan *" class="text-amber-950 text-xs font-medium mb-1" />
-                            <div class="grid grid-cols-3 gap-2">
+                            <InputLabel value="Jenis Infrastruktur *" class="text-amber-950 text-xs font-medium mb-1" />
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                                 <button
                                     type="button"
-                                    @click="handleNetworkChange('fiber_optic')"
+                                    @click="handleInfrastructureChange('Fiber optic')"
                                     :class="[
                                         'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        form.network_type === 'fiber_optic' 
+                                        (form.infrastructure_type || form.network_type) === 'Fiber optic' 
                                             ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
                                             : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
                                     ]"
                                 >
-                                    <Cable class="w-4 h-4 mb-1 text-purple-600" />
-                                    <span>Fiber Optic</span>
+                                    <Cable class="w-4 h-4 mb-1 text-sky-600" />
+                                    <span class="truncate">Fiber optic</span>
                                 </button>
 
                                 <button
                                     type="button"
-                                    @click="handleNetworkChange('lan')"
+                                    @click="handleInfrastructureChange('Perangkat/Akses')"
                                     :class="[
                                         'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        form.network_type === 'lan' 
+                                        (form.infrastructure_type || form.network_type) === 'Perangkat/Akses' 
                                             ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
                                             : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
                                     ]"
                                 >
-                                    <Network class="w-4 h-4 mb-1 text-cyan-600" />
-                                    <span>LAN</span>
+                                    <Network class="w-4 h-4 mb-1 text-indigo-600" />
+                                    <span class="truncate">Perangkat/Akses</span>
                                 </button>
 
                                 <button
                                     type="button"
-                                    @click="handleNetworkChange('wifi')"
+                                    @click="handleInfrastructureChange('Power/poe')"
                                     :class="[
                                         'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        form.network_type === 'wifi' 
+                                        (form.infrastructure_type || form.network_type) === 'Power/poe' 
                                             ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
                                             : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
                                     ]"
                                 >
-                                    <Wifi class="w-4 h-4 mb-1 text-sky-600" />
-                                    <span>WiFi</span>
+                                    <Zap class="w-4 h-4 mb-1 text-amber-600" />
+                                    <span class="truncate">Power/poe</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="handleInfrastructureChange('Converter')"
+                                    :class="[
+                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
+                                        (form.infrastructure_type || form.network_type) === 'Converter' 
+                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
+                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
+                                    ]"
+                                >
+                                    <Repeat class="w-4 h-4 mb-1 text-pink-600" />
+                                    <span class="truncate">Converter</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    @click="handleInfrastructureChange('Layanan/jaringan')"
+                                    :class="[
+                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
+                                        (form.infrastructure_type || form.network_type) === 'Layanan/jaringan' 
+                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
+                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
+                                    ]"
+                                >
+                                    <Globe class="w-4 h-4 mb-1 text-emerald-600" />
+                                    <span class="truncate">Layanan/jaringan</span>
                                 </button>
                             </div>
-                            <InputError :message="form.errors.network_type" class="mt-1" />
+                            <InputError :message="form.errors.infrastructure_type || form.errors.network_type" class="mt-1" />
                         </div>
 
                         <!-- Category & Priority Row -->
@@ -428,10 +465,10 @@ const formatDate = (dateStr: string) => {
                                 <InputLabel for="category_id" value="Kategori Masalah *" class="text-amber-950 text-xs font-medium" />
                                 <Select 
                                     v-model="form.category_id" 
-                                    :disabled="!form.network_type"
+                                    :disabled="!(form.infrastructure_type || form.network_type)"
                                 >
                                     <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue :placeholder="form.network_type ? 'Pilih Kategori' : 'Pilih tipe jaringan dahulu'" />
+                                        <SelectValue :placeholder="(form.infrastructure_type || form.network_type) ? 'Pilih Kategori' : 'Pilih jenis infrastruktur dahulu'" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem 

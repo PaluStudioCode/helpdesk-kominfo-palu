@@ -43,7 +43,10 @@ import {
     Check,
     Cable,
     Network,
-    Wifi
+    Wifi,
+    Zap,
+    Repeat,
+    Globe
 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -63,7 +66,7 @@ import {
 
 const props = defineProps<{
     ticket: any;
-    categoriesMap?: Record<string, Array<{id: number, name: string, network_type: string}>>;
+    categoriesMap?: Record<string, Array<{id: number, name: string, infrastructure_type?: string, network_type?: string}>>;
     technicians?: Array<{id: number, name: string, phone_number?: string}>;
     initialUnreadCount?: number;
 }>();
@@ -238,15 +241,17 @@ const openImagePreview = (imagesList: Array<{ url: string; name: string }>, inde
 
 // 1. Verify & Assign Form (Admin)
 const verifyForm = useForm({
-    network_type: props.ticket.network_type || 'lan',
+    infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
+    network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
     category_id: props.ticket.category_id ? props.ticket.category_id.toString() : '',
     priority: props.ticket.priority || 'medium',
     technician_ids: [] as number[],
 });
 
 const verifyCategories = computed(() => {
-    if (!verifyForm.network_type || !props.categoriesMap) return [];
-    return props.categoriesMap[verifyForm.network_type] || [];
+    const infraType = verifyForm.infrastructure_type || verifyForm.network_type;
+    if (!infraType || !props.categoriesMap) return [];
+    return props.categoriesMap[infraType] || [];
 });
 
 const toggleVerifyTechnician = (techId: number) => {
@@ -297,14 +302,16 @@ const submitResubmit = () => {
 // 4. Submit Resolution Form (Technician)
 const resolutionForm = useForm({
     resolution_note: '',
-    network_type: props.ticket.network_type || 'lan',
+    infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
+    network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
     category_id: props.ticket.category_id ? props.ticket.category_id.toString() : '',
     resolution_proofs: [] as File[],
 });
 
 const resolutionCategories = computed(() => {
-    if (!resolutionForm.network_type || !props.categoriesMap) return [];
-    return props.categoriesMap[resolutionForm.network_type] || [];
+    const infraType = resolutionForm.infrastructure_type || resolutionForm.network_type;
+    if (!infraType || !props.categoriesMap) return [];
+    return props.categoriesMap[infraType] || [];
 });
 
 const submitResolution = () => {
@@ -835,7 +842,7 @@ onUnmounted(() => {
                             <div>
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur & Kategori</p>
                                 <p class="font-bold text-slate-900 text-sm mt-0.5">
-                                    {{ ticket.network_type ? getNetworkLabel(ticket.network_type) : '-' }}
+                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getNetworkLabel(ticket.infrastructure_type || ticket.network_type) : '-' }}
                                 </p>
                                 <p class="text-xs text-slate-600 mt-0.5">
                                     {{ ticket.category ? ticket.category.name : 'Belum diverifikasi' }}
@@ -1018,47 +1025,69 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle>Verifikasi & Disposisi Tim Teknisi</DialogTitle>
                     <DialogDescription>
-                        Validasi kelayakan laporan gangguan, tetapkan jenis infrastruktur jaringan, kategori dugaan awal, dan pilih Tim Teknisi penanggung jawab.
+                        Validasi kelayakan laporan gangguan, tetapkan jenis infrastruktur, kategori dugaan awal, dan pilih Tim Teknisi penanggung jawab.
                     </DialogDescription>
                 </DialogHeader>
 
                 <form @submit.prevent="submitVerifyAndAssign" class="space-y-4">
-                    <!-- Network Type -->
+                    <!-- Infrastructure Type -->
                     <div>
-                        <InputLabel value="Jenis Infrastruktur Jaringan *" class="text-xs font-medium mb-1" />
-                        <div class="grid grid-cols-3 gap-2">
+                        <InputLabel value="Jenis Infrastruktur *" class="text-xs font-medium mb-1" />
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                             <button
                                 type="button"
-                                @click="verifyForm.network_type = 'fiber_optic'; verifyForm.category_id = ''"
+                                @click="verifyForm.infrastructure_type = 'Fiber optic'; verifyForm.network_type = 'Fiber optic'; verifyForm.category_id = ''"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs font-medium transition-all',
-                                    verifyForm.network_type === 'fiber_optic' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
+                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
+                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Fiber optic' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
                                 ]"
                             >
-                                <Cable class="w-5 h-5 mb-1 text-purple-600" />
-                                <span>Fiber Optic</span>
+                                <Cable class="w-4 h-4 mb-1 text-sky-600" />
+                                <span class="truncate">Fiber optic</span>
                             </button>
                             <button
                                 type="button"
-                                @click="verifyForm.network_type = 'lan'; verifyForm.category_id = ''"
+                                @click="verifyForm.infrastructure_type = 'Perangkat/Akses'; verifyForm.network_type = 'Perangkat/Akses'; verifyForm.category_id = ''"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs font-medium transition-all',
-                                    verifyForm.network_type === 'lan' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
+                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
+                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Perangkat/Akses' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
                                 ]"
                             >
-                                <Network class="w-5 h-5 mb-1 text-cyan-600" />
-                                <span>LAN</span>
+                                <Network class="w-4 h-4 mb-1 text-indigo-600" />
+                                <span class="truncate">Perangkat/Akses</span>
                             </button>
                             <button
                                 type="button"
-                                @click="verifyForm.network_type = 'wifi'; verifyForm.category_id = ''"
+                                @click="verifyForm.infrastructure_type = 'Power/poe'; verifyForm.network_type = 'Power/poe'; verifyForm.category_id = ''"
                                 :class="[
-                                    'flex flex-col items-center justify-center p-2.5 rounded-lg border text-xs font-medium transition-all',
-                                    verifyForm.network_type === 'wifi' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
+                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
+                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Power/poe' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
                                 ]"
                             >
-                                <Wifi class="w-5 h-5 mb-1 text-sky-600" />
-                                <span>WiFi</span>
+                                <Zap class="w-4 h-4 mb-1 text-amber-600" />
+                                <span class="truncate">Power/poe</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="verifyForm.infrastructure_type = 'Converter'; verifyForm.network_type = 'Converter'; verifyForm.category_id = ''"
+                                :class="[
+                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
+                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Converter' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
+                                ]"
+                            >
+                                <Repeat class="w-4 h-4 mb-1 text-pink-600" />
+                                <span class="truncate">Converter</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="verifyForm.infrastructure_type = 'Layanan/jaringan'; verifyForm.network_type = 'Layanan/jaringan'; verifyForm.category_id = ''"
+                                :class="[
+                                    'flex flex-col items-center justify-center p-2 rounded-lg border text-xs font-medium transition-all',
+                                    (verifyForm.infrastructure_type || verifyForm.network_type) === 'Layanan/jaringan' ? 'border-kominfo-primary bg-blue-50 ring-2 ring-kominfo-primary/20 text-kominfo-primary' : 'border-slate-200 hover:bg-slate-50'
+                                ]"
+                            >
+                                <Globe class="w-4 h-4 mb-1 text-emerald-600" />
+                                <span class="truncate">Layanan/jaringan</span>
                             </button>
                         </div>
                     </div>
@@ -1289,7 +1318,7 @@ onUnmounted(() => {
                 <DialogHeader>
                     <DialogTitle>Lapor Selesai & Konfirmasi Kategori Riil</DialogTitle>
                     <DialogDescription>
-                        Isi catatan tindakan perbaikan lapangan dan konfirmasi jika ada perubahan jenis jaringan atau kategori gangguan sebenarnya di lokasi.
+                        Isi catatan tindakan perbaikan lapangan dan konfirmasi jika ada perubahan jenis infrastruktur atau kategori gangguan sebenarnya di lokasi.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -1302,15 +1331,24 @@ onUnmounted(() => {
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <InputLabel value="Jenis Jaringan Riil" class="text-xs font-medium" />
-                                <Select v-model="resolutionForm.network_type">
+                                <InputLabel value="Jenis Infrastruktur Riil" class="text-xs font-medium" />
+                                <Select 
+                                    :modelValue="resolutionForm.infrastructure_type || resolutionForm.network_type"
+                                    @update:modelValue="(val: any) => {
+                                        resolutionForm.infrastructure_type = val;
+                                        resolutionForm.network_type = val;
+                                        resolutionForm.category_id = '';
+                                    }"
+                                >
                                     <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Jaringan" />
+                                        <SelectValue placeholder="Pilih Infrastruktur" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="fiber_optic">Fiber Optic</SelectItem>
-                                        <SelectItem value="lan">LAN</SelectItem>
-                                        <SelectItem value="wifi">WiFi</SelectItem>
+                                        <SelectItem value="Fiber optic">Fiber optic</SelectItem>
+                                        <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
+                                        <SelectItem value="Power/poe">Power/poe</SelectItem>
+                                        <SelectItem value="Converter">Converter</SelectItem>
+                                        <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -47,6 +47,10 @@ class MasterDataController extends Controller
             $search = $request->input('search');
             $catQuery->where('name', 'like', "%{$search}%");
         }
+        $infraType = $request->input('infrastructure_type', $request->input('network_type'));
+        if ($activeTab === 'categories' && !empty($infraType) && $infraType !== 'all') {
+            $catQuery->where('infrastructure_type', $infraType);
+        }
         if ($activeTab === 'categories' && $request->has('sort')) {
             $catQuery->orderBy($request->input('sort'), $request->input('direction', 'asc'));
         } else {
@@ -91,7 +95,7 @@ class MasterDataController extends Controller
             'users' => $users,
             'counts' => $counts,
             'allDepartments' => $allDepartments,
-            'filters' => $request->only(['tab', 'search', 'sort', 'direction', 'role']),
+            'filters' => $request->only(['tab', 'search', 'sort', 'direction', 'role', 'infrastructure_type', 'network_type']),
         ]);
     }
 }

@@ -144,7 +144,7 @@ class NotificationDispatcher
             . "Anda telah ditugaskan dalam penanganan laporan kendala jaringan berikut:\n\n"
             . "Nomor Tiket: {$ticket->ticket_number}\n"
             . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
-            . "Jenis Jaringan: " . strtoupper($ticket->network_type ?? 'Jaringan') . "\n"
+            . "Jenis Infrastruktur: " . strtoupper($ticket->infrastructure_type ?? $ticket->network_type ?? 'Jaringan') . "\n"
             . "Judul Masalah: {$ticket->title}\n"
             . "Lokasi: {$ticket->location_details}\n"
             . "Prioritas: " . ucfirst($ticket->priority ?? 'Medium') . "\n"

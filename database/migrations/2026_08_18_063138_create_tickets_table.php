@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('reporter_id')->constrained('users')->onDelete('restrict');
             $table->foreignId('assigned_to')->nullable()->constrained('users')->onDelete('set null');
             $table->foreignId('category_id')->nullable()->constrained('ticket_categories')->onDelete('restrict');
-            $table->enum('network_type', ['fiber_optic', 'lan', 'wifi'])->nullable();
+            $table->enum('infrastructure_type', ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])->nullable();
             $table->string('title', 200);
             $table->string('location_details', 255);
             $table->text('description');
@@ -38,7 +38,7 @@ return new class extends Migration
             
             $table->index(['department_id', 'status', 'created_at']);
             $table->index(['assigned_to', 'status']);
-            $table->index(['network_type', 'priority', 'status', 'due_at']);
+            $table->index(['infrastructure_type', 'priority', 'status', 'due_at']);
         });
     }
 

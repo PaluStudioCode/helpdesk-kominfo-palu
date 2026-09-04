@@ -27,6 +27,11 @@ class CategoryController extends Controller
             $query->where('name', 'like', "%{$search}%");
         }
 
+        $infraType = $request->input('infrastructure_type', $request->input('network_type'));
+        if (!empty($infraType) && $infraType !== 'all') {
+            $query->where('infrastructure_type', $infraType);
+        }
+
         if ($request->has('sort')) {
             $query->orderBy($request->input('sort'), $request->input('direction', 'asc'));
         } else {
@@ -37,7 +42,7 @@ class CategoryController extends Controller
 
         return Inertia::render('Admin/Categories/Index', [
             'categories' => $categories,
-            'filters' => $request->only(['search', 'sort', 'direction']),
+            'filters' => $request->only(['search', 'sort', 'direction', 'infrastructure_type', 'network_type']),
         ]);
     }
 

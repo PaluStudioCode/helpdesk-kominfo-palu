@@ -29,7 +29,8 @@ interface Ticket {
     reporter: { name: string };
     assignee: { name: string } | null;
     technicians?: { id: number; name: string }[];
-    network_type: string | null;
+    infrastructure_type?: string | null;
+    network_type?: string | null;
     title: string;
     description?: string;
     location_details?: string;
@@ -60,6 +61,7 @@ const props = defineProps<{
         start_date?: string;
         end_date?: string;
         department_id?: string;
+        infrastructure_type?: string;
         network_type?: string;
         status?: string;
         assigned_to?: string;
@@ -71,7 +73,8 @@ const form = reactive({
     start_date: props.filters.start_date || '',
     end_date: props.filters.end_date || '',
     department_id: props.filters.department_id || 'all',
-    network_type: props.filters.network_type || 'all',
+    infrastructure_type: props.filters.infrastructure_type || props.filters.network_type || 'all',
+    network_type: props.filters.infrastructure_type || props.filters.network_type || 'all',
     status: props.filters.status || 'all',
 });
 
@@ -92,6 +95,7 @@ const resetFilters = () => {
     form.start_date = '';
     form.end_date = '';
     form.department_id = 'all';
+    form.infrastructure_type = 'all';
     form.network_type = 'all';
     form.status = 'all';
     applyFilters();
@@ -219,9 +223,14 @@ const getPriorityColor = (priority: string): string => {
 const getNetworkLabel = (network: string | null): string => {
     if (!network) return '-';
     const map: Record<string, string> = {
-        fiber_optic: 'Fiber Optic',
-        lan: 'Jaringan LAN',
-        wifi: 'WiFi Nirkabel',
+        'Fiber optic': 'Fiber optic',
+        'Perangkat/Akses': 'Perangkat/Akses',
+        'Power/poe': 'Power/poe',
+        'Converter': 'Converter',
+        'Layanan/jaringan': 'Layanan/jaringan',
+        fiber_optic: 'Fiber optic',
+        lan: 'Perangkat/Akses',
+        wifi: 'Layanan/jaringan',
     };
     return map[network] || network;
 };
@@ -229,9 +238,14 @@ const getNetworkLabel = (network: string | null): string => {
 const getNetworkColor = (network: string | null): string => {
     if (!network) return 'text-slate-400';
     const map: Record<string, string> = {
-        fiber_optic: 'text-cyan-700',
+        'Fiber optic': 'text-sky-700',
+        'Perangkat/Akses': 'text-indigo-700',
+        'Power/poe': 'text-amber-700',
+        'Converter': 'text-pink-700',
+        'Layanan/jaringan': 'text-emerald-700',
+        fiber_optic: 'text-sky-700',
         lan: 'text-indigo-700',
-        wifi: 'text-violet-700',
+        wifi: 'text-emerald-700',
     };
     return map[network] || 'text-slate-700';
 };
@@ -399,17 +413,19 @@ const formatDateTime = (dateStr: string | null) => {
                             </Select>
                         </div>
 
-                        <!-- Network Type Filter -->
+                        <!-- Infrastructure Type Filter -->
                         <div>
-                            <Select :modelValue="form.network_type" @update:modelValue="(v) => handleSelectChange('network_type', v)">
+                            <Select :modelValue="form.infrastructure_type" @update:modelValue="(v) => { form.infrastructure_type = v; form.network_type = v; applyFilters(); }">
                                 <SelectTrigger class="h-9 text-xs">
-                                    <SelectValue placeholder="Semua Jaringan" />
+                                    <SelectValue placeholder="Semua Infrastruktur" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Semua Jaringan</SelectItem>
-                                    <SelectItem value="fiber_optic">Fiber Optic (FO)</SelectItem>
-                                    <SelectItem value="lan">Jaringan LAN</SelectItem>
-                                    <SelectItem value="wifi">WiFi / Nirkabel</SelectItem>
+                                    <SelectItem value="all">Semua Infrastruktur</SelectItem>
+                                    <SelectItem value="Fiber optic">Fiber optic</SelectItem>
+                                    <SelectItem value="Perangkat/Akses">Perangkat/Akses</SelectItem>
+                                    <SelectItem value="Power/poe">Power/poe</SelectItem>
+                                    <SelectItem value="Converter">Converter</SelectItem>
+                                    <SelectItem value="Layanan/jaringan">Layanan/jaringan</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -471,11 +487,11 @@ const formatDateTime = (dateStr: string | null) => {
                         </div>
                     </template>
 
-                    <!-- Column 3: Category & Network -->
+                    <!-- Column 3: Category & Infrastructure -->
                     <template #cell-technical_spec="{ item }">
                         <div class="space-y-0.5 max-w-xs">
-                            <p class="font-semibold text-xs" :class="getNetworkColor(item.network_type)">
-                                {{ getNetworkLabel(item.network_type) }}
+                            <p class="font-semibold text-xs" :class="getNetworkColor(item.infrastructure_type || item.network_type)">
+                                {{ getNetworkLabel(item.infrastructure_type || item.network_type) }}
                             </p>
                             <p class="text-[11px] text-slate-500 truncate" :title="item.category?.name">
                                 {{ item.category?.name || '-' }}
@@ -580,8 +596,8 @@ const formatDateTime = (dateStr: string | null) => {
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 rounded-lg bg-slate-50/70 border border-slate-200/80">
                             <div>
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur</p>
-                                <p class="font-bold text-xs sm:text-sm mt-0.5" :class="getNetworkColor(selectedTicket.network_type)">
-                                    {{ getNetworkLabel(selectedTicket.network_type) }}
+                                <p class="font-bold text-xs sm:text-sm mt-0.5" :class="getNetworkColor(selectedTicket.infrastructure_type || selectedTicket.network_type)">
+                                    {{ getNetworkLabel(selectedTicket.infrastructure_type || selectedTicket.network_type) }}
                                 </p>
                                 <p class="text-xs text-slate-500 mt-0.5">{{ selectedTicket.category?.name || '-' }}</p>
                             </div>

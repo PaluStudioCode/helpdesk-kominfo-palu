@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 
 const props = defineProps<{
     status: string;
-    type?: 'ticket' | 'sla' | 'priority' | 'network';
+    type?: 'ticket' | 'sla' | 'priority' | 'network' | 'infrastructure';
 }>();
 
 const variant = computed(() => {
@@ -39,11 +39,16 @@ const variant = computed(() => {
         }
     }
     
-    if (props.type === 'network') {
+    if (props.type === 'network' || props.type === 'infrastructure') {
         switch (props.status) {
+            case 'Fiber optic':
             case 'fiber_optic': return 'fiber_optic';
-            case 'lan': return 'lan';
-            case 'wifi': return 'wifi';
+            case 'Perangkat/Akses':
+            case 'lan': return 'perangkat_akses';
+            case 'Power/poe': return 'power_poe';
+            case 'Converter': return 'converter';
+            case 'Layanan/jaringan':
+            case 'wifi': return 'layanan_jaringan';
         }
     }
     
@@ -71,9 +76,14 @@ const label = computed(() => {
         high: 'Tinggi',
         emergency: 'Darurat',
         // Networks
-        fiber_optic: 'Fiber Optic',
-        lan: 'LAN',
-        wifi: 'WiFi',
+        'Fiber optic': 'Fiber optic',
+        'Perangkat/Akses': 'Perangkat/Akses',
+        'Power/poe': 'Power/poe',
+        'Converter': 'Converter',
+        'Layanan/jaringan': 'Layanan/jaringan',
+        fiber_optic: 'Fiber optic',
+        lan: 'Perangkat/Akses',
+        wifi: 'Layanan/jaringan',
     };
     
     return labels[props.status] || props.status;

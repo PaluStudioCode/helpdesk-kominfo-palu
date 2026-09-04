@@ -1,4 +1,4 @@
-import type { Ticket, TicketStatus, TicketPriority, NetworkType, UserRole } from '@/types';
+import type { Ticket, TicketStatus, TicketPriority, InfrastructureType, NetworkType, UserRole } from '@/types';
 
 /**
  * Format tanggal dan waktu standar Indonesia (WITA / Asia/Makassar).
@@ -87,30 +87,44 @@ export const getPriorityColor = (priority: TicketPriority | string | null | unde
 };
 
 /**
- * Label tipe infrastruktur jaringan.
+ * Label jenis infrastruktur.
  */
-export const getNetworkLabel = (network: NetworkType | string | null | undefined): string => {
-    if (!network) return '-';
+export const getInfrastructureLabel = (infra: InfrastructureType | NetworkType | string | null | undefined): string => {
+    if (!infra) return '-';
     const labels: Record<string, string> = {
-        fiber_optic: 'Fiber Optic',
-        lan: 'Jaringan LAN',
-        wifi: 'WiFi Nirkabel',
+        'Fiber optic': 'Fiber optic',
+        'Perangkat/Akses': 'Perangkat/Akses',
+        'Power/poe': 'Power/poe',
+        'Converter': 'Converter',
+        'Layanan/jaringan': 'Layanan/jaringan',
+        fiber_optic: 'Fiber optic',
+        lan: 'Perangkat/Akses',
+        wifi: 'Layanan/jaringan',
     };
-    return labels[network] || network;
+    return labels[infra] || infra;
 };
 
+export const getNetworkLabel = getInfrastructureLabel;
+
 /**
- * Warna teks tipe infrastruktur jaringan.
+ * Warna teks jenis infrastruktur.
  */
-export const getNetworkColor = (network: NetworkType | string | null | undefined): string => {
-    if (!network) return 'text-slate-400';
+export const getInfrastructureColor = (infra: InfrastructureType | NetworkType | string | null | undefined): string => {
+    if (!infra) return 'text-slate-400';
     const colors: Record<string, string> = {
-        fiber_optic: 'text-cyan-700 font-semibold',
+        'Fiber optic': 'text-sky-700 font-semibold',
+        'Perangkat/Akses': 'text-indigo-700 font-semibold',
+        'Power/poe': 'text-amber-700 font-semibold',
+        'Converter': 'text-pink-700 font-semibold',
+        'Layanan/jaringan': 'text-emerald-700 font-semibold',
+        fiber_optic: 'text-sky-700 font-semibold',
         lan: 'text-indigo-700 font-semibold',
-        wifi: 'text-violet-700 font-semibold',
+        wifi: 'text-emerald-700 font-semibold',
     };
-    return colors[network] || 'text-slate-700';
+    return colors[infra] || 'text-slate-700 font-semibold';
 };
+
+export const getNetworkColor = getInfrastructureColor;
 
 /**
  * Label peran pengguna (Role).

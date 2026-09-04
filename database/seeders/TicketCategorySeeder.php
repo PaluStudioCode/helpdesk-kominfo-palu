@@ -13,117 +13,163 @@ class TicketCategorySeeder extends Seeder
     public function run(): void
     {
         $categories = [
-            // Fiber Optic Categories
+            // 1. Fiber optic Categories
             [
                 'name' => 'Internet Putus Total / Backbone Down (Emergency)',
-                'network_type' => 'fiber_optic',
+                'infrastructure_type' => 'Fiber optic',
                 'sla_hours' => 4,
                 'status' => 'active',
             ],
             [
                 'name' => 'Kabel FO Utama / Backbone Putus Fisik',
-                'network_type' => 'fiber_optic',
-                'sla_hours' => 6,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Kerusakan / Masalah SFP / Media Converter',
-                'network_type' => 'fiber_optic',
+                'infrastructure_type' => 'Fiber optic',
                 'sla_hours' => 6,
                 'status' => 'active',
             ],
             [
                 'name' => 'Redaman Fiber Optic Tinggi (High Attenuation / Bending)',
-                'network_type' => 'fiber_optic',
+                'infrastructure_type' => 'Fiber optic',
                 'sla_hours' => 8,
                 'status' => 'active',
             ],
             [
                 'name' => 'Core FO Rusak / Sambungan Joint Closure Bermasalah',
-                'network_type' => 'fiber_optic',
+                'infrastructure_type' => 'Fiber optic',
                 'sla_hours' => 8,
                 'status' => 'active',
             ],
             [
                 'name' => 'Koneksi FO Dropcore Putus / Terjepit di Lokasi OPD',
-                'network_type' => 'fiber_optic',
+                'infrastructure_type' => 'Fiber optic',
                 'sla_hours' => 12,
                 'status' => 'active',
             ],
+            [
+                'name' => 'Patchcord FO Patah / Konektor OTB Rusak',
+                'infrastructure_type' => 'Fiber optic',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
 
-            // LAN Categories
+            // 2. Perangkat/Akses Categories
             [
-                'name' => 'Krimpingan RJ45 Longgar / Konektor Rusak',
-                'network_type' => 'lan',
-                'sla_hours' => 4,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Masalah IP Conflict / DHCP / Gateway Not Reachable',
-                'network_type' => 'lan',
-                'sla_hours' => 4,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Kabel UTP / LAN Gedung Putus atau Terkelupas',
-                'network_type' => 'lan',
-                'sla_hours' => 6,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Switch Distribusi Gedung Hang / Mati Listrik',
-                'network_type' => 'lan',
+                'name' => 'Switch Distribusi Gedung Hang / Mati Total',
+                'infrastructure_type' => 'Perangkat/Akses',
                 'sla_hours' => 6,
                 'status' => 'active',
             ],
             [
                 'name' => 'Koneksi Port Switch / Patch Panel Bermasalah',
-                'network_type' => 'lan',
+                'infrastructure_type' => 'Perangkat/Akses',
                 'sla_hours' => 8,
                 'status' => 'active',
             ],
             [
-                'name' => 'Koneksi LAN Antar Ruang / Server Lokal Lambat',
-                'network_type' => 'lan',
-                'sla_hours' => 8,
+                'name' => 'Access Point Mati Total / Indikator Merah',
+                'infrastructure_type' => 'Perangkat/Akses',
+                'sla_hours' => 6,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Sinyal Wi-Fi Lemah / Blind Spot Ruangan',
+                'infrastructure_type' => 'Perangkat/Akses',
+                'sla_hours' => 12,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Krimpingan RJ45 Longgar / Konektor Rusak',
+                'infrastructure_type' => 'Perangkat/Akses',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Router Gateway OPD Hang / Perlu Reset Konfigurasi',
+                'infrastructure_type' => 'Perangkat/Akses',
+                'sla_hours' => 4,
                 'status' => 'active',
             ],
 
-            // Wi-Fi Categories
+            // 3. Power/poe Categories
+            [
+                'name' => 'Adaptor / PoE Injector Access Point Mati Total',
+                'infrastructure_type' => 'Power/poe',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Gangguan Pasokan Listrik Rack Server / UPS Drop',
+                'infrastructure_type' => 'Power/poe',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Switch PoE Overload / Port PoE Tidak Mengalirkan Daya',
+                'infrastructure_type' => 'Power/poe',
+                'sla_hours' => 6,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Kabel Power / Steker Perangkat Jaringan Lepas atau Rusak',
+                'infrastructure_type' => 'Power/poe',
+                'sla_hours' => 2,
+                'status' => 'active',
+            ],
+
+            // 4. Converter Categories
+            [
+                'name' => 'Media Converter FO-LAN Mati / Rusak',
+                'infrastructure_type' => 'Converter',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Kerusakan / Masalah SFP Transceiver Optic Modul',
+                'infrastructure_type' => 'Converter',
+                'sla_hours' => 6,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Lampu Indikator Link / FX Media Converter Mati',
+                'infrastructure_type' => 'Converter',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+            [
+                'name' => 'Adaptor Power Media Converter Rusak / Drop Tegangan',
+                'infrastructure_type' => 'Converter',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
+
+            // 5. Layanan/jaringan Categories
+            [
+                'name' => 'Masalah IP Conflict / DHCP / Gateway Not Reachable',
+                'infrastructure_type' => 'Layanan/jaringan',
+                'sla_hours' => 4,
+                'status' => 'active',
+            ],
             [
                 'name' => 'Wi-Fi Terhubung tetapi Tidak Ada Akses Internet',
-                'network_type' => 'wifi',
+                'infrastructure_type' => 'Layanan/jaringan',
                 'sla_hours' => 4,
                 'status' => 'active',
             ],
             [
                 'name' => 'Gagal Login / Otentikasi Captive Portal Wi-Fi',
-                'network_type' => 'wifi',
+                'infrastructure_type' => 'Layanan/jaringan',
                 'sla_hours' => 4,
                 'status' => 'active',
             ],
             [
-                'name' => 'Access Point Mati Total / Indikator Merah',
-                'network_type' => 'wifi',
-                'sla_hours' => 6,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Overload Pengguna / Kapasitas AP Penuh',
-                'network_type' => 'wifi',
-                'sla_hours' => 6,
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Interferensi Sinyal Wi-Fi / Kanal Padat',
-                'network_type' => 'wifi',
+                'name' => 'Bandwidth Lambat / Koneksi Antar Ruang atau Server Lokal Lambat',
+                'infrastructure_type' => 'Layanan/jaringan',
                 'sla_hours' => 8,
                 'status' => 'active',
             ],
             [
-                'name' => 'Sinyal Wi-Fi Lemah / Blind Spot Ruangan',
-                'network_type' => 'wifi',
-                'sla_hours' => 12,
+                'name' => 'Gagal Akses DNS / Layanan Sistem Informasi Pemkot Terkendala',
+                'infrastructure_type' => 'Layanan/jaringan',
+                'sla_hours' => 4,
                 'status' => 'active',
             ],
         ];
@@ -132,7 +178,7 @@ class TicketCategorySeeder extends Seeder
             TicketCategory::updateOrCreate(
                 [
                     'name' => $category['name'],
-                    'network_type' => $category['network_type'],
+                    'infrastructure_type' => $category['infrastructure_type'],
                 ],
                 [
                     'sla_hours' => $category['sla_hours'],

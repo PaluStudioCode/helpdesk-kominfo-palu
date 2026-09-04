@@ -257,10 +257,11 @@
     <!-- BAGIAN 2: 2 KARTU VISUAL GRAFIK (FORMAL MONOKROM) -->
     <table class="section-table">
         <tr>
-            <!-- Grafik 1: Sebaran Infrastruktur Jaringan -->
+            <!-- Grafik 1: Sebaran Infrastruktur -->
             <td class="section-box">
-                <div class="section-header">Distribusi Infrastruktur Jaringan</div>
-                @foreach($networkStats as $net)
+                <div class="section-header">Distribusi Infrastruktur</div>
+                @php $infraList = $infrastructureStats ?? $networkStats ?? []; @endphp
+                @foreach($infraList as $net)
                     <div class="chart-row">
                         <table class="chart-label-table">
                             <tr>

@@ -1,7 +1,8 @@
 export type UserRole = 'admin' | 'technician' | 'opd_user';
 export type TicketStatus = 'pending_admin' | 'in_progress' | 'pending_approval' | 'closed' | 'cancelled';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'emergency';
-export type NetworkType = 'fiber_optic' | 'lan' | 'wifi';
+export type InfrastructureType = 'Fiber optic' | 'Perangkat/Akses' | 'Power/poe' | 'Converter' | 'Layanan/jaringan' | 'fiber_optic' | 'lan' | 'wifi';
+export type NetworkType = InfrastructureType; // backward compatibility alias
 
 export interface User {
     id: number;
@@ -26,7 +27,8 @@ export interface Department {
 export interface TicketCategory {
     id: number;
     name: string;
-    network_type: NetworkType;
+    infrastructure_type: InfrastructureType;
+    network_type?: InfrastructureType;
     sla_hours: number;
     status?: 'active' | 'inactive';
 }
@@ -80,7 +82,8 @@ export interface Ticket {
     reporter_id: number;
     assigned_to?: number | null;
     category_id?: number | null;
-    network_type?: NetworkType | null;
+    infrastructure_type?: InfrastructureType | null;
+    network_type?: InfrastructureType | null;
     title: string;
     location_details?: string | null;
     description?: string | null;

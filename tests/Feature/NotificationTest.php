@@ -69,7 +69,7 @@ class NotificationTest extends TestCase
         ]);
 
         $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/verify-assign", [
-            'network_type' => 'fiber_optic',
+            'network_type' => 'Fiber optic',
             'category_id' => $category->id,
             'priority' => 'high',
             'technician_ids' => [$tech->id],

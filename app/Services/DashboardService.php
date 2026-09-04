@@ -29,6 +29,7 @@ class DashboardService
         $filterStart = null;
         $filterEnd = null;
         $statusDistribution = null;
+        $infrastructureDistribution = null;
         $networkTypeDistribution = null;
         $priorityDistribution = null;
         $ticketTrend = null;
@@ -55,7 +56,8 @@ class DashboardService
             $filterStart = $adminData['filterStart'];
             $filterEnd = $adminData['filterEnd'];
             $statusDistribution = $adminData['statusDistribution'];
-            $networkTypeDistribution = $adminData['networkTypeDistribution'];
+            $infrastructureDistribution = $adminData['infrastructureDistribution'] ?? $adminData['networkTypeDistribution'];
+            $networkTypeDistribution = $infrastructureDistribution;
             $priorityDistribution = $adminData['priorityDistribution'];
             $monthlyReports = $adminData['monthlyReports'];
             $monthlySummary = $adminData['monthlySummary'];
@@ -77,6 +79,7 @@ class DashboardService
             'startDate' => $filterStart ? $filterStart->format('Y-m-d') : null,
             'endDate' => $filterEnd ? $filterEnd->format('Y-m-d') : null,
             'statusDistribution' => $statusDistribution,
+            'infrastructureDistribution' => $infrastructureDistribution,
             'networkTypeDistribution' => $networkTypeDistribution,
             'priorityDistribution' => $priorityDistribution,
             'ticketTrend' => $ticketTrend,
@@ -158,7 +161,8 @@ class DashboardService
                     'department_code' => $t->department ? $t->department->code : '-',
                     'location_details' => $t->location_details ?? '-',
                     'category_name' => $t->category ? $t->category->name : '-',
-                    'network_type' => $t->network_type,
+                    'infrastructure_type' => $t->infrastructure_type,
+                    'network_type' => $t->infrastructure_type,
                     'priority' => $t->priority,
                     'due_at' => $t->due_at ? $t->due_at->format('d M Y, H:i') : null,
                     'due_human' => $dueHuman,
@@ -341,15 +345,18 @@ class DashboardService
             'colors' => ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#f43f5e'],
         ];
 
-        $fiberCount = (clone $statsQuery)->where('network_type', 'fiber_optic')->count();
-        $lanCount = (clone $statsQuery)->where('network_type', 'lan')->count();
-        $wifiCount = (clone $statsQuery)->where('network_type', 'wifi')->count();
+        $fiberCount = (clone $statsQuery)->where('infrastructure_type', 'Fiber optic')->count();
+        $deviceCount = (clone $statsQuery)->where('infrastructure_type', 'Perangkat/Akses')->count();
+        $powerCount = (clone $statsQuery)->where('infrastructure_type', 'Power/poe')->count();
+        $converterCount = (clone $statsQuery)->where('infrastructure_type', 'Converter')->count();
+        $serviceCount = (clone $statsQuery)->where('infrastructure_type', 'Layanan/jaringan')->count();
 
-        $networkTypeDistribution = [
-            'labels' => ['FO', 'LAN', 'WiFi'],
-            'data' => [$fiberCount, $lanCount, $wifiCount],
-            'colors' => ['#0284c7', '#6366f1', '#0d9488'],
+        $infrastructureDistribution = [
+            'labels' => ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'],
+            'data' => [$fiberCount, $deviceCount, $powerCount, $converterCount, $serviceCount],
+            'colors' => ['#0284c7', '#6366f1', '#f59e0b', '#ec4899', '#10b981'],
         ];
+        $networkTypeDistribution = $infrastructureDistribution;
 
         $lowCount = (clone $statsQuery)->where('priority', 'low')->count();
         $mediumCount = (clone $statsQuery)->where('priority', 'medium')->count();
@@ -500,6 +507,7 @@ class DashboardService
             'filterStart' => $filterStart,
             'filterEnd' => $filterEnd,
             'statusDistribution' => $statusDistribution,
+            'infrastructureDistribution' => $infrastructureDistribution,
             'networkTypeDistribution' => $networkTypeDistribution,
             'priorityDistribution' => $priorityDistribution,
             'monthlyReports' => $monthlyReports,
@@ -556,7 +564,8 @@ class DashboardService
                     'reporter_name' => $ticket->reporter ? $ticket->reporter->name : '-',
                     'category_name' => $ticket->category ? $ticket->category->name : '-',
                     'technicians_label' => !empty($technicianNames) ? implode(', ', $technicianNames) : 'Belum ditugaskan',
-                    'network_type' => $ticket->network_type,
+                    'infrastructure_type' => $ticket->infrastructure_type,
+                    'network_type' => $ticket->infrastructure_type,
                     'priority' => $ticket->priority,
                     'status' => $ticket->status,
                     'created_at' => $ticket->created_at ? $ticket->created_at->format('d M Y, H:i') : '-',

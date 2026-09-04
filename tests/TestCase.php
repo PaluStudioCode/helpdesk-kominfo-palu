@@ -81,9 +81,12 @@ abstract class TestCase extends BaseTestCase
      */
     protected function createCategory(array $attributes = []): TicketCategory
     {
+        $infraType = $attributes['infrastructure_type'] ?? $attributes['network_type'] ?? 'Fiber optic';
+        unset($attributes['network_type']);
+
         return TicketCategory::create(array_merge([
             'name' => 'Kategori Test ' . uniqid(),
-            'network_type' => 'lan',
+            'infrastructure_type' => $infraType,
             'sla_hours' => 4,
             'status' => 'active',
         ], $attributes));
@@ -97,13 +100,16 @@ abstract class TestCase extends BaseTestCase
         $department = $attributes['department_id'] ?? $this->createDepartment()->id;
         $reporter = $attributes['reporter_id'] ?? $this->createOpdUser(Department::find($department))->id;
 
+        $infraType = $attributes['infrastructure_type'] ?? $attributes['network_type'] ?? null;
+        unset($attributes['network_type']);
+
         return Ticket::create(array_merge([
             'ticket_number' => 'TKT-' . date('Ymd') . '-' . rand(1000, 9999),
             'department_id' => $department,
             'reporter_id' => $reporter,
             'assigned_to' => null,
             'category_id' => null,
-            'network_type' => null,
+            'infrastructure_type' => $infraType,
             'title' => 'Laporan Gangguan Testing',
             'location_details' => 'Ruang Server Lt 2',
             'description' => 'Deskripsi gangguan testing.',

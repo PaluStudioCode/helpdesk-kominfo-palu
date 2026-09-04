@@ -9,7 +9,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import FileUpload from '@/Components/FileUpload.vue';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Cable, Network, Wifi } from 'lucide-vue-next';
+import { Cable, Network, Wifi, Zap, Repeat, Globe } from 'lucide-vue-next';
 import {
   Select,
   SelectContent,
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 
 const props = defineProps<{
-    categoriesMap: Record<string, Array<{id: number, name: string, network_type: string}>>;
+    categoriesMap: Record<string, Array<{id: number, name: string, infrastructure_type?: string, network_type?: string}>>;
     departments?: Array<{id: number, name: string}>;
     technicians?: Array<{id: number, name: string, phone_number?: string}>;
     isAdmin: boolean;
@@ -32,6 +32,7 @@ const form = useForm({
     attachments: [] as File[],
     // Admin On-Behalf Fields
     department_id: '',
+    infrastructure_type: '',
     network_type: '',
     category_id: '',
     priority: 'medium',
@@ -39,14 +40,18 @@ const form = useForm({
 });
 
 const availableCategories = computed(() => {
-    if (!form.network_type || !props.categoriesMap) return [];
-    return props.categoriesMap[form.network_type] || [];
+    const infraType = form.infrastructure_type || form.network_type;
+    if (!infraType || !props.categoriesMap) return [];
+    return props.categoriesMap[infraType] || [];
 });
 
-const handleNetworkChange = (type: string) => {
+const handleInfrastructureChange = (type: string) => {
+    form.infrastructure_type = type;
     form.network_type = type;
     form.category_id = '';
 };
+
+const handleNetworkChange = handleInfrastructureChange;
 
 const toggleTechnician = (techId: number) => {
     const index = form.technician_ids.indexOf(techId);
@@ -128,47 +133,65 @@ const submitForm = () => {
                                 <InputError :message="form.errors.department_id" class="mt-1" />
                             </div>
 
-                            <!-- 2. Jenis Jaringan & Kategori -->
+                            <!-- 2. Jenis Infrastruktur & Kategori -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <InputLabel value="Jenis Infrastruktur Jaringan *" class="text-amber-950 font-medium mb-1.5" />
-                                    <div class="grid grid-cols-3 gap-2">
+                                    <InputLabel value="Jenis Infrastruktur *" class="text-amber-950 font-medium mb-1.5" />
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                                         <button 
                                             type="button"
-                                            @click="handleNetworkChange('fiber_optic')"
-                                            class="border rounded-lg p-2.5 text-center flex flex-col items-center justify-center gap-1.5 transition-all text-xs font-medium"
-                                            :class="form.network_type === 'fiber_optic' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
+                                            @click="handleInfrastructureChange('Fiber optic')"
+                                            class="border rounded-lg p-2 text-center flex flex-col items-center justify-center gap-1 transition-all text-xs font-medium"
+                                            :class="(form.infrastructure_type || form.network_type) === 'Fiber optic' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
                                         >
-                                            <Cable class="h-5 w-5 text-purple-600" />
-                                            <span>Fiber Optic</span>
+                                            <Cable class="h-4 w-4 text-sky-600" />
+                                            <span class="truncate">Fiber optic</span>
                                         </button>
                                         <button 
                                             type="button"
-                                            @click="handleNetworkChange('lan')"
-                                            class="border rounded-lg p-2.5 text-center flex flex-col items-center justify-center gap-1.5 transition-all text-xs font-medium"
-                                            :class="form.network_type === 'lan' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
+                                            @click="handleInfrastructureChange('Perangkat/Akses')"
+                                            class="border rounded-lg p-2 text-center flex flex-col items-center justify-center gap-1 transition-all text-xs font-medium"
+                                            :class="(form.infrastructure_type || form.network_type) === 'Perangkat/Akses' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
                                         >
-                                            <Network class="h-5 w-5 text-cyan-600" />
-                                            <span>LAN</span>
+                                            <Network class="h-4 w-4 text-indigo-600" />
+                                            <span class="truncate">Perangkat/Akses</span>
                                         </button>
                                         <button 
                                             type="button"
-                                            @click="handleNetworkChange('wifi')"
-                                            class="border rounded-lg p-2.5 text-center flex flex-col items-center justify-center gap-1.5 transition-all text-xs font-medium"
-                                            :class="form.network_type === 'wifi' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
+                                            @click="handleInfrastructureChange('Power/poe')"
+                                            class="border rounded-lg p-2 text-center flex flex-col items-center justify-center gap-1 transition-all text-xs font-medium"
+                                            :class="(form.infrastructure_type || form.network_type) === 'Power/poe' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
                                         >
-                                            <Wifi class="h-5 w-5 text-sky-600" />
-                                            <span>WiFi</span>
+                                            <Zap class="h-4 w-4 text-amber-600" />
+                                            <span class="truncate">Power/poe</span>
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            @click="handleInfrastructureChange('Converter')"
+                                            class="border rounded-lg p-2 text-center flex flex-col items-center justify-center gap-1 transition-all text-xs font-medium"
+                                            :class="(form.infrastructure_type || form.network_type) === 'Converter' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
+                                        >
+                                            <Repeat class="h-4 w-4 text-pink-600" />
+                                            <span class="truncate">Converter</span>
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            @click="handleInfrastructureChange('Layanan/jaringan')"
+                                            class="border rounded-lg p-2 text-center flex flex-col items-center justify-center gap-1 transition-all text-xs font-medium"
+                                            :class="(form.infrastructure_type || form.network_type) === 'Layanan/jaringan' ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'"
+                                        >
+                                            <Globe class="h-4 w-4 text-emerald-600" />
+                                            <span class="truncate">Layanan/jaringan</span>
                                         </button>
                                     </div>
-                                    <InputError :message="form.errors.network_type" class="mt-1" />
+                                    <InputError :message="form.errors.infrastructure_type || form.errors.network_type" class="mt-1" />
                                 </div>
 
                                 <div>
                                     <InputLabel for="category_id" value="Kategori Masalah / Dugaan Awal *" class="text-amber-950 font-medium mb-1.5" />
-                                    <Select v-model="form.category_id" :disabled="!form.network_type">
+                                    <Select v-model="form.category_id" :disabled="!(form.infrastructure_type || form.network_type)">
                                         <SelectTrigger class="bg-white">
-                                            <SelectValue :placeholder="form.network_type ? 'Pilih kategori...' : 'Pilih jenis jaringan dahulu'" />
+                                            <SelectValue :placeholder="(form.infrastructure_type || form.network_type) ? 'Pilih kategori...' : 'Pilih jenis infrastruktur dahulu'" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem v-for="cat in availableCategories" :key="cat.id" :value="cat.id.toString()">

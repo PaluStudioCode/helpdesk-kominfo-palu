@@ -19,7 +19,8 @@ class Ticket extends Model
         'reporter_id',
         'assigned_to',
         'category_id',
-        'network_type',
+        'infrastructure_type',
+        'network_type', // backward compatibility alias
         'title',
         'location_details',
         'description',
@@ -138,5 +139,15 @@ class Ticket extends Model
 
         $diffHours = (now()->getTimestamp() - $cancelledTime->getTimestamp()) / 3600;
         return $diffHours >= 0 && $diffHours < 72;
+    }
+
+    public function getNetworkTypeAttribute()
+    {
+        return $this->attributes['infrastructure_type'] ?? null;
+    }
+
+    public function setNetworkTypeAttribute($value)
+    {
+        $this->attributes['infrastructure_type'] = $value;
     }
 }

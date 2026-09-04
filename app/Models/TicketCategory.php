@@ -13,10 +13,21 @@ class TicketCategory extends Model
 
     protected $fillable = [
         'name',
-        'network_type',
+        'infrastructure_type',
+        'network_type', // backward compatibility alias
         'sla_hours',
         'status',
     ];
+
+    public function getNetworkTypeAttribute()
+    {
+        return $this->attributes['infrastructure_type'] ?? null;
+    }
+
+    public function setNetworkTypeAttribute($value)
+    {
+        $this->attributes['infrastructure_type'] = $value;
+    }
 
     public function tickets(): HasMany
     {

@@ -48,7 +48,7 @@ class MasterDataTest extends TestCase
 
         $response = $this->actingAs($admin)->post('/admin/categories', [
             'name' => 'Kabel FO Putus Jalur Utama',
-            'network_type' => 'fiber_optic',
+            'network_type' => 'Fiber optic',
             'sla_hours' => 3,
             'status' => 'active',
         ]);
@@ -56,6 +56,7 @@ class MasterDataTest extends TestCase
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('ticket_categories', [
             'name' => 'Kabel FO Putus Jalur Utama',
+            'infrastructure_type' => 'Fiber optic',
             'sla_hours' => 3,
         ]);
     }
@@ -141,4 +142,42 @@ class MasterDataTest extends TestCase
         $response->assertSessionHas('error');
         $this->assertNotSoftDeleted($category);
     }
+
+    public function test_admin_can_filter_categories_by_infrastructure_type(): void
+    {
+        $admin = $this->createAdmin();
+        $catFo = $this->createCategory([
+            'name' => 'Kategori Fiber Optic Unik',
+            'infrastructure_type' => 'Fiber optic',
+        ]);
+        $catPower = $this->createCategory([
+            'name' => 'Kategori Power Poe Unik',
+            'infrastructure_type' => 'Power/poe',
+        ]);
+
+        // Test in Master Data Hub categories tab
+        $response = $this->actingAs($admin)->get('/admin/master-data?tab=categories&infrastructure_type=Fiber optic');
+        $response->assertStatus(200);
+        $response->assertInertia(fn ($page) => $page
+            ->component('Admin/MasterData/Index')
+            ->where('categories.data', function ($cats) {
+                $names = collect($cats)->pluck('name');
+                return $names->contains('Kategori Fiber Optic Unik')
+                    && !$names->contains('Kategori Power Poe Unik');
+            })
+        );
+
+        // Test in standalone Category index
+        $responseCategory = $this->actingAs($admin)->get('/admin/categories?infrastructure_type=Power/poe');
+        $responseCategory->assertStatus(200);
+        $responseCategory->assertInertia(fn ($page) => $page
+            ->component('Admin/Categories/Index')
+            ->where('categories.data', function ($cats) {
+                $names = collect($cats)->pluck('name');
+                return $names->contains('Kategori Power Poe Unik')
+                    && !$names->contains('Kategori Fiber Optic Unik');
+            })
+        );
+    }
 }
+

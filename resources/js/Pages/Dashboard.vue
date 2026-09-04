@@ -117,7 +117,8 @@ interface RecentTicket {
     reporter_name: string;
     category_name: string;
     technicians_label?: string;
-    network_type: string;
+    infrastructure_type?: string;
+    network_type?: string;
     priority: string;
     status: string;
     created_at: string;
@@ -147,7 +148,8 @@ interface ActiveTask {
     department_code: string;
     location_details: string;
     category_name: string;
-    network_type: string;
+    infrastructure_type?: string;
+    network_type?: string;
     priority: string;
     due_at: string | null;
     due_human: string;
@@ -184,6 +186,7 @@ const props = withDefaults(defineProps<{
     startDate?: string | null;
     endDate?: string | null;
     statusDistribution?: ChartDataset | null;
+    infrastructureDistribution?: ChartDataset | null;
     networkTypeDistribution?: ChartDataset | null;
     priorityDistribution?: ChartDataset | null;
     ticketTrend?: TicketTrendDataset | null;
@@ -203,6 +206,7 @@ const props = withDefaults(defineProps<{
     startDate: null,
     endDate: null,
     statusDistribution: null,
+    infrastructureDistribution: null,
     networkTypeDistribution: null,
     priorityDistribution: null,
     ticketTrend: null,
@@ -405,18 +409,28 @@ const getRateTextColor = (rate: number) => {
 // Recent tickets text-only styling (no badge background)
 const getNetworkLabel = (type: string) => {
     switch (type) {
-        case 'fiber_optic': return 'FO';
-        case 'lan': return 'LAN';
-        case 'wifi': return 'WiFi';
+        case 'Fiber optic':
+        case 'fiber_optic': return 'Fiber optic';
+        case 'Perangkat/Akses':
+        case 'lan': return 'Perangkat/Akses';
+        case 'Power/poe': return 'Power/poe';
+        case 'Converter': return 'Converter';
+        case 'Layanan/jaringan':
+        case 'wifi': return 'Layanan/jaringan';
         default: return type || '-';
     }
 };
 
 const getNetworkColor = (type: string) => {
     switch (type) {
+        case 'Fiber optic':
         case 'fiber_optic': return 'text-sky-600 font-semibold';
+        case 'Perangkat/Akses':
         case 'lan': return 'text-indigo-600 font-semibold';
-        case 'wifi': return 'text-teal-600 font-semibold';
+        case 'Power/poe': return 'text-amber-600 font-semibold';
+        case 'Converter': return 'text-pink-600 font-semibold';
+        case 'Layanan/jaringan':
+        case 'wifi': return 'text-emerald-600 font-semibold';
         default: return 'text-slate-600 font-semibold';
     }
 };
@@ -588,18 +602,20 @@ const priorityBarChartOptions = {
     },
 };
 
-// Chart 3: Network Type Distribution (Bar)
+const infraDist = computed(() => props.infrastructureDistribution || props.networkTypeDistribution);
+
+// Chart 3: Infrastructure Distribution (Bar)
 const barChartData = computed(() => {
-    if (!props.networkTypeDistribution) {
+    if (!infraDist.value) {
         return { labels: [], datasets: [] };
     }
     return {
-        labels: props.networkTypeDistribution.labels,
+        labels: infraDist.value.labels,
         datasets: [
             {
                 label: 'Jumlah Laporan Gangguan',
-                data: props.networkTypeDistribution.data,
-                backgroundColor: props.networkTypeDistribution.colors,
+                data: infraDist.value.data,
+                backgroundColor: infraDist.value.colors,
                 borderRadius: 6,
                 maxBarThickness: 36,
             },
@@ -1198,7 +1214,7 @@ const techResolutionChartOptions = computed(() => ({
                                                                 {{ ticket.ticket_number }}
                                                             </div>
                                                             <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
-                                                                {{ ticket.network_type ? ticket.network_type.replace('_', ' ') : '-' }}
+                                                                {{ (ticket.infrastructure_type || ticket.network_type) ? (ticket.infrastructure_type || ticket.network_type).replace('_', ' ') : '-' }}
                                                             </div>
                                                         </Link>
                                                     </TableCell>
@@ -1536,7 +1552,7 @@ const techResolutionChartOptions = computed(() => ({
                                                                 {{ task.ticket_number }}
                                                             </div>
                                                             <div class="text-[11px] text-slate-400 mt-0.5 capitalize">
-                                                                {{ task.network_type ? task.network_type.replace('_', ' ') : '-' }}
+                                                                {{ (task.infrastructure_type || task.network_type) ? (task.infrastructure_type || task.network_type).replace('_', ' ') : '-' }}
                                                             </div>
                                                         </Link>
                                                     </TableCell>
@@ -1739,30 +1755,79 @@ const techResolutionChartOptions = computed(() => ({
                     </Card>
                 </div>
 
-                <!-- Line Chart: Tren Tiket Terselesaikan -->
-                <Card class="border-slate-200 shadow-sm flex flex-col">
-                    <CardHeader class="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div class="flex items-center gap-2">
-                            <TrendingUp class="w-4 h-4 text-emerald-600" />
-                            <CardTitle class="text-sm font-bold text-slate-900">Tren Tiket Terselesaikan</CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent class="pt-2">
-                        <div class="h-60 relative">
-                            <Line 
-                                v-if="ticketTrend && ticketTrend.labels && ticketTrend.labels.length > 0"
-                                :data="lineChartData" 
-                                :options="lineChartOptions" 
-                            />
-                            <div v-else class="h-full flex items-center justify-center text-xs text-slate-400">
-                                Belum ada data tren tiket pada periode ini
+                <!-- Charts Row 1: Tren Tiket Terselesaikan & Laporan Distribusi Infrastruktur -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Line Chart: Tren Tiket Terselesaikan -->
+                    <Card class="border-slate-200 shadow-sm flex flex-col">
+                        <CardHeader class="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <TrendingUp class="w-4 h-4 text-emerald-600" />
+                                <CardTitle class="text-sm font-bold text-slate-900">Tren Tiket Terselesaikan</CardTitle>
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardHeader>
+                        <CardContent class="pt-2 flex-1 flex flex-col justify-between">
+                            <div class="h-56 sm:h-64 relative flex items-center justify-center">
+                                <Line 
+                                    v-if="ticketTrend && ticketTrend.labels && ticketTrend.labels.length > 0"
+                                    :data="lineChartData" 
+                                    :options="lineChartOptions" 
+                                />
+                                <div v-else class="h-full flex items-center justify-center text-xs text-slate-400">
+                                    Belum ada data tren tiket pada periode ini
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                <!-- 3 Visual Interactive Charts Grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Chart: Distribusi Berdasarkan Infrastruktur (Bar) -->
+                    <Card class="border-slate-200 shadow-sm flex flex-col">
+                        <CardHeader class="pb-2">
+                            <div class="flex items-center gap-2">
+                                <Network class="w-4 h-4 text-indigo-600" />
+                                <CardTitle class="text-sm font-bold text-slate-900">Laporan Distribusi Infrastruktur</CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent class="flex-1 flex flex-col justify-between pt-2">
+                            <div class="h-52 relative flex items-center justify-center">
+                                <Bar 
+                                    v-if="infraDist && infraDist.data.some(v => v > 0)"
+                                    :data="barChartData" 
+                                    :options="barChartOptions" 
+                                />
+                                <div v-else class="text-center text-xs text-slate-400">
+                                    Belum ada data distribusi infrastruktur pada periode ini
+                                </div>
+                            </div>
+
+                            <!-- Custom Quick Summary Pills -->
+                            <div v-if="infraDist" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs text-center">
+                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                    <span class="text-[10px] sm:text-[11px] text-slate-500 block truncate" title="Fiber optic">Fiber optic</span>
+                                    <span class="font-bold text-sky-700 text-xs">{{ infraDist.data[0] || 0 }}</span>
+                                </div>
+                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                    <span class="text-[10px] sm:text-[11px] text-slate-500 block truncate" title="Perangkat/Akses">Perangkat/Akses</span>
+                                    <span class="font-bold text-indigo-700 text-xs">{{ infraDist.data[1] || 0 }}</span>
+                                </div>
+                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                    <span class="text-[10px] sm:text-[11px] text-slate-500 block truncate" title="Power/poe">Power/poe</span>
+                                    <span class="font-bold text-amber-700 text-xs">{{ infraDist.data[2] || 0 }}</span>
+                                </div>
+                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                    <span class="text-[10px] sm:text-[11px] text-slate-500 block truncate" title="Converter">Converter</span>
+                                    <span class="font-bold text-pink-700 text-xs">{{ infraDist.data[3] || 0 }}</span>
+                                </div>
+                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                    <span class="text-[10px] sm:text-[11px] text-slate-500 block truncate" title="Layanan/jaringan">Layanan/jaringan</span>
+                                    <span class="font-bold text-emerald-700 text-xs">{{ infraDist.data[4] || 0 }}</span>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <!-- Charts Row 2: Status & Prioritas Tiket -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Chart 1: Distribusi Status Tiket (Doughnut) -->
                     <Card class="border-slate-200 shadow-sm flex flex-col">
                         <CardHeader class="pb-2">
@@ -1842,44 +1907,6 @@ const techResolutionChartOptions = computed(() => ({
                                 <div class="bg-rose-50/50 rounded-lg p-1.5 border border-rose-100">
                                     <span class="text-[10px] text-rose-600 block truncate">Darurat</span>
                                     <span class="font-bold text-rose-700 text-xs">{{ priorityDistribution.data[3] || 0 }}</span>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <!-- Chart 3: Distribusi Berdasarkan Tipe Jaringan (Bar) -->
-                    <Card class="border-slate-200 shadow-sm flex flex-col">
-                        <CardHeader class="pb-2">
-                            <div class="flex items-center gap-2">
-                                <Network class="w-4 h-4 text-indigo-600" />
-                                <CardTitle class="text-sm font-bold text-slate-900">Laporan Tipe Jaringan</CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent class="flex-1 flex flex-col justify-between pt-2">
-                            <div class="h-52 relative flex items-center justify-center">
-                                <Bar 
-                                    v-if="networkTypeDistribution && networkTypeDistribution.data.some(v => v > 0)"
-                                    :data="barChartData" 
-                                    :options="barChartOptions" 
-                                />
-                                <div v-else class="text-center text-xs text-slate-400">
-                                    Belum ada data tipe jaringan pada periode ini
-                                </div>
-                            </div>
-
-                            <!-- Custom Quick Summary Pills -->
-                            <div v-if="networkTypeDistribution" class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100 text-xs text-center">
-                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
-                                    <span class="text-[11px] text-slate-500 block truncate">Fiber Optic</span>
-                                    <span class="font-bold text-sky-700 text-xs">{{ networkTypeDistribution.data[0] || 0 }}</span>
-                                </div>
-                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
-                                    <span class="text-[11px] text-slate-500 block truncate">LAN</span>
-                                    <span class="font-bold text-indigo-700 text-xs">{{ networkTypeDistribution.data[1] || 0 }}</span>
-                                </div>
-                                <div class="bg-slate-50 rounded-lg p-2 border border-slate-100">
-                                    <span class="text-[11px] text-slate-500 block truncate">Wireless</span>
-                                    <span class="font-bold text-teal-700 text-xs">{{ networkTypeDistribution.data[2] || 0 }}</span>
                                 </div>
                             </div>
                         </CardContent>

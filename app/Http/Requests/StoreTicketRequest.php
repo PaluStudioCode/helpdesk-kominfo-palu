@@ -16,6 +16,18 @@ class StoreTicketRequest extends FormRequest
     }
 
     /**
+     * Prepare inputs before validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('network_type') && !$this->has('infrastructure_type')) {
+            $this->merge(['infrastructure_type' => $this->network_type]);
+        } elseif ($this->has('infrastructure_type') && !$this->has('network_type')) {
+            $this->merge(['network_type' => $this->infrastructure_type]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -36,7 +48,8 @@ class StoreTicketRequest extends FormRequest
         // Admin On-Behalf Creation Rules
         if ($user->role === 'admin') {
             $rules['department_id'] = ['required', 'exists:departments,id'];
-            $rules['network_type'] = ['required', 'string', 'in:fiber_optic,lan,wifi'];
+            $rules['infrastructure_type'] = ['required', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])];
+            $rules['network_type'] = ['nullable', 'string'];
             $rules['category_id'] = ['required', 'exists:ticket_categories,id'];
             $rules['priority'] = ['required', 'in:low,medium,high,emergency'];
             $rules['technician_ids'] = ['required', 'array', 'min:1'];
@@ -49,11 +62,12 @@ class StoreTicketRequest extends FormRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            if ($this->filled('category_id') && $this->filled('network_type')) {
+            $infraType = $this->infrastructure_type ?? $this->network_type;
+            if ($this->filled('category_id') && !empty($infraType)) {
                 $category = TicketCategory::find($this->category_id);
                 
-                if ($category && $category->network_type !== $this->network_type) {
-                    $validator->errors()->add('category_id', 'Kategori yang dipilih tidak sesuai dengan tipe jaringan.');
+                if ($category && $category->infrastructure_type !== $infraType) {
+                    $validator->errors()->add('category_id', 'Kategori yang dipilih tidak sesuai dengan jenis infrastruktur.');
                 }
 
                 if ($category && $category->status !== 'active') {

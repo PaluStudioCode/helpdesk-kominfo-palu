@@ -26,7 +26,7 @@ class TicketSeeder extends Seeder
 
         $opdUsers = User::where('role', 'opd_user')->get()->keyBy('department_id');
         $departments = Department::all();
-        $categoriesByNet = TicketCategory::all()->groupBy('network_type');
+        $categoriesByNet = TicketCategory::all()->groupBy('infrastructure_type');
 
         if ($departments->isEmpty() || $categoriesByNet->isEmpty()) {
             $this->command->warn('Department atau TicketCategory belum di-seed. Harap jalankan DepartmentSeeder dan TicketCategorySeeder terlebih dahulu.');
@@ -35,7 +35,7 @@ class TicketSeeder extends Seeder
 
         // Realistic Issue Templates
         $issueTemplates = [
-            'fiber_optic' => [
+            'Fiber optic' => [
                 [
                     'title' => 'Koneksi FO Dropcore Utama Terputus',
                     'desc' => 'Kabel dropcore yang masuk ke rack server utama OPD terputus akibat perbaikan plafon gedung. Seluruh koneksi internet dan intranet gedung mati.',
@@ -55,19 +55,19 @@ class TicketSeeder extends Seeder
                     'res' => 'Pembersihan ferrule konektor optic dengan optical cleaner dan pelurusan kabel patchcord yang mengalami bending.',
                 ],
                 [
-                    'title' => 'Kerusakan Media Converter / SFP Transceiver',
-                    'desc' => 'Lampu indikator Link/Act pada media converter mati, port LAN tidak terdeteksi oleh switch distribusi.',
-                    'loc' => 'Ruang Operator Jaringan',
-                    'res' => 'Penggantian 1 unit Media Converter Gigabit Single Mode dan adaptor power suplai.',
-                ],
-                [
                     'title' => 'Core FO Joint Closure Bermasalah di Luar Gedung',
-                    'desc' => 'Koneksi ke server induk Pemkot putus setelah hujan lebat dan angin kencang di sekitar tiang tiang distribusi.',
+                    'desc' => 'Koneksi ke server induk Pemkot putus setelah hujan lebat dan angin kencang di sekitar tiang distribusi.',
                     'loc' => 'Tiang Distribusi Samping Kantor',
                     'res' => 'Rekonstruksi sambungan core di joint closure dan proteksi isolasi waterproof.',
                 ],
+                [
+                    'title' => 'Kabel FO Dropcore Terjepit di Pintu Ruang Rapat',
+                    'desc' => 'Kabel optik dropcore terjepit pintu hingga jaket pelindung terkoyak dan koneksi ruangan terputus.',
+                    'loc' => 'Ruang Rapat VIP',
+                    'res' => 'Penyambungan ulang core dan penataan jalur kabel dengan protective spiral wrapping.',
+                ],
             ],
-            'lan' => [
+            'Perangkat/Akses' => [
                 [
                     'title' => 'Kabel UTP / LAN Ruang Staf Putus',
                     'desc' => 'Kabel jaringan di bawah meja staf terjepit kursi dan terkelupas sehingga komputer tidak mendapatkan koneksi internet.',
@@ -87,30 +87,16 @@ class TicketSeeder extends Seeder
                     'res' => 'Restart hard-reboot switch distribusi, pergantian port uplink, dan penataan kabel patch panel.',
                 ],
                 [
-                    'title' => 'Masalah IP Conflict & DHCP Gateway Unreachable',
-                    'desc' => 'Beberapa PC menampilkan notifikasi IP address conflict dan tidak bisa mencetak ke printer jaringan.',
-                    'loc' => 'Ruang Pelayanan Masyarakat & Kasir',
-                    'res' => 'Pengecekan static IP yang bentrok pada salah satu printer, konfigurasi ulang DHCP scope dan static binding.',
-                ],
-                [
                     'title' => 'Port Patch Panel Bermasalah',
                     'desc' => 'Wallplate jaringan nomor 04 di meja rapat tidak mengeluarkan sinyal konektivitas LAN.',
                     'loc' => 'Ruang Rapat Utama',
                     'res' => 'Punchdown ulang kabel UTP ke keystone jack wallplate dan pengecekan koneksi end-to-end.',
                 ],
-            ],
-            'wifi' => [
-                [
-                    'title' => 'Wi-Fi Terhubung tetapi Tidak Ada Akses Internet',
-                    'desc' => 'Perangkat smartphone dan laptop staf dapat terhubung ke SSID kantor namun status "No Internet Access".',
-                    'loc' => 'Ruang Pertemuan & Ruang Tamu',
-                    'res' => 'Pembaruan lease DHCP pool pada VLAN Wi-Fi tamu dan restart service DNS caching di gateway.',
-                ],
                 [
                     'title' => 'Access Point Mati Total / Indikator Merah',
                     'desc' => 'Access point yang terpasang di lorong tengah kantor mati dan tidak memancarkan sinyal SSID.',
                     'loc' => 'Lorong Lantai 1 Dekat Ruang Rapat',
-                    'res' => 'Pemeriksaan PoE injector yang rusak, penggantian unit adaptor PoE 24V dan access point kembali online.',
+                    'res' => 'Pemeriksaan port access point, restart perangkat, dan konfigurasi ulang profil SSID.',
                 ],
                 [
                     'title' => 'Sinyal Wi-Fi Lemah / Blind Spot Ruangan',
@@ -118,17 +104,89 @@ class TicketSeeder extends Seeder
                     'loc' => 'Ruang Pimpinan & Staf Ahli',
                     'res' => 'Reposisi letak Access Point ke area tengah ruangan dan optimalisasi daya transmisi RF (Tx Power).',
                 ],
+            ],
+            'Power/poe' => [
                 [
-                    'title' => 'Overload Pengguna Wi-Fi Saat Rapat Koordinasi',
-                    'desc' => 'Koneksi Wi-Fi menjadi sangat lambat dan sering kick-out saat ada kegiatan rapat bersama instansi luar.',
-                    'loc' => 'Aula Pertemuan',
-                    'res' => 'Penyesuaian batas maksimum client per radio band dan pengaktifan fitur band steering 5GHz.',
+                    'title' => 'Adaptor / PoE Injector Access Point Mati Total',
+                    'desc' => 'Access point di lantai 2 tidak menyala sama sekali, adaptor PoE injector tidak mengeluarkan lampu indikator hijau.',
+                    'loc' => 'Gedung B Lantai 2',
+                    'res' => 'Penggantian unit adaptor PoE injector 24V 1A baru dan pengetesan voltase output normal.',
+                ],
+                [
+                    'title' => 'Gangguan Pasokan Listrik Rack Server / UPS Drop',
+                    'desc' => 'UPS pada rak server utama sering berbunyi beep panjang dan switch distribusi sempat restart tiba-tiba.',
+                    'loc' => 'Ruang Rack Server OPD',
+                    'res' => 'Pengecekan beban daya UPS, penggantian stopkontak panel listrik, dan kalibrasi baterai cadangan.',
+                ],
+                [
+                    'title' => 'Switch PoE Overload / Port PoE Drop',
+                    'desc' => 'Beberapa access point yang terhubung ke switch PoE mati bersamaan saat jam kerja sibuk.',
+                    'loc' => 'Ruang Distribusi Jaringan Lantai 1',
+                    'res' => 'Penataan ulang alokasi power budget PoE per port dan pembagian beban ke switch sekunder.',
+                ],
+                [
+                    'title' => 'Kabel Power Steker Perangkat Jaringan Lepas',
+                    'desc' => 'Router utama mati karena kabel power steker terlepas di belakang meja server.',
+                    'loc' => 'Ruang Administrasi',
+                    'res' => 'Pemasangan kabel ties pengunci steker power dan penataan jalur kelistrikan rak.',
+                ],
+            ],
+            'Converter' => [
+                [
+                    'title' => 'Kerusakan Media Converter / SFP Transceiver',
+                    'desc' => 'Lampu indikator Link/Act pada media converter mati, port LAN tidak terdeteksi oleh switch distribusi.',
+                    'loc' => 'Ruang Operator Jaringan',
+                    'res' => 'Penggantian 1 unit Media Converter Gigabit Single Mode dan adaptor power suplai.',
+                ],
+                [
+                    'title' => 'SFP Transceiver Optic Modul Error',
+                    'desc' => 'Port SFP pada switch backbone tidak mendeteksi link optik dari core switch Diskominfo.',
+                    'loc' => 'Ruang Server OPD',
+                    'res' => 'Penggantian modul SFP 1.25G 1310nm 20km dan link uplink kembali UP 1 Gbps.',
+                ],
+                [
+                    'title' => 'Lampu Indikator FX / Link Media Converter Mati',
+                    'desc' => 'Koneksi optik masuk tapi converter tidak mengubah sinyal ke ethernet LAN.',
+                    'loc' => 'Ruang Pelayanan Kasir',
+                    'res' => 'Cleaning konektor optik SC converter dan penggantian jumper kabel LAN Cat6.',
+                ],
+                [
+                    'title' => 'Adaptor Media Converter Rusak / Drop Tegangan',
+                    'desc' => 'Media converter sering restart berulang kali menyebabkan koneksi intranet terputus-putus.',
+                    'loc' => 'Gedung Sayap Timur',
+                    'res' => 'Penggantian unit adaptor switching 5V 2A pada media converter.',
+                ],
+            ],
+            'Layanan/jaringan' => [
+                [
+                    'title' => 'Masalah IP Conflict & DHCP Gateway Unreachable',
+                    'desc' => 'Beberapa PC menampilkan notifikasi IP address conflict dan tidak bisa mencetak ke printer jaringan.',
+                    'loc' => 'Ruang Pelayanan Masyarakat & Kasir',
+                    'res' => 'Pengecekan static IP yang bentrok pada salah satu printer, konfigurasi ulang DHCP scope dan static binding.',
+                ],
+                [
+                    'title' => 'Wi-Fi Terhubung tetapi Tidak Ada Akses Internet',
+                    'desc' => 'Perangkat smartphone dan laptop staf dapat terhubung ke SSID kantor namun status "No Internet Access".',
+                    'loc' => 'Ruang Pertemuan & Ruang Tamu',
+                    'res' => 'Pembaruan lease DHCP pool pada VLAN Wi-Fi tamu dan restart service DNS caching di gateway.',
                 ],
                 [
                     'title' => 'Gagal Login / Captive Portal Error',
                     'desc' => 'Halaman login web portal Wi-Fi tidak muncul saat pertama kali connect ke jaringan Wi-Fi publik OPD.',
                     'loc' => 'Lobby Pelayanan Umum',
                     'res' => 'Pembersihan cache redirect captive portal controller dan restart daemon authentication.',
+                ],
+                [
+                    'title' => 'Koneksi Intranet Lambat & Akses Aplikasi Pemkot RTO',
+                    'desc' => 'Akses ke aplikasi SIMDA dan website resmi Pemkot mengalami perlambatan signifikan saat jam kerja.',
+                    'loc' => 'Ruang Keuangan dan Aset',
+                    'res' => 'Pengecekan routing tabel intranet dan optimalisasi bandwidth management QoS per departemen.',
+                ],
+                [
+                    'title' => 'Gagal Akses DNS Server Pemkot Palu',
+                    'desc' => 'Komputer di ruang sekretariat tidak dapat me-resolve nama domain internal palukota.go.id.',
+                    'loc' => 'Ruang Sekretariat Utama',
+                    'res' => 'Pembaruan setting primary dan secondary DNS server pada DHCP server lokal.',
                 ],
             ],
         ];
@@ -254,7 +312,7 @@ class TicketSeeder extends Seeder
                 }
 
                 // Choose network type & issue template
-                $netTypes = ['lan', 'lan', 'fiber_optic', 'fiber_optic', 'wifi']; // weighted
+                $netTypes = ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'];
                 $networkType = $netTypes[array_rand($netTypes)];
                 $templates = $issueTemplates[$networkType];
                 $tmpl = $templates[array_rand($templates)];
@@ -337,7 +395,7 @@ class TicketSeeder extends Seeder
                     'reporter_id' => $reporter->id,
                     'assigned_to' => $assignedTo,
                     'category_id' => $category->id,
-                    'network_type' => $networkType,
+                    'infrastructure_type' => $networkType,
                     'title' => $tmpl['title'],
                     'location_details' => $tmpl['loc'],
                     'description' => $tmpl['desc'],

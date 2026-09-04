@@ -25,8 +25,13 @@ class TicketActionController extends Controller
     {
         $this->authorize('verifyAndAssign', $ticket);
 
+        if ($request->has('network_type') && !$request->has('infrastructure_type')) {
+            $request->merge(['infrastructure_type' => $request->input('network_type')]);
+        }
+
         $validated = $request->validate([
-            'network_type' => ['required', 'string', 'in:fiber_optic,lan,wifi'],
+            'infrastructure_type' => ['required', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
+            'network_type' => ['nullable', 'string'],
             'category_id' => ['required', 'exists:ticket_categories,id'],
             'priority' => ['required', 'in:low,medium,high,emergency'],
             'technician_ids' => ['required', 'array', 'min:1'],
@@ -50,7 +55,7 @@ class TicketActionController extends Controller
             $leadTechnicianId = $validated['technician_ids'][0];
 
             $lockedTicket->update([
-                'network_type' => $validated['network_type'],
+                'infrastructure_type' => $validated['infrastructure_type'],
                 'category_id' => $category->id,
                 'priority' => $validated['priority'],
                 'assigned_to' => $leadTechnicianId,
@@ -297,9 +302,14 @@ class TicketActionController extends Controller
     {
         $this->authorize('submitResolution', $ticket);
 
+        if ($request->has('network_type') && !$request->has('infrastructure_type')) {
+            $request->merge(['infrastructure_type' => $request->input('network_type')]);
+        }
+
         $validated = $request->validate([
             'resolution_note' => ['required', 'string', 'min:10'],
-            'network_type' => ['nullable', 'string', 'in:fiber_optic,lan,wifi'],
+            'infrastructure_type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
+            'network_type' => ['nullable', 'string'],
             'category_id' => ['nullable', 'exists:ticket_categories,id'],
             'resolution_proofs' => ['nullable', 'array', 'max:3'],
             'resolution_proofs.*' => ['file', 'mimes:jpg,jpeg,png', 'max:5120'],
@@ -327,8 +337,9 @@ class TicketActionController extends Controller
                 $newCategory = TicketCategory::findOrFail($validated['category_id']);
                 $updateData['category_id'] = $newCategory->id;
                 
-                if (!empty($validated['network_type'])) {
-                    $updateData['network_type'] = $validated['network_type'];
+                $infraType = $validated['infrastructure_type'] ?? $validated['network_type'] ?? null;
+                if (!empty($infraType)) {
+                    $updateData['infrastructure_type'] = $infraType;
                 }
 
                 // Recalculate SLA from assigned_at

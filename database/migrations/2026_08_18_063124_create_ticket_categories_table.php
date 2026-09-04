@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::create('ticket_categories', function (Blueprint $table) {
             $table->id();
             $table->string('name', 150);
-            $table->enum('network_type', ['fiber_optic', 'lan', 'wifi']);
+            $table->enum('infrastructure_type', ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan']);
             $table->unsignedInteger('sla_hours');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
             $table->softDeletes();
             
-            $table->index(['network_type', 'status']);
+            $table->index(['infrastructure_type', 'status']);
         });
     }
 

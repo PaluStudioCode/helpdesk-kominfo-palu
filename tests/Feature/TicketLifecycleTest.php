@@ -33,13 +33,13 @@ class TicketLifecycleTest extends TestCase
     {
         $admin = $this->createAdmin();
         $dept = $this->createDepartment();
-        $category = $this->createCategory(['sla_hours' => 6, 'network_type' => 'lan']);
+        $category = $this->createCategory(['sla_hours' => 6, 'network_type' => 'Perangkat/Akses']);
         $leadTech = $this->createTechnician();
         $secondTech = $this->createTechnician();
 
         $response = $this->actingAs($admin)->post('/tickets', [
             'department_id' => $dept->id,
-            'network_type' => 'lan',
+            'network_type' => 'Perangkat/Akses',
             'category_id' => $category->id,
             'priority' => 'high',
             'technician_ids' => [$leadTech->id, $secondTech->id],
@@ -51,6 +51,7 @@ class TicketLifecycleTest extends TestCase
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('tickets', [
             'department_id' => $dept->id,
+            'infrastructure_type' => 'Perangkat/Akses',
             'assigned_to' => $leadTech->id,
             'status' => 'in_progress',
             'priority' => 'high',
@@ -65,11 +66,11 @@ class TicketLifecycleTest extends TestCase
     {
         $admin = $this->createAdmin();
         $ticket = $this->createTicket(['status' => 'pending_admin']);
-        $category = $this->createCategory(['sla_hours' => 4, 'network_type' => 'lan']);
+        $category = $this->createCategory(['sla_hours' => 4, 'network_type' => 'Perangkat/Akses']);
         $leadTech = $this->createTechnician();
 
         $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/verify-assign", [
-            'network_type' => 'lan',
+            'infrastructure_type' => 'Perangkat/Akses',
             'category_id' => $category->id,
             'priority' => 'medium',
             'technician_ids' => [$leadTech->id],
@@ -79,6 +80,7 @@ class TicketLifecycleTest extends TestCase
         $ticket->refresh();
 
         $this->assertEquals('in_progress', $ticket->status);
+        $this->assertEquals('Perangkat/Akses', $ticket->infrastructure_type);
         $this->assertEquals($leadTech->id, $ticket->assigned_to);
         $this->assertNotNull($ticket->due_at);
     }
