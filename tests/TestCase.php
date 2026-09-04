@@ -87,7 +87,6 @@ abstract class TestCase extends BaseTestCase
         return TicketCategory::create(array_merge([
             'name' => 'Kategori Test ' . uniqid(),
             'infrastructure_type' => $infraType,
-            'sla_hours' => 4,
             'status' => 'active',
         ], $attributes));
     }

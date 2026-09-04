@@ -11,75 +11,37 @@ use Illuminate\Support\Facades\DB;
 class TicketService
 {
     /**
-     * Create a new ticket (either by OPD User or Admin On-Behalf).
+     * Create a new complaint ticket by OPD User.
      */
     public function createTicket(array $validated, User $user, array $attachments = []): Ticket
     {
         return DB::transaction(function () use ($validated, $user, $attachments) {
             $ticketNumber = $this->generateTicketNumber();
 
-            if ($user->role === 'admin') {
-                $category = TicketCategory::findOrFail($validated['category_id']);
-                $dueAt = now()->addHours($category->sla_hours);
-                $leadTechnicianId = $validated['technician_ids'][0];
+            $ticket = Ticket::create([
+                'ticket_number' => $ticketNumber,
+                'department_id' => $user->department_id,
+                'reporter_id' => $user->id,
+                'assigned_to' => null,
+                'category_id' => null,
+                'infrastructure_type' => null,
+                'title' => $validated['title'],
+                'location_details' => $validated['location_details'] ?? null,
+                'description' => $validated['description'],
+                'priority' => null,
+                'status' => 'pending_admin',
+                'assigned_at' => null,
+                'due_at' => null,
+            ]);
 
-                $ticket = Ticket::create([
-                    'ticket_number' => $ticketNumber,
-                    'department_id' => $validated['department_id'],
-                    'reporter_id' => $user->id,
-                    'assigned_to' => $leadTechnicianId,
-                    'category_id' => $category->id,
-                    'infrastructure_type' => $validated['infrastructure_type'] ?? $validated['network_type'] ?? null,
-                    'title' => $validated['title'],
-                    'location_details' => $validated['location_details'] ?? null,
-                    'description' => $validated['description'],
-                    'priority' => $validated['priority'],
-                    'status' => 'in_progress',
-                    'assigned_at' => now(),
-                    'due_at' => $dueAt,
-                ]);
-
-                // Sync team technicians
-                $ticket->technicians()->sync($validated['technician_ids']);
-
-                // Status History
-                $ticket->statusHistories()->create([
-                    'changed_by' => $user->id,
-                    'previous_status' => null,
-                    'new_status' => 'in_progress',
-                    'comment' => 'Tiket dibuat mewakili OPD oleh Admin dan langsung ditugaskan ke Tim Teknisi.',
-                    'created_at' => now(),
-                ]);
-
-                $activityAction = 'ticket.created_on_behalf';
-            } else {
-                $ticket = Ticket::create([
-                    'ticket_number' => $ticketNumber,
-                    'department_id' => $user->department_id,
-                    'reporter_id' => $user->id,
-                    'assigned_to' => null,
-                    'category_id' => null,
-                    'infrastructure_type' => null,
-                    'title' => $validated['title'],
-                    'location_details' => $validated['location_details'] ?? null,
-                    'description' => $validated['description'],
-                    'priority' => null,
-                    'status' => 'pending_admin',
-                    'assigned_at' => null,
-                    'due_at' => null,
-                ]);
-
-                // Status History
-                $ticket->statusHistories()->create([
-                    'changed_by' => $user->id,
-                    'previous_status' => null,
-                    'new_status' => 'pending_admin',
-                    'comment' => 'Laporan gangguan didaftarkan oleh OPD (Menunggu Verifikasi Admin).',
-                    'created_at' => now(),
-                ]);
-
-                $activityAction = 'ticket.created';
-            }
+            // Status History
+            $ticket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => null,
+                'new_status' => 'pending_admin',
+                'comment' => 'Laporan gangguan didaftarkan oleh OPD (Menunggu Verifikasi Admin).',
+                'created_at' => now(),
+            ]);
 
             // Save Attachments
             if (!empty($attachments)) {
@@ -97,18 +59,14 @@ class TicketService
             }
 
             // Activity Log
-            ActivityLogger::log($activityAction, $ticket, [
+            ActivityLogger::log('ticket.created', $ticket, [
                 'ticket_number' => $ticket->ticket_number,
                 'title' => $ticket->title,
                 'status' => $ticket->status,
             ], $user->id);
 
             // Dispatch Notifications
-            if ($user->role === 'admin') {
-                NotificationDispatcher::ticketAssigned($ticket);
-            } else {
-                NotificationDispatcher::ticketCreated($ticket);
-            }
+            NotificationDispatcher::ticketCreated($ticket);
 
             return $ticket;
         });

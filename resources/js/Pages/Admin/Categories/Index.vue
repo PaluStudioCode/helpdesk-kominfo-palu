@@ -36,7 +36,6 @@ const infrastructureFilter = ref(props.filters?.infrastructure_type || props.fil
 const columns = [
     { key: 'name', label: 'Nama Kategori', sortable: true },
     { key: 'infrastructure_type', label: 'Jenis Infrastruktur', sortable: true },
-    { key: 'sla_hours', label: 'Target SLA (Jam)', sortable: true },
     { key: 'status', label: 'Status', sortable: true },
 ];
 
@@ -98,7 +97,6 @@ const form = useForm({
     name: '',
     infrastructure_type: 'Fiber optic',
     network_type: 'Fiber optic',
-    sla_hours: 24,
     status: 'active'
 });
 
@@ -108,6 +106,7 @@ const openCreateModal = () => {
     form.clearErrors();
     form.infrastructure_type = 'Fiber optic';
     form.network_type = 'Fiber optic';
+    form.status = 'active';
     isModalOpen.value = true;
 };
 
@@ -119,7 +118,6 @@ const openEditModal = (category: any) => {
     form.name = category.name;
     form.infrastructure_type = category.infrastructure_type || category.network_type || 'Fiber optic';
     form.network_type = form.infrastructure_type;
-    form.sla_hours = category.sla_hours;
     form.status = category.status;
     isModalOpen.value = true;
 };
@@ -204,10 +202,6 @@ const confirmDelete = () => {
                     <StatusBadge type="infrastructure" :status="item.infrastructure_type || item.network_type" />
                 </template>
                 
-                <template #cell-sla_hours="{ item }">
-                    <span class="font-medium text-slate-700">{{ item.sla_hours }} Jam</span>
-                </template>
-
                 <template #cell-status="{ item }">
                     <StatusBadge :status="item.status" />
                 </template>
@@ -231,7 +225,7 @@ const confirmDelete = () => {
                 <DialogHeader>
                     <DialogTitle>{{ isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru' }}</DialogTitle>
                     <DialogDescription>
-                        Konfigurasi kategori masalah beserta jenis infrastruktur dan target SLA-nya.
+                        Konfigurasi kategori masalah beserta jenis infrastrukturnya.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -258,12 +252,6 @@ const confirmDelete = () => {
                                 </SelectContent>
                             </Select>
                             <InputError :message="form.errors.infrastructure_type || form.errors.network_type" />
-                        </div>
-                        
-                        <div>
-                            <InputLabel for="sla_hours" value="Target Waktu Penanganan / SLA (dalam Jam)" />
-                            <Input id="sla_hours" type="number" min="1" v-model="form.sla_hours" />
-                            <InputError :message="form.errors.sla_hours" />
                         </div>
 
                         <div>

@@ -36,7 +36,7 @@ watch(() => props.activeTab, (newTab) => {
 
 const tabs = computed(() => [
     { id: 'departments', label: 'Data OPD / Instansi', count: props.counts?.departments ?? 0 },
-    { id: 'categories', label: 'Kategori Gangguan & SLA', count: props.counts?.categories ?? 0 },
+    { id: 'categories', label: 'Kategori & Klasifikasi Gangguan', count: props.counts?.categories ?? 0 },
     { id: 'users', label: 'Manajemen Pengguna', count: props.counts?.users ?? 0 },
     { id: 'devices', label: 'Perangkat / Node Jaringan', count: props.counts?.devices ?? 0 },
     { id: 'materials', label: 'Material / Suku Cadang', count: props.counts?.materials ?? 0 },

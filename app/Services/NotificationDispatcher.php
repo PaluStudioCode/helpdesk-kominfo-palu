@@ -372,4 +372,70 @@ class NotificationDispatcher
             );
         }
     }
+
+    /**
+     * Dispatch notification for ticket_held event (on_hold).
+     */
+    public static function ticketHeld(Ticket $ticket, string $categoryLabel, string $reasonNote): void
+    {
+        $ticket->loadMissing(['department', 'reporter']);
+        $reporter = $ticket->reporter;
+
+        if ($reporter) {
+            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+                . "*Pemberitahuan Penundaan Sementara Penanganan Gangguan*\n\n"
+                . "Yth. Bapak/Ibu,\n"
+                . "Penanganan kendala jaringan untuk laporan Anda sedang dijeda sementara karena adanya kendala di lapangan:\n\n"
+                . "Nomor Tiket: {$ticket->ticket_number}\n"
+                . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+                . "Kategori Kendala: {$categoryLabel}\n"
+                . "Catatan Penjelasan: {$reasonNote}\n\n"
+                . "Tim teknisi akan segera melanjutkan pekerjaan setelah kendala eksternal/logistik teratasi. Anda dapat memantau status terkini di:\n"
+                . url('/tickets/' . $ticket->id) . "\n\n"
+                . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
+
+            SendTicketNotificationJob::dispatch(
+                ticket: $ticket,
+                recipient: $reporter,
+                eventType: 'ticket_held',
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
+                waMessage: $waMessage,
+                emailSubject: "Pemberitahuan Penundaan Sementara Tiket ({$ticket->ticket_number})",
+                emailHeadline: "Penanganan gangguan sedang dijeda sementara karena kendala lapangan.",
+                emailCustomMessage: "Kategori kendala: {$categoryLabel}. Catatan: {$reasonNote}"
+            );
+        }
+    }
+
+    /**
+     * Dispatch notification for ticket_resumed event (in_progress).
+     */
+    public static function ticketResumed(Ticket $ticket): void
+    {
+        $ticket->loadMissing(['department', 'reporter']);
+        $reporter = $ticket->reporter;
+
+        if ($reporter) {
+            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+                . "*Pemberitahuan Kelanjutan Penanganan Gangguan*\n\n"
+                . "Yth. Bapak/Ibu,\n"
+                . "Tim teknisi Diskominfo telah melanjutkan kembali perbaikan jaringan untuk laporan Anda:\n\n"
+                . "Nomor Tiket: {$ticket->ticket_number}\n"
+                . "Instansi / OPD: " . ($ticket->department?->name ?? '-') . "\n"
+                . "Status: Sedang Dikerjakan (In Progress)\n\n"
+                . "Pantau progres di: " . url('/tickets/' . $ticket->id) . "\n\n"
+                . "Dinas Komunikasi, Informatika, Persandian dan Statistik Kota Palu";
+
+            SendTicketNotificationJob::dispatch(
+                ticket: $ticket,
+                recipient: $reporter,
+                eventType: 'ticket_resumed',
+                targetPhone: $reporter->phone_number ?? ($ticket->department?->operator?->phone_number ?? ''),
+                waMessage: $waMessage,
+                emailSubject: "Pekerjaan Penanganan Tiket Dilanjutkan ({$ticket->ticket_number})",
+                emailHeadline: "Tim teknisi telah melanjutkan kembali proses perbaikan.",
+                emailCustomMessage: "Tim teknisi sedang berada di lokasi untuk menyelesaikan kendala jaringan Anda."
+            );
+        }
+    }
 }

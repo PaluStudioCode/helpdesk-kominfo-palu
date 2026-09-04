@@ -17,7 +17,8 @@ export const badgeVariants = cva(
         outline: "text-slate-900",
         // Custom variants for Ticket Lifecycle
         pending_admin: "border-transparent bg-blue-100 text-blue-800 font-medium",
-        in_progress: "border-transparent bg-amber-100 text-amber-800 font-medium",
+        in_progress: "border-transparent bg-blue-50 text-blue-800 font-medium border border-blue-200",
+        on_hold: "border-transparent bg-amber-100 text-amber-900 font-medium border border-amber-300",
         pending_approval: "border-transparent bg-purple-100 text-purple-800 font-medium",
         closed: "border-transparent bg-emerald-100 text-emerald-800 font-medium",
         cancelled: "border-transparent bg-rose-100 text-rose-800 font-medium",

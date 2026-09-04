@@ -37,7 +37,6 @@ class UpdateCategoryRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'infrastructure_type' => ['required', \Illuminate\Validation\Rule::in(['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])],
             'network_type' => ['nullable', 'string'],
-            'sla_hours' => ['required', 'integer', 'min:1'],
             'status' => ['required', 'in:active,inactive'],
         ];
     }

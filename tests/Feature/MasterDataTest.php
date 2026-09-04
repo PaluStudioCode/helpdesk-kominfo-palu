@@ -44,14 +44,13 @@ class MasterDataTest extends TestCase
         $this->assertDatabaseHas('departments', ['code' => $code]);
     }
 
-    public function test_admin_can_create_ticket_category_with_sla(): void
+    public function test_admin_can_create_ticket_category(): void
     {
         $admin = $this->createAdmin();
 
         $response = $this->actingAs($admin)->post('/admin/categories', [
             'name' => 'Kabel FO Putus Jalur Utama',
             'network_type' => 'Fiber optic',
-            'sla_hours' => 3,
             'status' => 'active',
         ]);
 
@@ -59,7 +58,6 @@ class MasterDataTest extends TestCase
         $this->assertDatabaseHas('ticket_categories', [
             'name' => 'Kabel FO Putus Jalur Utama',
             'infrastructure_type' => 'Fiber optic',
-            'sla_hours' => 3,
         ]);
     }
 

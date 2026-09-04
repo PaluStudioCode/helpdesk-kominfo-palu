@@ -49,6 +49,42 @@ class TicketSecurityTest extends TestCase
         $response->assertStatus(403);
     }
 
+    public function test_admin_cannot_submit_resolution(): void
+    {
+        $admin = $this->createAdmin();
+        $tech = $this->createTechnician();
+
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/submit-resolution", [
+            'resolution_note' => 'Percobaan submit resolusi oleh admin.',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_opd_cannot_submit_resolution(): void
+    {
+        $dept = $this->createDepartment();
+        $opdUser = $this->createOpdUser($dept);
+        $tech = $this->createTechnician();
+
+        $ticket = $this->createTicket([
+            'department_id' => $dept->id,
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $response = $this->actingAs($opdUser)->post("/tickets/{$ticket->id}/submit-resolution", [
+            'resolution_note' => 'Percobaan submit resolusi oleh OPD.',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
     public function test_admin_can_view_any_ticket(): void
     {
         $admin = $this->createAdmin();

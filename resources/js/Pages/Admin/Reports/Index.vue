@@ -190,6 +190,7 @@ const getStatusLabel = (status: string): string => {
     const map: Record<string, string> = {
         pending_admin: 'Menunggu Verifikasi',
         in_progress: 'Sedang Dikerjakan',
+        on_hold: 'Tertunda (On-Hold)',
         pending_approval: 'Menunggu Review Admin',
         closed: 'Selesai',
         cancelled: 'Ditolak',
@@ -201,6 +202,7 @@ const getStatusColor = (status: string): string => {
     const map: Record<string, string> = {
         pending_admin: 'text-blue-600',
         in_progress: 'text-amber-600',
+        on_hold: 'text-amber-700',
         pending_approval: 'text-purple-600',
         closed: 'text-emerald-600',
         cancelled: 'text-rose-600',
@@ -448,6 +450,7 @@ const formatDateTime = (dateStr: string | null) => {
                                     <SelectItem value="all">Semua Status</SelectItem>
                                     <SelectItem value="pending_admin">Menunggu Verifikasi</SelectItem>
                                     <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
+                                    <SelectItem value="on_hold">Tertunda (On-Hold)</SelectItem>
                                     <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
                                     <SelectItem value="closed">Selesai</SelectItem>
                                     <SelectItem value="cancelled">Ditolak</SelectItem>

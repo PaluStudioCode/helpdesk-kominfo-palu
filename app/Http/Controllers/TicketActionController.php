@@ -52,18 +52,14 @@ class TicketActionController extends Controller
             $category = !empty($validated['category_id']) ? TicketCategory::find($validated['category_id']) : null;
             $assignedAt = now();
 
-            if ($category) {
-                $dueAt = (clone $assignedAt)->addHours($category->sla_hours);
-            } else {
-                $slaHours = match ($validated['priority']) {
-                    'emergency' => 4,
-                    'high' => 8,
-                    'medium' => 24,
-                    'low' => 48,
-                    default => 24,
-                };
-                $dueAt = (clone $assignedAt)->addHours($slaHours);
-            }
+            $slaHours = match ($validated['priority']) {
+                'emergency' => 4,
+                'high' => 8,
+                'medium' => 24,
+                'low' => 48,
+                default => 24,
+            };
+            $dueAt = (clone $assignedAt)->addHours($slaHours);
 
             $leadTechnicianId = $validated['technician_ids'][0];
 
@@ -397,19 +393,14 @@ class TicketActionController extends Controller
                 'resolved_at' => now(),
             ];
 
-            // Dynamic SLA recalculation if technician updated real category
+            // Category & Infrastructure assignment by technician
             $infraType = $validated['infrastructure_type'] ?? $validated['network_type'] ?? null;
             if (!empty($infraType)) {
                 $updateData['infrastructure_type'] = $infraType;
             }
 
-            if (!empty($validated['category_id']) && (int) $validated['category_id'] !== (int) $lockedTicket->category_id) {
-                $newCategory = TicketCategory::findOrFail($validated['category_id']);
-                $updateData['category_id'] = $newCategory->id;
-
-                // Recalculate SLA from assigned_at
-                $startPoint = $lockedTicket->assigned_at ?? $lockedTicket->created_at;
-                $updateData['due_at'] = (clone $startPoint)->addHours($newCategory->sla_hours);
+            if (!empty($validated['category_id'])) {
+                $updateData['category_id'] = $validated['category_id'];
             }
 
             $lockedTicket->update($updateData);
@@ -681,6 +672,144 @@ class TicketActionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan.')->withInput();
+        }
+    }
+
+    /**
+     * Put ticket on hold (in_progress -> on_hold) with reason category & note.
+     * Pauses the SLA countdown.
+     */
+    public function holdTicket(Request $request, Ticket $ticket)
+    {
+        $this->authorize('hold', $ticket);
+
+        $validated = $request->validate([
+            'hold_reason_category' => ['required', 'string', \Illuminate\Validation\Rule::in([
+                'vendor_isp',
+                'material_procurement',
+                'access_permit',
+                'weather_force_majeure',
+                'need_escalation',
+            ])],
+            'hold_reason_note' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isInProgress()) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket tidak sedang dalam status pengerjaan (In Progress).');
+            }
+
+            $categoryLabels = [
+                'vendor_isp' => 'Ketergantungan Pihak Ketiga (Vendor ISP / Telkom / PLN)',
+                'material_procurement' => 'Ketiadaan Material & Suku Cadang (Menunggu Pengadaan)',
+                'access_permit' => 'Kendala Izin Akses Fisik / Kunci Lokasi',
+                'weather_force_majeure' => 'Faktor Keamanan & Cuaca Ekstrem',
+                'need_escalation' => 'Eskalasi ke Tim Ahli / Network Engineer',
+            ];
+            $catLabel = $categoryLabels[$validated['hold_reason_category']] ?? $validated['hold_reason_category'];
+
+            $lockedTicket->update([
+                'status' => 'on_hold',
+                'hold_reason_category' => $validated['hold_reason_category'],
+                'hold_reason_note' => $validated['hold_reason_note'],
+                'hold_started_at' => now(),
+            ]);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'in_progress',
+                'new_status' => 'on_hold',
+                'comment' => "Pengerjaan dijeda ({$catLabel}). Catatan: {$validated['hold_reason_note']}",
+                'created_at' => now(),
+            ]);
+
+            ActivityLogger::log('ticket.held', $lockedTicket, [
+                'category' => $validated['hold_reason_category'],
+                'note' => $validated['hold_reason_note'],
+            ], $user->id);
+
+            DB::commit();
+
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            NotificationDispatcher::ticketHeld($lockedTicket, $catLabel, $validated['hold_reason_note']);
+
+            return back()->with('success', 'Status tiket berhasil diubah menjadi Tertunda (On-Hold). Timer SLA telah dijeda.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat menunda tiket: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Resume a held ticket (on_hold -> in_progress).
+     * Calculates hold duration and shifts SLA due_at forward.
+     */
+    public function resumeTicket(Request $request, Ticket $ticket)
+    {
+        $this->authorize('resume', $ticket);
+
+        $user = $request->user();
+
+        DB::beginTransaction();
+        try {
+            $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
+
+            if (!$lockedTicket->isOnHold()) {
+                DB::rollBack();
+                return back()->with('error', 'Tiket tidak sedang dalam status tertunda (On-Hold).');
+            }
+
+            // Calculate hold duration in minutes
+            $holdStartedAt = $lockedTicket->hold_started_at ? \Carbon\Carbon::parse($lockedTicket->hold_started_at) : now();
+            $holdDurationMinutes = max(0, (int) $holdStartedAt->diffInMinutes(now()));
+
+            $totalHold = ($lockedTicket->total_hold_duration_minutes ?? 0) + $holdDurationMinutes;
+
+            $updateData = [
+                'status' => 'in_progress',
+                'hold_started_at' => null,
+                'total_hold_duration_minutes' => $totalHold,
+            ];
+
+            // Shift due_at forward by hold duration if due_at exists
+            if ($lockedTicket->due_at) {
+                $updateData['due_at'] = \Carbon\Carbon::parse($lockedTicket->due_at)->addMinutes($holdDurationMinutes);
+            }
+
+            $lockedTicket->update($updateData);
+
+            // Status History
+            $history = $lockedTicket->statusHistories()->create([
+                'changed_by' => $user->id,
+                'previous_status' => 'on_hold',
+                'new_status' => 'in_progress',
+                'comment' => "Pekerjaan lapangan dilanjutkan kembali. Durasi jeda: {$holdDurationMinutes} menit (Target SLA diperpanjang).",
+                'created_at' => now(),
+            ]);
+
+            ActivityLogger::log('ticket.resumed', $lockedTicket, [
+                'hold_duration_minutes' => $holdDurationMinutes,
+                'total_hold_duration_minutes' => $totalHold,
+            ], $user->id);
+
+            DB::commit();
+
+            broadcast(new TicketStatusUpdated($lockedTicket, $history));
+
+            NotificationDispatcher::ticketResumed($lockedTicket);
+
+            return back()->with('success', "Pekerjaan tiket dilanjutkan kembali. Target SLA telah disesuaikan (+{$holdDurationMinutes} menit).");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan saat melanjutkan tiket: ' . $e->getMessage());
         }
     }
 

@@ -37,6 +37,7 @@ export const getStatusLabel = (status: TicketStatus | string): string => {
     const labels: Record<string, string> = {
         pending_admin: 'Menunggu Verifikasi',
         in_progress: 'Sedang Dikerjakan',
+        on_hold: 'Tertunda (Kendala)',
         pending_approval: 'Menunggu Review',
         closed: 'Selesai',
         cancelled: 'Dibatalkan',
@@ -50,7 +51,8 @@ export const getStatusLabel = (status: TicketStatus | string): string => {
 export const getStatusColor = (status: TicketStatus | string): string => {
     const colors: Record<string, string> = {
         pending_admin: 'text-blue-600 font-semibold',
-        in_progress: 'text-amber-600 font-semibold',
+        in_progress: 'text-blue-600 font-semibold',
+        on_hold: 'text-amber-700 font-semibold',
         pending_approval: 'text-purple-600 font-semibold',
         closed: 'text-emerald-600 font-semibold',
         cancelled: 'text-rose-600 font-semibold',
@@ -200,6 +202,10 @@ export const getSlaStatus = (ticket: Partial<Ticket>): { label: string; color: s
 
     if (ticket.status === 'pending_admin') {
         return { status: 'pending_admin', label: '⏱ SLA ditangguhkan (Menunggu Verifikasi)', color: 'text-blue-700 font-medium' };
+    }
+
+    if (ticket.status === 'on_hold') {
+        return { status: 'on_hold', label: '⏱ SLA dijeda sementara (Clock Paused)', color: 'text-amber-700 font-semibold' };
     }
 
     if (!ticket.due_at) {

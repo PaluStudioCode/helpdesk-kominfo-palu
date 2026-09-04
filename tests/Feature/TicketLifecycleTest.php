@@ -31,37 +31,30 @@ class TicketLifecycleTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_create_ticket_on_behalf_immediately_in_progress(): void
+    public function test_admin_cannot_create_ticket(): void
     {
         $admin = $this->createAdmin();
-        $dept = $this->createDepartment();
-        $category = $this->createCategory(['sla_hours' => 6, 'network_type' => 'Perangkat/Akses']);
-        $leadTech = $this->createTechnician();
-        $secondTech = $this->createTechnician();
 
         $response = $this->actingAs($admin)->post('/tickets', [
-            'department_id' => $dept->id,
-            'network_type' => 'Perangkat/Akses',
-            'category_id' => $category->id,
-            'priority' => 'high',
-            'technician_ids' => [$leadTech->id, $secondTech->id],
-            'title' => 'Perbaikan Switch On Behalf',
-            'location_details' => 'Ruang Server Diskominfo',
-            'description' => 'Admin membuat tiket mewakili OPD.',
+            'title' => 'Admin mencoba buat tiket',
+            'location_details' => 'Lokasi',
+            'description' => 'Deskripsi kendala.',
         ]);
 
-        $response->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('tickets', [
-            'department_id' => $dept->id,
-            'infrastructure_type' => 'Perangkat/Akses',
-            'assigned_to' => $leadTech->id,
-            'status' => 'in_progress',
-            'priority' => 'high',
+        $response->assertStatus(403);
+    }
+
+    public function test_technician_cannot_create_ticket(): void
+    {
+        $tech = $this->createTechnician();
+
+        $response = $this->actingAs($tech)->post('/tickets', [
+            'title' => 'Teknisi mencoba buat tiket',
+            'location_details' => 'Lokasi',
+            'description' => 'Deskripsi kendala.',
         ]);
 
-        $ticket = Ticket::where('title', 'Perbaikan Switch On Behalf')->first();
-        $this->assertNotNull($ticket->due_at);
-        $this->assertTrue($ticket->technicians()->where('users.id', $secondTech->id)->exists());
+        $response->assertStatus(403);
     }
 
     public function test_admin_can_verify_and_assign_ticket_without_technical_inputs(): void
@@ -99,7 +92,7 @@ class TicketLifecycleTest extends TestCase
     {
         $admin = $this->createAdmin();
         $ticket = $this->createTicket(['status' => 'pending_admin']);
-        $category = $this->createCategory(['sla_hours' => 4, 'network_type' => 'Perangkat/Akses']);
+        $category = $this->createCategory(['network_type' => 'Perangkat/Akses']);
         $leadTech = $this->createTechnician();
 
         $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/verify-assign", [
@@ -202,15 +195,17 @@ class TicketLifecycleTest extends TestCase
     public function test_technician_can_set_real_infrastructure_and_category_on_resolution(): void
     {
         $tech = $this->createTechnician();
+        $initialDueAt = now()->addHours(24);
         $ticket = $this->createTicket([
             'status' => 'in_progress',
             'assigned_to' => $tech->id,
             'assigned_at' => now(),
+            'due_at' => $initialDueAt,
             'category_id' => null,
             'infrastructure_type' => null,
             'priority' => 'medium',
         ]);
-        $category = $this->createCategory(['sla_hours' => 6, 'network_type' => 'Fiber optic']);
+        $category = $this->createCategory(['network_type' => 'Fiber optic']);
 
         $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/submit-resolution", [
             'resolution_note' => 'Kabel FO putus di tiang nomor 12 telah disambung menggunakan fusion splicer.',
@@ -224,10 +219,8 @@ class TicketLifecycleTest extends TestCase
         $this->assertEquals('pending_approval', $ticket->status);
         $this->assertEquals('Fiber optic', $ticket->infrastructure_type);
         $this->assertEquals($category->id, $ticket->category_id);
-        $this->assertEquals(
-            $ticket->assigned_at->copy()->addHours(6)->toDateTimeString(),
-            $ticket->due_at->toDateTimeString()
-        );
+        // Target SLA (due_at) must remain locked as initially set by Admin Priority (not overridden by category sla)
+        $this->assertEquals($initialDueAt->toDateTimeString(), $ticket->due_at->toDateTimeString());
     }
 
     public function test_technician_can_submit_full_structured_resolution_details(): void
@@ -240,7 +233,7 @@ class TicketLifecycleTest extends TestCase
             'assigned_to' => $tech->id,
             'assigned_at' => now(),
         ]);
-        $category = $this->createCategory(['sla_hours' => 4, 'network_type' => 'Fiber optic']);
+        $category = $this->createCategory(['network_type' => 'Fiber optic']);
 
         $proofFile = UploadedFile::fake()->image('bukti_perbaikan.jpg');
 
@@ -465,5 +458,144 @@ class TicketLifecycleTest extends TestCase
             'reason' => 'abc', // < 5 characters
         ]);
         $response->assertSessionHasErrors(['reason']);
+    }
+
+    public function test_assigned_technician_can_hold_ticket(): void
+    {
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+            'due_at' => now()->addHours(6),
+        ]);
+
+        $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/hold", [
+            'hold_reason_category' => 'vendor_isp',
+            'hold_reason_note' => 'Menunggu perbaikan link backbone oleh Telkom (No Tiket: INC9999).',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('on_hold', $ticket->status);
+        $this->assertEquals('vendor_isp', $ticket->hold_reason_category);
+        $this->assertEquals('Menunggu perbaikan link backbone oleh Telkom (No Tiket: INC9999).', $ticket->hold_reason_note);
+        $this->assertNotNull($ticket->hold_started_at);
+
+        $this->assertDatabaseHas('ticket_status_histories', [
+            'ticket_id' => $ticket->id,
+            'changed_by' => $tech->id,
+            'previous_status' => 'in_progress',
+            'new_status' => 'on_hold',
+        ]);
+    }
+
+    public function test_assigned_technician_can_resume_held_ticket_and_sla_is_extended(): void
+    {
+        $tech = $this->createTechnician();
+        $initialDueAt = now()->addHours(4);
+        $holdStartedAt = now()->subMinutes(120); // Held 2 hours ago
+
+        $ticket = $this->createTicket([
+            'status' => 'on_hold',
+            'assigned_to' => $tech->id,
+            'hold_reason_category' => 'material_procurement',
+            'hold_reason_note' => 'Menunggu pengadaan SFP modul 10G.',
+            'hold_started_at' => $holdStartedAt,
+            'total_hold_duration_minutes' => 0,
+            'due_at' => $initialDueAt,
+        ]);
+
+        $response = $this->actingAs($tech)->post("/tickets/{$ticket->id}/resume");
+
+        $response->assertSessionHasNoErrors();
+        $ticket->refresh();
+
+        $this->assertEquals('in_progress', $ticket->status);
+        $this->assertNull($ticket->hold_started_at);
+        $this->assertGreaterThanOrEqual(119, $ticket->total_hold_duration_minutes);
+        // due_at should be extended by approx 120 minutes (4 hours + 2 hours = 6 hours from initial)
+        $this->assertTrue($ticket->due_at->greaterThan($initialDueAt));
+
+        $this->assertDatabaseHas('ticket_status_histories', [
+            'ticket_id' => $ticket->id,
+            'changed_by' => $tech->id,
+            'previous_status' => 'on_hold',
+            'new_status' => 'in_progress',
+        ]);
+    }
+
+    public function test_opd_user_cannot_hold_or_resume_ticket(): void
+    {
+        $dept = $this->createDepartment();
+        $opdUser = $this->createOpdUser($dept);
+        $ticket = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'in_progress',
+        ]);
+
+        $response = $this->actingAs($opdUser)->post("/tickets/{$ticket->id}/hold", [
+            'hold_reason_category' => 'access_permit',
+            'hold_reason_note' => 'Mencoba hold sendiri oleh OPD.',
+        ]);
+        $response->assertStatus(403);
+
+        $ticketOnHold = $this->createTicket([
+            'department_id' => $dept->id,
+            'reporter_id' => $opdUser->id,
+            'status' => 'on_hold',
+        ]);
+
+        $responseResume = $this->actingAs($opdUser)->post("/tickets/{$ticketOnHold->id}/resume");
+        $responseResume->assertStatus(403);
+    }
+
+    public function test_admin_cannot_hold_or_resume_ticket(): void
+    {
+        $admin = $this->createAdmin();
+        $tech = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $response = $this->actingAs($admin)->post("/tickets/{$ticket->id}/hold", [
+            'hold_reason_category' => 'need_escalation',
+            'hold_reason_note' => 'Admin mencoba menunda langsung.',
+        ]);
+        $response->assertStatus(403);
+
+        $ticketOnHold = $this->createTicket([
+            'status' => 'on_hold',
+            'assigned_to' => $tech->id,
+        ]);
+
+        $responseResume = $this->actingAs($admin)->post("/tickets/{$ticketOnHold->id}/resume");
+        $responseResume->assertStatus(403);
+    }
+
+    public function test_unassigned_technician_cannot_hold_or_resume_ticket(): void
+    {
+        $techA = $this->createTechnician();
+        $techB = $this->createTechnician();
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $techA->id,
+        ]);
+
+        $response = $this->actingAs($techB)->post("/tickets/{$ticket->id}/hold", [
+            'hold_reason_category' => 'vendor_isp',
+            'hold_reason_note' => 'Teknisi lain mencoba menunda tiket.',
+        ]);
+        $response->assertStatus(403);
+
+        $ticketOnHold = $this->createTicket([
+            'status' => 'on_hold',
+            'assigned_to' => $techA->id,
+        ]);
+
+        $responseResume = $this->actingAs($techB)->post("/tickets/{$ticketOnHold->id}/resume");
+        $responseResume->assertStatus(403);
     }
 }

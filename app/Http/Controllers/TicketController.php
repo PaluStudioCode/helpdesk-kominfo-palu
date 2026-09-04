@@ -122,33 +122,9 @@ class TicketController extends Controller
             ];
         });
 
-        $categories = TicketCategory::where('status', 'active')
-                        ->select('id', 'name', 'infrastructure_type')
-                        ->get()
-                        ->groupBy('infrastructure_type');
-
-        $departments = [];
-        $technicians = [];
-        if ($user->role === 'admin') {
-            $departments = Department::where('status', 'active')
-                            ->select('id', 'name')
-                            ->orderBy('name')
-                            ->get();
-
-            $technicians = User::where('role', 'technician')
-                            ->where('status', 'active')
-                            ->select('id', 'name', 'phone_number')
-                            ->orderBy('name')
-                            ->get();
-        }
-
         return Inertia::render('Tickets/Index', [
             'tickets' => $tickets,
-            'categoriesMap' => $categories,
-            'departments' => $departments,
-            'technicians' => $technicians,
             'filters' => $request->only(['search', 'status', 'priority', 'infrastructure_type', 'network_type', 'sort', 'direction']),
-            'canCreateOnBehalf' => $user->role === 'admin'
         ]);
     }
 
@@ -159,32 +135,7 @@ class TicketController extends Controller
     {
         $this->authorize('create', Ticket::class);
 
-        $categories = TicketCategory::where('status', 'active')
-                        ->select('id', 'name', 'infrastructure_type')
-                        ->get()
-                        ->groupBy('infrastructure_type');
-
-        $departments = [];
-        $technicians = [];
-        if (auth()->user()->role === 'admin') {
-            $departments = Department::where('status', 'active')
-                            ->select('id', 'name')
-                            ->orderBy('name')
-                            ->get();
-
-            $technicians = User::where('role', 'technician')
-                            ->where('status', 'active')
-                            ->select('id', 'name', 'phone_number')
-                            ->orderBy('name')
-                            ->get();
-        }
-
-        return Inertia::render('Tickets/Create', [
-            'categoriesMap' => $categories,
-            'departments' => $departments,
-            'technicians' => $technicians,
-            'isAdmin' => auth()->user()->role === 'admin'
-        ]);
+        return Inertia::render('Tickets/Create');
     }
 
     /**

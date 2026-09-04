@@ -31,6 +31,8 @@ Route::middleware('auth')->group(function () {
     Route::post('tickets/{ticket}/reject', [TicketActionController::class, 'reject'])->name('tickets.reject');
     Route::post('tickets/{ticket}/cancel-by-reporter', [TicketActionController::class, 'cancelByReporter'])->name('tickets.cancel-by-reporter');
     Route::post('tickets/{ticket}/resubmit', [TicketActionController::class, 'resubmit'])->name('tickets.resubmit');
+    Route::post('tickets/{ticket}/hold', [TicketActionController::class, 'holdTicket'])->name('tickets.hold');
+    Route::post('tickets/{ticket}/resume', [TicketActionController::class, 'resumeTicket'])->name('tickets.resume');
     Route::post('tickets/{ticket}/submit-resolution', [TicketActionController::class, 'submitResolution'])->name('tickets.submit-resolution');
     Route::post('tickets/{ticket}/approve-resolution', [TicketActionController::class, 'approveResolution'])->name('tickets.approve-resolution');
     Route::post('tickets/{ticket}/request-revision', [TicketActionController::class, 'requestRevision'])->name('tickets.request-revision');

@@ -1,5 +1,5 @@
 export type UserRole = 'admin' | 'technician' | 'opd_user';
-export type TicketStatus = 'pending_admin' | 'in_progress' | 'pending_approval' | 'closed' | 'cancelled';
+export type TicketStatus = 'pending_admin' | 'in_progress' | 'on_hold' | 'pending_approval' | 'closed' | 'cancelled';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'emergency';
 export type InfrastructureType = 'Fiber optic' | 'Perangkat/Akses' | 'Power/poe' | 'Converter' | 'Layanan/jaringan' | 'fiber_optic' | 'lan' | 'wifi';
 export type NetworkType = InfrastructureType; // backward compatibility alias
@@ -29,7 +29,6 @@ export interface TicketCategory {
     name: string;
     infrastructure_type: InfrastructureType;
     network_type?: InfrastructureType;
-    sla_hours: number;
     status?: 'active' | 'inactive';
 }
 
@@ -89,6 +88,10 @@ export interface Ticket {
     description?: string | null;
     priority?: TicketPriority | null;
     status: TicketStatus;
+    hold_reason_category?: string | null;
+    hold_reason_note?: string | null;
+    hold_started_at?: string | null;
+    total_hold_duration_minutes?: number;
     affected_device?: string | null;
     actual_repair_location?: string | null;
     resolution_note?: string | null;

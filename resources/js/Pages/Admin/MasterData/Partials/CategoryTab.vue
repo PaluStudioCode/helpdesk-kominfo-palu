@@ -38,7 +38,6 @@ const infrastructureFilter = ref(
 const columns = [
     { key: 'name', label: 'Nama Kategori', sortable: true },
     { key: 'infrastructure_type', label: 'Jenis Infrastruktur', sortable: true },
-    { key: 'sla_hours', label: 'Target SLA (Jam)', sortable: true },
     { key: 'status', label: 'Status', sortable: true },
 ];
 
@@ -102,7 +101,6 @@ const form = useForm({
     name: '',
     infrastructure_type: 'Fiber optic',
     network_type: 'Fiber optic',
-    sla_hours: 24,
     status: 'active'
 });
 
@@ -112,7 +110,6 @@ const openCreateModal = () => {
     form.clearErrors();
     form.infrastructure_type = 'Fiber optic';
     form.network_type = 'Fiber optic';
-    form.sla_hours = 24;
     form.status = 'active';
     isModalOpen.value = true;
 };
@@ -125,7 +122,6 @@ const openEditModal = (category: any) => {
     form.name = category.name;
     form.infrastructure_type = category.infrastructure_type || category.network_type || 'Fiber optic';
     form.network_type = form.infrastructure_type;
-    form.sla_hours = category.sla_hours;
     form.status = category.status;
     isModalOpen.value = true;
 };
@@ -210,10 +206,6 @@ const confirmDelete = () => {
                 <span class="text-xs sm:text-sm text-slate-700">{{ item.infrastructure_type || item.network_type || '-' }}</span>
             </template>
 
-            <template #cell-sla_hours="{ item }">
-                <span class="text-xs sm:text-sm text-slate-700">{{ item.sla_hours }} Jam</span>
-            </template>
-
             <template #cell-status="{ item }">
                 <span 
                     class="text-xs sm:text-sm font-medium"
@@ -253,7 +245,7 @@ const confirmDelete = () => {
                 <DialogHeader class="pb-1">
                     <DialogTitle class="text-lg font-semibold text-slate-900">{{ isEditMode ? 'Edit Kategori' : 'Tambah Kategori Baru' }}</DialogTitle>
                     <DialogDescription class="text-xs text-slate-500">
-                        Konfigurasi nama gangguan, jenis infrastruktur jaringan, dan estimasi waktu penanganan (SLA).
+                        Konfigurasi nama gangguan dan klasifikasi jenis infrastruktur jaringan.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -280,13 +272,6 @@ const confirmDelete = () => {
                                 </SelectContent>
                             </Select>
                             <InputError :message="form.errors.infrastructure_type || form.errors.network_type" />
-                        </div>
-                        
-                        <div class="space-y-1">
-                            <InputLabel for="sla_hours" value="Target SLA (dalam Jam)" class="text-xs" />
-                            <Input id="sla_hours" type="number" min="1" max="720" v-model="form.sla_hours" placeholder="Cth: 24" class="h-9 text-sm" />
-                            <InputError :message="form.errors.sla_hours" />
-                            <p class="text-[11px] text-slate-500">Batas waktu perbaikan sebelum tiket dianggap overdue.</p>
                         </div>
 
                         <div class="space-y-1">

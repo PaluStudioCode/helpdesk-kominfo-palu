@@ -45,35 +45,24 @@ class TicketServiceTest extends TestCase
         $this->assertEquals($seq1 + 1, $seq2);
     }
 
-    public function test_ticket_service_calculates_dynamic_sla_for_admin_on_behalf(): void
+    public function test_ticket_service_creates_pending_admin_ticket_for_opd_user(): void
     {
-        $admin = $this->createAdmin();
         $dept = $this->createDepartment();
-        $category = $this->createCategory(['sla_hours' => 5, 'network_type' => 'Fiber optic']);
-        $leadTech = $this->createTechnician();
-        $teamTech = $this->createTechnician();
+        $opdUser = $this->createOpdUser($dept);
 
         $ticket = $this->ticketService->createTicket([
-            'department_id' => $dept->id,
-            'network_type' => 'Fiber optic',
-            'category_id' => $category->id,
-            'priority' => 'high',
-            'technician_ids' => [$leadTech->id, $teamTech->id],
-            'title' => 'Kabel FO Putus Utama',
-            'location_details' => 'Tiang FO No. 12',
-            'description' => 'Kabel FO terputus tertabrak truk.',
-        ], $admin);
+            'title' => 'Kabel Jaringan Putus',
+            'location_details' => 'Ruang Rapat Lantai 2',
+            'description' => 'Kabel LAN terlepas dan konektor pecah.',
+        ], $opdUser);
 
-        $this->assertEquals('in_progress', $ticket->status);
-        $this->assertEquals($leadTech->id, $ticket->assigned_to);
-        $this->assertNotNull($ticket->due_at);
-        $this->assertNotNull($ticket->assigned_at);
-
-        // Due time must be approximately 5 hours from assigned_at
-        $diffHours = $ticket->assigned_at->diffInHours($ticket->due_at);
-        $this->assertEquals(5, $diffHours);
-
-        // Check team technicians sync
-        $this->assertTrue($ticket->technicians->contains('id', $teamTech->id));
+        $this->assertEquals('pending_admin', $ticket->status);
+        $this->assertEquals($dept->id, $ticket->department_id);
+        $this->assertEquals($opdUser->id, $ticket->reporter_id);
+        $this->assertNull($ticket->assigned_to);
+        $this->assertNull($ticket->due_at);
+        $this->assertNull($ticket->category_id);
+        $this->assertNull($ticket->infrastructure_type);
+        $this->assertNotNull($ticket->ticket_number);
     }
 }

@@ -15,7 +15,6 @@ class TicketCategory extends Model
         'name',
         'infrastructure_type',
         'network_type', // backward compatibility alias
-        'sla_hours',
         'status',
     ];
 

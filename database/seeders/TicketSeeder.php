@@ -581,7 +581,14 @@ class TicketSeeder extends Seeder
                     // in_progress, pending_approval, closed
                     $assignedTo = $leadTech->id;
                     $assignedAt = (clone $createdAt)->addMinutes(rand(15, 120));
-                    $dueAt = (clone $assignedAt)->addHours($category->sla_hours);
+                    $slaHours = match ($priority) {
+                        'emergency' => 4,
+                        'high' => 8,
+                        'medium' => 24,
+                        'low' => 48,
+                        default => 24,
+                    };
+                    $dueAt = (clone $assignedAt)->addHours($slaHours);
 
                     if ($status === 'in_progress') {
                         $rSla = rand(1, 4);
@@ -589,10 +596,10 @@ class TicketSeeder extends Seeder
                             $dueAt = (clone $assignedAt)->addHours(2);
                         }
                     } elseif ($status === 'pending_approval') {
-                        $resolvedAt = (clone $assignedAt)->addMinutes(rand(30, $category->sla_hours * 50));
+                        $resolvedAt = (clone $assignedAt)->addMinutes(rand(30, $slaHours * 45));
                         $resolutionNote = $tmpl['res'];
                     } elseif ($status === 'closed') {
-                        $resolvedAt = (clone $assignedAt)->addMinutes(rand(30, $category->sla_hours * 50));
+                        $resolvedAt = (clone $assignedAt)->addMinutes(rand(30, $slaHours * 45));
                         $closedAt = (clone $resolvedAt)->addMinutes(rand(10, 180));
                         $resolutionNote = $tmpl['res'];
                         

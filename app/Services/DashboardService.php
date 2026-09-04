@@ -98,7 +98,7 @@ class DashboardService
     {
         return [
             'in_process' => Ticket::where('department_id', $departmentId)
-                ->whereIn('status', ['pending_admin', 'in_progress', 'pending_approval'])
+                ->whereIn('status', ['pending_admin', 'in_progress', 'on_hold', 'pending_approval'])
                 ->count(),
             'closed_tickets' => Ticket::where('department_id', $departmentId)
                 ->where('status', 'closed')
@@ -128,15 +128,15 @@ class DashboardService
 
         $stats = [
             'closed_tickets' => Ticket::where('status', 'closed')->where($myTicketsQuery)->count(),
-            'in_progress' => Ticket::where('status', 'in_progress')->where($myTicketsQuery)->count(),
+            'in_progress' => Ticket::whereIn('status', ['in_progress', 'on_hold'])->where($myTicketsQuery)->count(),
             'pending_approval' => Ticket::where('status', 'pending_approval')->where($myTicketsQuery)->count(),
             'avg_rating' => $avgRating,
             'rating_count' => $ratingCount,
         ];
 
-        // 1. Active In-Progress Tasks
+        // 1. Active In-Progress & On-Hold Tasks
         $activeTasks = Ticket::with(['department:id,name,code', 'category:id,name'])
-            ->where('status', 'in_progress')
+            ->whereIn('status', ['in_progress', 'on_hold'])
             ->where($myTicketsQuery)
             ->orderByRaw("FIELD(priority, 'emergency', 'high', 'medium', 'low') ASC")
             ->orderBy('due_at', 'asc')
@@ -328,21 +328,23 @@ class DashboardService
             'total_tickets' => (clone $statsQuery)->count(),
             'pending_admin' => (clone $statsQuery)->where('status', 'pending_admin')->count(),
             'in_progress' => (clone $statsQuery)->where('status', 'in_progress')->count(),
+            'on_hold' => (clone $statsQuery)->where('status', 'on_hold')->count(),
             'pending_approval' => (clone $statsQuery)->where('status', 'pending_approval')->count(),
             'closed_tickets' => (clone $statsQuery)->where('status', 'closed')->count(),
             'rejected_tickets' => (clone $statsQuery)->where('status', 'cancelled')->count(),
         ];
 
         $statusDistribution = [
-            'labels' => ['Selesai', 'Dalam Penanganan', 'Menunggu Verifikasi', 'Menunggu Approval', 'Ditolak'],
+            'labels' => ['Selesai', 'Dalam Penanganan', 'Tertunda (On-Hold)', 'Menunggu Verifikasi', 'Menunggu Approval', 'Ditolak'],
             'data' => [
                 $stats['closed_tickets'],
                 $stats['in_progress'],
+                $stats['on_hold'],
                 $stats['pending_admin'],
                 $stats['pending_approval'],
                 $stats['rejected_tickets'],
             ],
-            'colors' => ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#f43f5e'],
+            'colors' => ['#10b981', '#f59e0b', '#d97706', '#3b82f6', '#8b5cf6', '#f43f5e'],
         ];
 
         $fiberCount = (clone $statsQuery)->where('infrastructure_type', 'Fiber optic')->count();
@@ -394,7 +396,7 @@ class DashboardService
         $tableQuery = Ticket::selectRaw("
             DATE_FORMAT(created_at, '%Y-%m') as period,
             COUNT(*) as total_tickets,
-            SUM(CASE WHEN status IN ('pending_admin', 'in_progress', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
+            SUM(CASE WHEN status IN ('pending_admin', 'in_progress', 'on_hold', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
             SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed,
             SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
             AVG(CASE WHEN status = 'closed' AND closed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, created_at, closed_at) ELSE NULL END) as avg_resolution_minutes

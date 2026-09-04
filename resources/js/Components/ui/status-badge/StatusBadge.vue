@@ -12,6 +12,7 @@ const variant = computed(() => {
         switch (props.status) {
             case 'pending_admin': return 'pending_admin';
             case 'in_progress': return 'in_progress';
+            case 'on_hold': return 'on_hold';
             case 'pending_approval': return 'pending_approval';
             case 'closed': return 'closed';
             case 'cancelled': return 'cancelled';
@@ -59,6 +60,7 @@ const label = computed(() => {
     const labels: Record<string, string> = {
         pending_admin: 'Menunggu Verifikasi',
         in_progress: 'Sedang Dikerjakan',
+        on_hold: 'Tertunda (Kendala Lapangan)',
         pending_approval: 'Menunggu Review Admin',
         closed: 'Selesai',
         cancelled: 'Ditolak',

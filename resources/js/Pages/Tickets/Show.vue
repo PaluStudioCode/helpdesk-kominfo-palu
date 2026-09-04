@@ -16,6 +16,7 @@ import {
 } from '@/lib/ticket-helpers';
 import FileUpload from '@/Components/FileUpload.vue';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
+import LiveTicketTimer from '@/Components/LiveTicketTimer.vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,7 +54,10 @@ import {
     Search,
     Plus,
     Trash2,
-    Boxes
+    Boxes,
+    PauseCircle,
+    PlayCircle,
+    Info
 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -118,7 +122,9 @@ const canVerifyAndAssign = computed(() => props.ticket.status === 'pending_admin
 const canReject = computed(() => props.ticket.status === 'pending_admin' && role.value === 'admin');
 const canCancelByReporter = computed(() => props.ticket.status === 'pending_admin' && role.value === 'opd_user' && isDepartmentMatch.value);
 const canResubmit = computed(() => props.ticket.status === 'cancelled' && role.value === 'opd_user' && isDepartmentMatch.value && isWithin72Hours.value);
-const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && (role.value === 'admin' || (role.value === 'technician' && isAssignedTechnician.value)));
+const canHold = computed(() => props.ticket.status === 'in_progress' && role.value === 'technician' && isAssignedTechnician.value);
+const canResume = computed(() => props.ticket.status === 'on_hold' && role.value === 'technician' && isAssignedTechnician.value);
+const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && role.value === 'technician' && isAssignedTechnician.value);
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
@@ -139,6 +145,17 @@ const cancellationInfo = computed(() => {
         comment: cancelledHistory?.comment || 'Laporan telah dibatalkan / ditolak.',
     };
 });
+
+const getHoldCategoryLabel = (cat: string | null | undefined) => {
+    const labels: Record<string, string> = {
+        vendor_isp: 'Ketergantungan Pihak Ketiga (Vendor ISP / Telkom / PLN)',
+        material_procurement: 'Ketiadaan Material & Suku Cadang (Menunggu Pengadaan)',
+        access_permit: 'Kendala Izin Akses Fisik / Kunci Lokasi',
+        weather_force_majeure: 'Faktor Keamanan & Cuaca Ekstrem',
+        need_escalation: 'Eskalasi ke Tim Ahli / Network Engineer',
+    };
+    return cat ? (labels[cat] || cat) : '-';
+};
 
 const getSlaStatus = (ticket: any) => {
     if (ticket.status === 'closed') {
@@ -162,6 +179,14 @@ const getSlaStatus = (ticket: any) => {
             status: 'pending_admin',
             label: '⏱ SLA ditangguhkan (Menunggu Verifikasi)',
             textColor: 'text-blue-700 font-medium'
+        };
+    }
+
+    if (ticket.status === 'on_hold') {
+        return {
+            status: 'warning',
+            label: '⏱ SLA dijeda sementara (Clock Paused)',
+            textColor: 'text-amber-700 font-semibold'
         };
     }
 
@@ -198,10 +223,39 @@ const isVerifyModalOpen = ref(false);
 const isRejectModalOpen = ref(false);
 const isCancelModalOpen = ref(false);
 const isResubmitModalOpen = ref(false);
+const isHoldModalOpen = ref(false);
 const isResolutionModalOpen = ref(false);
 const isApproveModalOpen = ref(false);
 const isRevisionModalOpen = ref(false);
 const isDrawerOpen = ref(false);
+
+const holdReasonCategories = [
+    { value: 'vendor_isp', label: 'Ketergantungan Pihak Ketiga (Vendor ISP / Telkom / PLN)' },
+    { value: 'material_procurement', label: 'Ketiadaan Material & Suku Cadang (Menunggu Pengadaan)' },
+    { value: 'access_permit', label: 'Kendala Izin Akses Fisik / Kunci Lokasi' },
+    { value: 'weather_force_majeure', label: 'Faktor Keamanan & Cuaca Ekstrem' },
+    { value: 'need_escalation', label: 'Eskalasi ke Tim Ahli / Network Engineer' },
+];
+
+const holdForm = useForm({
+    hold_reason_category: 'vendor_isp',
+    hold_reason_note: '',
+});
+
+const submitHold = () => {
+    holdForm.post(route('tickets.hold', props.ticket.id), {
+        onSuccess: () => {
+            isHoldModalOpen.value = false;
+            holdForm.reset();
+        }
+    });
+};
+
+const resumeForm = useForm({});
+
+const submitResume = () => {
+    resumeForm.post(route('tickets.resume', props.ticket.id));
+};
 
 const quickCancelReasons = [
     'Kendala jaringan telah teratasi sendiri oleh OPD',
@@ -968,7 +1022,27 @@ onUnmounted(() => {
                         <XCircle class="w-4 h-4 mr-1.5" /> Batalkan Laporan
                     </Button>
 
-                    <!-- Technician Action: In Progress -->
+                    <!-- Technician Action: In Progress & On-Hold -->
+                    <Button 
+                        v-if="canHold" 
+                        @click="isHoldModalOpen = true" 
+                        size="sm" 
+                        variant="outline" 
+                        class="h-9 px-3.5 border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <PauseCircle class="w-4 h-4 mr-1.5 text-amber-700" /> Tunda (On-Hold)
+                    </Button>
+
+                    <Button 
+                        v-if="canResume" 
+                        @click="submitResume" 
+                        size="sm" 
+                        :disabled="resumeForm.processing"
+                        class="h-9 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs sm:text-sm font-medium whitespace-nowrap"
+                    >
+                        <PlayCircle class="w-4 h-4 mr-1.5" /> {{ resumeForm.processing ? 'Melanjutkan...' : 'Lanjutkan Pengerjaan (Resume)' }}
+                    </Button>
+
                     <Button 
                         v-if="canSubmitResolution" 
                         @click="isResolutionModalOpen = true" 
@@ -1012,6 +1086,35 @@ onUnmounted(() => {
 
             <!-- Contextual Workflow Status Banners -->
             
+            <!-- 0. On-Hold Status Banner -->
+            <div v-if="ticket.status === 'on_hold'" class="p-5 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                <div class="flex items-start gap-3">
+                    <PauseCircle class="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+                    <div class="space-y-1 text-sm text-amber-950 flex-1">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <p class="font-bold text-amber-950 text-base">
+                                Penanganan Lapangan Ditunda Sementara (On-Hold)
+                            </p>
+                            <span v-if="ticket.hold_started_at" class="text-xs text-amber-700 font-medium">
+                                Sejak: {{ formatDate(ticket.hold_started_at) }}
+                            </span>
+                        </div>
+                        <p class="text-amber-900 text-xs sm:text-sm font-medium">
+                            Kategori Hambatan: <span class="font-bold text-amber-950">{{ getHoldCategoryLabel(ticket.hold_reason_category) }}</span>
+                        </p>
+                        <p v-if="ticket.hold_reason_note" class="text-amber-800 text-xs sm:text-sm leading-relaxed bg-amber-100/60 p-3 rounded-lg border border-amber-200/70 mt-2">
+                            <span class="font-semibold text-amber-900">Catatan Kendala:</span> {{ ticket.hold_reason_note }}
+                        </p>
+                        <div class="pt-2 border-t border-amber-200/80 mt-2">
+                            <span class="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                                <Clock class="w-4 h-4 text-amber-600" />
+                                Timer batas target SLA dijeda otomatis dan akan disesuaikan saat penanganan dilanjutkan.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 1. Cancelled / Rejection Banner -->
             <div v-if="ticket.status === 'cancelled'" class="p-5 bg-rose-50 border border-rose-200 rounded-xl space-y-3">
                 <div class="flex items-start gap-3">
@@ -1155,13 +1258,9 @@ onUnmounted(() => {
                                 <p class="font-bold text-slate-900 text-sm mt-0.5">
                                     {{ ticket.due_at ? formatDate(ticket.due_at) : '-' }}
                                 </p>
-                                <p 
-                                    v-if="getSlaStatus(ticket)" 
-                                    class="text-xs mt-0.5 font-medium"
-                                    :class="getSlaStatus(ticket)?.textColor"
-                                >
-                                    {{ getSlaStatus(ticket)?.label }}
-                                </p>
+                                <div class="mt-1">
+                                    <LiveTicketTimer :ticket="ticket" variant="inline" />
+                                </div>
                             </div>
 
                             <div>
@@ -2011,6 +2110,62 @@ onUnmounted(() => {
                         <Button type="button" variant="outline" @click="isRevisionModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="revisionForm.processing || !revisionForm.comment" class="bg-amber-600 hover:bg-amber-700 text-white">
                             {{ revisionForm.processing ? 'Mengirim...' : 'Kirim Instruksi Revisi' }}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+
+        <!-- 7. Hold Ticket Modal (Technician / Admin) -->
+        <Dialog v-model:open="isHoldModalOpen">
+            <DialogContent class="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle>Tunda Penanganan Tiket (On-Hold)</DialogTitle>
+                    <DialogDescription>
+                        Gunakan status ini bila pengerjaan di lapangan mengalami hambatan eksternal atau perlu eskalasi. Timer target SLA akan dijeda otomatis selama masa tunda.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <form @submit.prevent="submitHold" class="space-y-4 pt-1">
+                    <div>
+                        <InputLabel for="hold_category" value="Kategori Hambatan / Alasan Penundaan *" class="text-xs font-semibold text-slate-700" />
+                        <Select v-model="holdForm.hold_reason_category">
+                            <SelectTrigger id="hold_category" class="mt-1">
+                                <SelectValue placeholder="Pilih Kategori Kendala" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem 
+                                    v-for="cat in holdReasonCategories" 
+                                    :key="cat.value" 
+                                    :value="cat.value"
+                                >
+                                    {{ cat.label }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="holdForm.errors.hold_reason_category" class="mt-1" />
+                    </div>
+
+                    <div>
+                        <InputLabel for="hold_reason_note" value="Rincian Kendala & Rencana Tindak Lanjut *" class="text-xs font-semibold text-slate-700" />
+                        <Textarea 
+                            id="hold_reason_note"
+                            v-model="holdForm.hold_reason_note"
+                            placeholder="Cth: Telah dilaporkan ke ISP Telkom (No. Tiket: INC12345). Menunggu teknisi kabel tiba..."
+                            rows="4"
+                            class="mt-1 text-sm bg-white"
+                            required
+                        />
+                        <p class="text-[11px] text-slate-500 mt-1">
+                            Tuliskan nomor tiket ISP, nama teknisi vendor, nomor kontak, atau estimasi material yang ditunggu.
+                        </p>
+                        <InputError :message="holdForm.errors.hold_reason_note" class="mt-1" />
+                    </div>
+
+                    <DialogFooter class="pt-3 border-t border-slate-100">
+                        <Button type="button" variant="outline" @click="isHoldModalOpen = false">Batal</Button>
+                        <Button type="submit" :disabled="holdForm.processing || !holdForm.hold_reason_note" class="bg-amber-600 hover:bg-amber-700 text-white">
+                            {{ holdForm.processing ? 'Memproses...' : 'Konfirmasi Tunda (On-Hold)' }}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -482,6 +482,7 @@ const getStatusLabel = (status: string) => {
     switch (status) {
         case 'pending_admin': return 'Menunggu Verifikasi';
         case 'in_progress': return 'Sedang Dikerjakan';
+        case 'on_hold': return 'Tertunda (On-Hold)';
         case 'pending_approval': return 'Menunggu Review';
         case 'closed': return 'Selesai';
         case 'cancelled': return 'Ditolak';
@@ -493,6 +494,7 @@ const getStatusColor = (status: string) => {
     switch (status) {
         case 'pending_admin': return 'text-blue-600 font-semibold';
         case 'in_progress': return 'text-amber-600 font-semibold';
+        case 'on_hold': return 'text-amber-700 font-semibold';
         case 'pending_approval': return 'text-purple-600 font-semibold';
         case 'closed': return 'text-emerald-600 font-semibold';
         case 'cancelled': return 'text-rose-600 font-semibold';

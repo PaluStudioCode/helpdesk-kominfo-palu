@@ -28,6 +28,10 @@ class Ticket extends Model
         'description',
         'priority',
         'status',
+        'hold_reason_category',
+        'hold_reason_note',
+        'hold_started_at',
+        'total_hold_duration_minutes',
         'resolution_note',
         'inspection_result',
         'root_cause',
@@ -54,6 +58,8 @@ class Ticket extends Model
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
             'rated_at' => 'datetime',
+            'hold_started_at' => 'datetime',
+            'total_hold_duration_minutes' => 'integer',
             'rating' => 'integer',
         ];
     }
@@ -127,6 +133,11 @@ class Ticket extends Model
     public function isInProgress(): bool
     {
         return $this->status === 'in_progress';
+    }
+
+    public function isOnHold(): bool
+    {
+        return $this->status === 'on_hold';
     }
 
     public function isPendingApproval(): bool

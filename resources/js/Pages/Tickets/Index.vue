@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
-import { Plus, Eye, Cable, Network, Wifi, Zap, Repeat, Globe } from 'lucide-vue-next';
+import { Plus, Eye } from 'lucide-vue-next';
 import {
   Dialog,
   DialogContent,
@@ -28,57 +28,24 @@ import {
 const props = defineProps<{
     tickets: any;
     filters: any;
-    canCreateOnBehalf: boolean;
-    categoriesMap?: Record<string, Array<{id: number, name: string, infrastructure_type?: string, network_type?: string}>>;
-    departments?: Array<{id: number, name: string}>;
-    technicians?: Array<{id: number, name: string, phone_number?: string}>;
 }>();
 
 const currentUser = computed(() => usePage().props.auth.user as any);
-const canCreateTicket = computed(() => ['admin', 'opd_user'].includes(currentUser.value?.role));
+const canCreateTicket = computed(() => currentUser.value?.role === 'opd_user');
 
 const searchQuery = ref(props.filters?.search || '');
 const statusFilter = ref(props.filters?.status || 'all');
 const infrastructureFilter = ref(props.filters?.infrastructure_type || props.filters?.network_type || 'all');
 const networkFilter = infrastructureFilter;
 
-// Create Ticket Modal State & Form
+// Create Ticket Modal State & Form (OPD Complaint)
 const isCreateModalOpen = ref(false);
 const form = useForm({
     title: '',
     location_details: '',
     description: '',
     attachments: [] as File[],
-    // Admin On-Behalf Fields
-    department_id: '',
-    infrastructure_type: '',
-    network_type: '',
-    category_id: '',
-    priority: 'medium',
-    technician_ids: [] as number[],
 });
-
-const availableCategories = computed(() => {
-    const infra = form.infrastructure_type || form.network_type;
-    if (!infra || !props.categoriesMap) return [];
-    return props.categoriesMap[infra] || [];
-});
-
-const handleInfrastructureChange = (type: string) => {
-    form.infrastructure_type = type;
-    form.network_type = type;
-    form.category_id = '';
-};
-const handleNetworkChange = handleInfrastructureChange;
-
-const toggleTechnician = (techId: number) => {
-    const index = form.technician_ids.indexOf(techId);
-    if (index === -1) {
-        form.technician_ids.push(techId);
-    } else {
-        form.technician_ids.splice(index, 1);
-    }
-};
 
 // Common non-technical issue options for OPD
 const opdIssueOptions = [
@@ -104,16 +71,7 @@ const onSelectOpdIssueOption = (val: any) => {
 
 const openCreateTicketModal = () => {
     form.clearErrors();
-    form.title = '';
-    form.location_details = '';
-    form.description = '';
-    form.infrastructure_type = '';
-    form.network_type = '';
-    form.category_id = '';
-    form.priority = 'medium';
-    form.department_id = '';
-    form.technician_ids = [];
-    form.attachments = [];
+    form.reset();
     selectedOpdIssueOption.value = '';
     isCreateModalOpen.value = true;
 };
@@ -198,6 +156,7 @@ const getStatusLabel = (status: string) => {
     switch (status) {
         case 'pending_admin': return 'Menunggu Verifikasi';
         case 'in_progress': return 'Sedang Dikerjakan';
+        case 'on_hold': return 'Tertunda (On-Hold)';
         case 'pending_approval': return 'Menunggu Review';
         case 'closed': return 'Selesai';
         case 'cancelled': return 'Ditolak';
@@ -209,6 +168,7 @@ const getStatusColor = (status: string) => {
     switch (status) {
         case 'pending_admin': return 'text-blue-600 font-semibold';
         case 'in_progress': return 'text-amber-600 font-semibold';
+        case 'on_hold': return 'text-amber-700 font-semibold';
         case 'pending_approval': return 'text-purple-600 font-semibold';
         case 'closed': return 'text-emerald-600 font-semibold';
         case 'cancelled': return 'text-rose-600 font-semibold';
@@ -288,6 +248,7 @@ const formatDate = (dateStr: string) => {
                                 <SelectItem value="all">{{ currentUser?.role === 'technician' ? 'Semua Tugas Saya' : 'Semua Status' }}</SelectItem>
                                 <SelectItem v-if="currentUser?.role !== 'technician'" value="pending_admin">Menunggu Verifikasi</SelectItem>
                                 <SelectItem value="in_progress">Sedang Dikerjakan</SelectItem>
+                                <SelectItem value="on_hold">Tertunda (On-Hold)</SelectItem>
                                 <SelectItem value="pending_approval">Menunggu Review Admin</SelectItem>
                                 <SelectItem value="closed">Selesai</SelectItem>
                                 <SelectItem value="cancelled">Ditolak</SelectItem>
@@ -312,7 +273,7 @@ const formatDate = (dateStr: string) => {
 
                 <template #actions>
                     <Button v-if="canCreateTicket" @click="openCreateTicketModal" class="bg-kominfo-primary hover:bg-kominfo-primary-dark w-full sm:w-auto text-xs sm:text-sm h-9">
-                        <Plus class="w-4 h-4 mr-1.5" /> {{ canCreateOnBehalf ? 'Buat Tiket (On-Behalf)' : 'Buat Laporan Baru' }}
+                        <Plus class="w-4 h-4 mr-1.5" /> Buat Laporan Baru
                     </Button>
                 </template>
 
@@ -383,187 +344,8 @@ const formatDate = (dateStr: string) => {
                 </DialogHeader>
 
                 <form @submit.prevent="submitCreateTicket" class="space-y-4 pt-1 sm:pt-2">
-
-                    <!-- On-Behalf Selection (Admin Only) -->
-                    <div v-if="canCreateOnBehalf" class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-3.5">
-                        <div class="text-xs font-semibold text-amber-950 border-b border-amber-200 pb-1.5">
-                            Pengaturan On-Behalf & Disposisi Tim (Admin)
-                        </div>
-
-                        <div>
-                            <InputLabel for="department_id" value="Instansi / OPD Pelapor *" class="text-amber-950 text-xs font-medium" />
-                            <Select v-model="form.department_id">
-                                <SelectTrigger class="bg-white mt-1">
-                                    <SelectValue placeholder="Pilih OPD Terkait" />
-                                </SelectTrigger>
-                                <SelectContent class="max-h-56">
-                                    <SelectItem v-for="dept in departments" :key="dept.id" :value="dept.id.toString()">
-                                        {{ dept.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <InputError :message="form.errors.department_id" class="mt-1" />
-                        </div>
-
-                        <!-- Infrastructure Type Card Selector -->
-                        <div>
-                            <InputLabel value="Jenis Infrastruktur *" class="text-amber-950 text-xs font-medium mb-1" />
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                                <button
-                                    type="button"
-                                    @click="handleInfrastructureChange('Fiber optic')"
-                                    :class="[
-                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        (form.infrastructure_type || form.network_type) === 'Fiber optic' 
-                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
-                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    <Cable class="w-4 h-4 mb-1 text-sky-600" />
-                                    <span class="truncate">Fiber optic</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    @click="handleInfrastructureChange('Perangkat/Akses')"
-                                    :class="[
-                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        (form.infrastructure_type || form.network_type) === 'Perangkat/Akses' 
-                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
-                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    <Network class="w-4 h-4 mb-1 text-indigo-600" />
-                                    <span class="truncate">Perangkat/Akses</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    @click="handleInfrastructureChange('Power/poe')"
-                                    :class="[
-                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        (form.infrastructure_type || form.network_type) === 'Power/poe' 
-                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
-                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    <Zap class="w-4 h-4 mb-1 text-amber-600" />
-                                    <span class="truncate">Power/poe</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    @click="handleInfrastructureChange('Converter')"
-                                    :class="[
-                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        (form.infrastructure_type || form.network_type) === 'Converter' 
-                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
-                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    <Repeat class="w-4 h-4 mb-1 text-pink-600" />
-                                    <span class="truncate">Converter</span>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    @click="handleInfrastructureChange('Layanan/jaringan')"
-                                    :class="[
-                                        'flex flex-col items-center justify-center p-2 rounded-lg border text-center transition-all text-xs font-medium',
-                                        (form.infrastructure_type || form.network_type) === 'Layanan/jaringan' 
-                                            ? 'border-amber-600 bg-white ring-2 ring-amber-500 text-amber-900 shadow-xs' 
-                                            : 'border-amber-200 bg-amber-50/50 hover:bg-white text-slate-700'
-                                    ]"
-                                >
-                                    <Globe class="w-4 h-4 mb-1 text-emerald-600" />
-                                    <span class="truncate">Layanan/jaringan</span>
-                                </button>
-                            </div>
-                            <InputError :message="form.errors.infrastructure_type || form.errors.network_type" class="mt-1" />
-                        </div>
-
-                        <!-- Category & Priority Row -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <InputLabel for="category_id" value="Kategori Masalah *" class="text-amber-950 text-xs font-medium" />
-                                <Select 
-                                    v-model="form.category_id" 
-                                    :disabled="!(form.infrastructure_type || form.network_type)"
-                                >
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue :placeholder="(form.infrastructure_type || form.network_type) ? 'Pilih Kategori' : 'Pilih jenis infrastruktur dahulu'" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem 
-                                            v-for="cat in availableCategories" 
-                                            :key="cat.id" 
-                                            :value="cat.id.toString()"
-                                        >
-                                            {{ cat.name }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="form.errors.category_id" class="mt-1" />
-                            </div>
-
-                            <div>
-                                <InputLabel for="priority" value="Tingkat Prioritas *" class="text-amber-950 text-xs font-medium" />
-                                <Select v-model="form.priority">
-                                    <SelectTrigger class="bg-white mt-1">
-                                        <SelectValue placeholder="Pilih Prioritas" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="low">Rendah (Low)</SelectItem>
-                                        <SelectItem value="medium">Sedang (Medium)</SelectItem>
-                                        <SelectItem value="high">Tinggi (High)</SelectItem>
-                                        <SelectItem value="emergency">Darurat (Emergency)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <InputError :message="form.errors.priority" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <!-- Multi-select Tim Teknisi -->
-                        <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <InputLabel value="Tim Teknisi Penanggung Jawab *" class="text-amber-950 text-xs font-medium" />
-                                <span v-if="form.technician_ids.length > 0" class="text-[11px] font-semibold text-amber-800">
-                                    {{ form.technician_ids.length }} teknisi dipilih
-                                </span>
-                            </div>
-
-                            <div class="bg-white border border-amber-200 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-100">
-                                <div v-if="!technicians || technicians.length === 0" class="text-xs text-slate-500 italic p-2 text-center">
-                                    Belum ada data teknisi aktif yang tersedia.
-                                </div>
-                                <label 
-                                    v-for="tech in technicians" 
-                                    :key="tech.id"
-                                    class="flex items-center justify-between text-xs text-slate-800 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors"
-                                >
-                                    <div class="flex items-center gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            :checked="form.technician_ids.includes(tech.id)"
-                                            @change="toggleTechnician(tech.id)"
-                                            class="rounded border-slate-300 text-kominfo-primary focus:ring-0 focus:ring-offset-0 focus:outline-none outline-none w-4 h-4 cursor-pointer"
-                                        />
-                                        <span :class="form.technician_ids.includes(tech.id) ? 'font-medium text-slate-900' : 'text-slate-700'">{{ tech.name }}</span>
-                                        <span v-if="form.technician_ids[0] === tech.id" class="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">
-                                            Lead
-                                        </span>
-                                    </div>
-                                    <span v-if="tech.phone_number" class="text-slate-400 font-mono text-[11px]">
-                                        {{ tech.phone_number }}
-                                    </span>
-                                </label>
-                            </div>
-                            <InputError :message="form.errors.technician_ids" class="mt-1" />
-                        </div>
-                    </div>
-
                     <!-- Jenis Kendala / Subjek Laporan (OPD) -->
-                    <div v-if="!canCreateOnBehalf">
+                    <div>
                         <InputLabel value="Jenis Kendala / Subjek Laporan *" class="text-xs font-semibold text-slate-700" />
                         <Select :modelValue="selectedOpdIssueOption" @update:modelValue="onSelectOpdIssueOption">
                             <SelectTrigger class="mt-1">
@@ -591,13 +373,6 @@ const formatDate = (dateStr: string) => {
                             />
                             <p class="text-[11px] text-slate-500 mt-1">Tuliskan ringkasan kendala secara singkat (minimal 5 karakter).</p>
                         </div>
-                    </div>
-
-                    <!-- Title (Admin On-Behalf Only) -->
-                    <div v-else>
-                        <InputLabel for="title" value="Subjek / Ringkasan Kendala *" />
-                        <Input id="title" v-model="form.title" placeholder="Cth: Internet mati di ruang bidang informasi" class="mt-1" />
-                        <InputError :message="form.errors.title" class="mt-1" />
                     </div>
 
                     <!-- Location Details -->
@@ -640,7 +415,7 @@ const formatDate = (dateStr: string) => {
                     <DialogFooter class="pt-3 pb-2 border-t border-slate-100 sticky bottom-0 bg-white sm:static">
                         <Button type="button" variant="outline" @click="isCreateModalOpen = false">Batal</Button>
                         <Button type="submit" :disabled="form.processing" class="bg-kominfo-primary hover:bg-kominfo-primary-dark">
-                            {{ form.processing ? 'Mengirim Laporan...' : (canCreateOnBehalf ? 'Terbitkan & Tugaskan' : 'Kirim Laporan Gangguan') }}
+                            {{ form.processing ? 'Mengirim Laporan...' : 'Kirim Laporan Gangguan' }}
                         </Button>
                     </DialogFooter>
                 </form>
