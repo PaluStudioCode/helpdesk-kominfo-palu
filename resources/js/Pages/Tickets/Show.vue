@@ -9,10 +9,9 @@ import {
     getStatusColor,
     getPriorityLabel,
     getPriorityColor,
-    getNetworkLabel,
-    getNetworkColor,
     getRoleLabel,
-    getRoleColor
+    getRoleColor,
+    getRevisionInfo
 } from '@/lib/ticket-helpers';
 import FileUpload from '@/Components/FileUpload.vue';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
@@ -57,8 +56,7 @@ import {
     Trash2,
     Boxes,
     PauseCircle,
-    PlayCircle,
-    Info
+    PlayCircle
 } from 'lucide-vue-next';
 import {
   Dialog,
@@ -140,7 +138,7 @@ const canSubmitResolution = computed(() => props.ticket.status === 'in_progress'
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
-const canViewBeritaAcara = computed(() => {
+const canViewRincianTeknis = computed(() => {
     if (role.value !== 'admin' && !(role.value === 'technician' && isAssignedTechnician.value)) return false;
     return Boolean(props.ticket.resolved_at || props.ticket.action_taken || props.ticket.resolution_note || props.ticket.status === 'pending_approval' || props.ticket.status === 'closed');
 });
@@ -176,6 +174,8 @@ const approvalInfo = computed(() => {
         approvedAt: latestClosed.created_at,
     };
 });
+
+const revisionInfo = computed(() => getRevisionInfo(props.ticket));
 
 const getHoldCategoryLabel = (cat: string | null | undefined) => {
     const labels: Record<string, string> = {
@@ -824,21 +824,6 @@ onUnmounted(() => {
                         </span>
                     </Button>
 
-                    <!-- Tombol Rincian Teknis (Berita Acara) Khusus Admin & Teknisi -->
-                    <Link 
-                        v-if="canViewBeritaAcara" 
-                        :href="route('tickets.berita-acara', ticket.id)"
-                    >
-                        <Button 
-                            size="sm" 
-                            variant="outline" 
-                            class="border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium whitespace-nowrap cursor-pointer"
-                        >
-                            <FileText class="w-4 h-4 mr-1.5 text-slate-600" />
-                            <span>Rincian Teknis</span>
-                        </Button>
-                    </Link>
-
                     <!-- Admin Actions: Pending Admin -->
                     <Button 
                         v-if="canVerifyAndAssign" 
@@ -903,25 +888,21 @@ onUnmounted(() => {
                         </Button>
                     </Link>
 
-                    <!-- Admin Actions: Pending Approval (Quality Gate) -->
-                    <Button 
-                        v-if="canApproveResolution" 
-                        @click="isApproveModalOpen = true" 
-                        size="sm" 
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium whitespace-nowrap"
+                    <!-- Tombol Rincian Teknis (Khusus Admin/Teknisi saat Closed, atau Teknisi saat Pending Approval) -->
+                    <Link 
+                        v-if="canViewRincianTeknis && (ticket.status === 'closed' || (role === 'technician' && ticket.status === 'pending_approval'))" 
+                        :href="route('tickets.rincian-teknis', ticket.id)"
                     >
-                        <CheckCircle2 class="w-4 h-4 mr-1.5" /> Setujui Hasil Kerja
-                    </Button>
+                        <Button 
+                            size="sm" 
+                            variant="outline" 
+                            class="border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 font-medium whitespace-nowrap cursor-pointer"
+                        >
+                            <FileText class="w-4 h-4 mr-1.5 text-slate-600" />
+                            <span>Rincian Teknis</span>
+                        </Button>
+                    </Link>
 
-                    <Button 
-                        v-if="canRequestRevision" 
-                        @click="isRevisionModalOpen = true" 
-                        size="sm" 
-                        variant="outline" 
-                        class="border-amber-300 text-amber-900 bg-amber-50/50 hover:bg-amber-100 font-medium whitespace-nowrap"
-                    >
-                        <RotateCcw class="w-4 h-4 mr-1.5 text-amber-700" /> Minta Revisi
-                    </Button>
 
                     <!-- OPD Action: Resubmit on Cancelled (within 72 hours) -->
                     <Button 
@@ -1014,24 +995,38 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <!-- 2. Pending Admin Banner -->
-            <div v-if="ticket.status === 'pending_admin'" class="p-3.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3 text-sm text-blue-900">
-                <Info class="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                    <p class="font-bold text-blue-950">Menunggu Verifikasi & Disposisi Admin</p>
-                    <p class="text-blue-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                        Laporan telah diterima dan sedang menunggu validasi kelayakan serta penugasan Tim Teknisi oleh Administrator Diskominfo.
-                    </p>
+
+            <!-- 3. Pending Approval Banner (Khusus Admin) -->
+            <div v-if="role === 'admin' && ticket.status === 'pending_approval'" class="p-3.5 sm:p-4 bg-purple-50 border border-purple-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-purple-900">
+                <div class="flex items-start gap-3">
+                    <ShieldCheck class="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+                    <div>
+                        <p class="font-bold text-purple-950">Menunggu Peninjauan Mutu Layanan</p>
+                        <p class="text-purple-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                            Tim Teknisi telah menyelesaikan perbaikan kendala di lapangan dan mengunggah laporan rincian teknis. Menunggu proses verifikasi kendali mutu oleh Administrator.
+                        </p>
+                    </div>
+                </div>
+                <div v-if="canViewRincianTeknis" class="shrink-0 pl-8 sm:pl-0">
+                    <Link :href="route('tickets.rincian-teknis', ticket.id)">
+                        <Button 
+                            size="sm" 
+                            class="bg-purple-700 hover:bg-purple-800 text-white font-medium text-xs whitespace-nowrap cursor-pointer shadow-xs"
+                        >
+                            <FileText class="w-3.5 h-3.5 mr-1.5" />
+                            <span>Rincian Teknis</span>
+                        </Button>
+                    </Link>
                 </div>
             </div>
 
-            <!-- 3. Pending Approval Banner -->
-            <div v-if="ticket.status === 'pending_approval'" class="p-3.5 sm:p-4 bg-purple-50 border border-purple-200 rounded-xl flex items-start gap-3 text-sm text-purple-900">
-                <ShieldCheck class="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                <div>
-                    <p class="font-bold text-purple-950">Pekerjaan Lapangan Selesai (Menunggu Review Mutu Admin)</p>
-                    <p class="text-purple-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
-                        Tim Teknisi telah menyelesaikan perbaikan di lokasi dan mengunggah dokumentasi solusi. Menunggu peninjauan kendali mutu oleh Administrator.
+            <!-- 4. Revision Requested Banner (Khusus Teknisi) -->
+            <div v-if="role === 'technician' && revisionInfo" class="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-sm text-amber-900">
+                <RotateCcw class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div class="space-y-0.5 flex-1">
+                    <p class="font-bold text-amber-950">Permintaan Revisi</p>
+                    <p class="text-amber-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                        {{ revisionInfo.instruction }}
                     </p>
                 </div>
             </div>
@@ -1103,24 +1098,6 @@ onUnmounted(() => {
                         </h3>
 
                         <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-5">
-                            <!-- Khusus Admin & Teknisi: Tampilkan Detail Infrastruktur Jaringan & Kategori Riil -->
-                            <div v-if="role === 'admin' || role === 'technician'">
-                                <dt class="text-xs text-slate-500 font-medium">Infrastruktur & Kategori</dt>
-                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getNetworkLabel(ticket.infrastructure_type || ticket.network_type) : 'Menunggu diagnosa teknisi' }}
-                                </dd>
-                                <dd class="text-xs text-slate-500 mt-0.5">
-                                    {{ ticket.category ? ticket.category.name : ((ticket.infrastructure_type || ticket.network_type) ? 'Kategori belum ditentukan' : 'Diidentifikasi di lokasi') }}
-                                </dd>
-                            </div>
-                            <!-- Khusus Pelapor OPD: Tampilkan Kategori Kendala yang Mudah Dipahami -->
-                            <div v-else>
-                                <dt class="text-xs text-slate-500 font-medium">Kategori Gangguan</dt>
-                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ ticket.category ? ticket.category.name : 'Gangguan Jaringan OPD' }}
-                                </dd>
-                            </div>
-
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Tingkat Prioritas</dt>
                                 <dd class="text-sm font-semibold mt-0.5" :class="getPriorityColor(ticket.priority)">
@@ -1152,60 +1129,18 @@ onUnmounted(() => {
                                     </span>
                                 </dd>
                             </div>
-                        </dl>
-                    </div>
 
-                    <!-- SEKSI 3: HASIL PENANGANAN (Bila Tersedia) -->
-                    <div v-if="ticket.resolution_note || ticket.action_taken || ticket.resolved_at">
-                        <div class="pb-1.5 mb-3 border-b border-slate-200">
-                            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                                Hasil Penanganan
-                            </h3>
-                        </div>
-
-                        <dl class="grid grid-cols-1 sm:grid-cols-3 gap-y-3 gap-x-5 mb-3">
-                            <div>
-                                <dt class="text-xs text-slate-500 font-medium">Status Penanganan</dt>
-                                <dd class="text-sm font-semibold text-emerald-700 mt-0.5">Selesai Ditangani</dd>
-                            </div>
-                            <div>
+                            <!-- Waktu Selesai (Bila Tiket Telah Diselesaikan / Ditutup) -->
+                            <div v-if="ticket.resolved_at || ticket.closed_at">
                                 <dt class="text-xs text-slate-500 font-medium">Waktu Selesai</dt>
-                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs text-slate-500 font-medium">Teknisi Pelaksana</dt>
-                                <dd class="text-sm text-slate-900 mt-0.5">
-                                    {{ ticket.assignee ? ticket.assignee.name : (ticket.technicians && ticket.technicians.length > 0 ? ticket.technicians.map((t: any) => t.name).join(', ') : '-') }}
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ formatDate(ticket.resolved_at || ticket.closed_at) }}
                                 </dd>
                             </div>
                         </dl>
-
-                        <div class="space-y-2.5">
-                            <div>
-                                <dt class="text-xs text-slate-500 font-medium mb-0.5">Tindakan Perbaikan yang Dilakukan</dt>
-                                <dd class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{{ ticket.action_taken || ticket.resolution_note }}</dd>
-                            </div>
-
-                            <!-- Foto Dokumentasi Perbaikan Khusus Pelapor OPD (Admin & Teknisi melihat di Modal Berita Acara) -->
-                            <div v-if="role === 'opd_user' && ticket.attachments && ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').length > 0">
-                                <dt class="text-xs text-slate-500 font-medium mb-1.5">Foto Dokumentasi Perbaikan</dt>
-                                <div class="flex flex-wrap gap-2">
-                                    <button 
-                                        type="button"
-                                        v-for="(att, idx) in ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof')" 
-                                        :key="att.id"
-                                        @click="openImagePreview(ticket.attachments.filter((a: any) => a.attachment_type === 'resolution_proof').map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                        class="inline-flex items-center gap-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:text-emerald-700 hover:border-slate-300 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
-                                    >
-                                        <Paperclip class="w-3.5 h-3.5 text-slate-400" />
-                                        <span class="truncate max-w-[200px]">{{ att.file_name }}</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
 
-                    <!-- SEKSI 4: EVALUASI KEPUASAN LAYANAN (CSAT) (Bila status Closed) -->
+                    <!-- SEKSI 3: EVALUASI KEPUASAN LAYANAN (CSAT) (Bila status Closed) -->
                     <div v-if="ticket.status === 'closed'">
                         <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
                             Evaluasi Kepuasan Layanan (CSAT)

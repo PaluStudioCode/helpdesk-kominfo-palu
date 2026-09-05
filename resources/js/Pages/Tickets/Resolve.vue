@@ -12,7 +12,8 @@ import FileUpload from '@/Components/FileUpload.vue';
 import { 
     getPriorityLabel, 
     getPriorityColor, 
-    formatDateWithWita as formatDate 
+    formatDateWithWita as formatDate,
+    getRevisionInfo 
 } from '@/lib/ticket-helpers';
 import {
     Select,
@@ -22,16 +23,28 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     ArrowLeft,
     Plus,
     Trash2,
+    RotateCcw,
+    CheckCircle2,
 } from 'lucide-vue-next';
 
 const props = defineProps<{
     ticket: any;
+    categoriesMap?: Record<string, Array<{ id: number; name: string; infrastructure_type?: string }>>;
     availableDevices?: string[];
     availableMaterials?: Array<{ name: string; default_unit: string }>;
 }>();
+
+const revisionInfo = computed(() => getRevisionInfo(props.ticket));
 
 // Default device options if not in DB
 const defaultAffectedDeviceOptions = [
@@ -190,11 +203,15 @@ const selectedTestResult = ref<string>(
 
 const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.materials_used));
 
+const initialInfra = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
+const initialCategoryId = props.ticket.category_id || (props.categoriesMap?.[initialInfra]?.[0]?.id ?? null);
+
 const form = useForm({
     affected_device: initialDevice,
     actual_repair_location: props.ticket.actual_repair_location || props.ticket.location_details || '',
-    infrastructure_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
-    network_type: props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic',
+    infrastructure_type: initialInfra,
+    network_type: initialInfra,
+    category_id: initialCategoryId,
     inspection_result: props.ticket.inspection_result || '',
     root_cause: props.ticket.root_cause || '',
     action_taken: props.ticket.action_taken || '',
@@ -203,6 +220,35 @@ const form = useForm({
     test_parameters: props.ticket.test_parameters || '',
     notes: props.ticket.resolution_note || '',
     resolution_proofs: [] as File[],
+});
+
+const availableCategories = computed(() => {
+    if (!props.categoriesMap || !form.infrastructure_type) return [];
+    return props.categoriesMap[form.infrastructure_type] || [];
+});
+
+const onInfrastructureChange = (val: string) => {
+    form.infrastructure_type = val;
+    form.network_type = val;
+
+    const categories = props.categoriesMap?.[val] || [];
+    if (categories.length > 0) {
+        const exists = categories.some((c: any) => Number(c.id) === Number(form.category_id));
+        if (!exists) {
+            form.category_id = categories[0].id;
+        }
+    } else {
+        form.category_id = null;
+    }
+};
+
+const selectedCategoryName = computed(() => {
+    if (!form.category_id || !props.categoriesMap) return '-';
+    for (const infra in props.categoriesMap) {
+        const cat = props.categoriesMap[infra].find((c: any) => Number(c.id) === Number(form.category_id));
+        if (cat) return cat.name;
+    }
+    return props.ticket.category?.name || '-';
 });
 
 const onSelectMaterial = (index: number, val: string) => {
@@ -270,17 +316,56 @@ watch(materialRows, () => {
     syncMaterialsUsed();
 }, { deep: true });
 
-const submitResolution = () => {
+const isConfirmModalOpen = ref(false);
+
+const openConfirmModal = () => {
+    form.clearErrors();
+    let hasError = false;
+
+    if (!form.actual_repair_location || !form.actual_repair_location.trim()) {
+        form.setError('actual_repair_location', 'Lokasi fisik penanganan wajib diisi.');
+        hasError = true;
+    }
+    if (!form.action_taken || !form.action_taken.trim()) {
+        form.setError('action_taken', 'Uraian tindakan perbaikan wajib diisi.');
+        hasError = true;
+    }
+    if (!selectedAffectedDevice.value) {
+        form.setError('affected_device', 'Perangkat terdampak wajib dipilih.');
+        hasError = true;
+    }
+    if (!form.category_id) {
+        form.setError('category_id', 'Kategori masalah wajib dipilih.');
+        hasError = true;
+    }
+
+    if (hasError) return;
+
     form.affected_device = selectedAffectedDevice.value;
     form.test_result = selectedTestResult.value;
     syncMaterialsUsed();
 
-    form.post(route('tickets.submit-resolution', props.ticket.id));
+    isConfirmModalOpen.value = true;
+};
+
+const handleFinalSubmit = () => {
+    form.affected_device = selectedAffectedDevice.value;
+    form.test_result = selectedTestResult.value;
+    syncMaterialsUsed();
+
+    form.post(route('tickets.submit-resolution', props.ticket.id), {
+        onSuccess: () => {
+            isConfirmModalOpen.value = false;
+        },
+        onError: () => {
+            isConfirmModalOpen.value = false;
+        }
+    });
 };
 </script>
 
 <template>
-    <Head :title="`Berita Acara - ${ticket.ticket_number}`" />
+    <Head :title="`Rincian Teknis & Penyelesaian - ${ticket.ticket_number}`" />
 
     <AuthenticatedLayout>
         <div class="max-w-5xl mx-auto space-y-4 pb-12">
@@ -292,15 +377,26 @@ const submitResolution = () => {
                     class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
                 >
                     <ArrowLeft class="w-3.5 h-3.5 mr-1.5" />
-                    Kembali ke Tiket {{ ticket.ticket_number }}
+                    Kembali ke Tiket
                 </Link>
                 <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                    Formulir Berita Acara & Penyelesaian Tiket
+                    Formulir Rincian Teknis & Penyelesaian Tiket
                 </h1>
             </div>
 
+            <!-- Banner Catatan Revisi (Jika Ada) -->
+            <div v-if="revisionInfo" class="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3 text-sm text-amber-900">
+                <RotateCcw class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div class="space-y-0.5 flex-1">
+                    <p class="font-bold text-amber-950">Permintaan Revisi</p>
+                    <p class="text-amber-800 text-xs sm:text-sm mt-0.5 leading-relaxed">
+                        {{ revisionInfo.instruction }}
+                    </p>
+                </div>
+            </div>
+
             <!-- Single Unified Docket Card (Format Dokumen Formal, Proporsional, dan Rapi) -->
-            <form @submit.prevent="submitResolution">
+            <form @submit.prevent="openConfirmModal">
                 <Card class="border-slate-200 shadow-xs bg-white rounded-xl overflow-hidden">
                     
                     <!-- Header Kartu Utama: Info Ringkas Tiket -->
@@ -327,33 +423,8 @@ const submitResolution = () => {
                     </div>
 
                     <CardContent class="p-5 sm:p-6 space-y-5">
-                        
-                        <!-- Panel Ringkas Informasi Tiket Rujukan -->
-                        <div class="p-3.5 bg-slate-50/80 rounded-lg border border-slate-200">
-                            <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                                <div>
-                                    <dt class="text-slate-500 font-medium">Instansi Pelapor</dt>
-                                    <dd class="text-slate-900 font-semibold mt-0.5 text-xs sm:text-sm truncate">{{ ticket.department?.name || '-' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-slate-500 font-medium">Nama Pelapor</dt>
-                                    <dd class="text-slate-900 font-semibold mt-0.5 text-xs sm:text-sm truncate">
-                                        {{ ticket.reporter?.name || ticket.user?.name || '-' }}
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="text-slate-500 font-medium">Lokasi / Ruangan</dt>
-                                    <dd class="text-slate-800 mt-0.5 text-xs sm:text-sm truncate">{{ ticket.location_details || '-' }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-slate-500 font-medium">Batas Waktu (SLA)</dt>
-                                    <dd class="text-slate-800 font-semibold mt-0.5 text-xs sm:text-sm">{{ ticket.due_at ? formatDate(ticket.due_at) : '-' }}</dd>
-                                </div>
-                            </dl>
-                        </div>
-
-                        <!-- Baris 1: Identifikasi Perangkat, Lokasi Riil & Jenis Infrastruktur (3 Kolom Seimbang) -->
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <!-- Baris 1: Identifikasi Lapangan & Klasifikasi Kendala (4 Kolom) -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
                                 <InputLabel value="Perangkat / Komponen Terdampak *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
                                 <Select v-model="selectedAffectedDevice">
@@ -370,7 +441,7 @@ const submitResolution = () => {
                             </div>
 
                             <div>
-                                <InputLabel for="actual_repair_location" value="Titik Lokasi Riil Perbaikan *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
+                                <InputLabel for="actual_repair_location" value="Titik Lokasi Perbaikan *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
                                 <Input 
                                     id="actual_repair_location"
                                     type="text" 
@@ -383,13 +454,10 @@ const submitResolution = () => {
                             </div>
 
                             <div>
-                                <InputLabel value="Jenis Infrastruktur Riil *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
+                                <InputLabel value="Jenis Infrastruktur *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
                                 <Select 
                                     :modelValue="form.infrastructure_type"
-                                    @update:modelValue="(val: any) => {
-                                        form.infrastructure_type = val;
-                                        form.network_type = val;
-                                    }"
+                                    @update:modelValue="onInfrastructureChange"
                                 >
                                     <SelectTrigger class="bg-white h-9 text-xs">
                                         <SelectValue placeholder="Pilih Jenis Infrastruktur" />
@@ -403,6 +471,31 @@ const submitResolution = () => {
                                     </SelectContent>
                                 </Select>
                                 <InputError :message="form.errors.infrastructure_type" class="mt-1" />
+                            </div>
+
+                            <div>
+                                <InputLabel value="Kategori Masalah *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
+                                <Select 
+                                    :modelValue="form.category_id ? String(form.category_id) : ''"
+                                    @update:modelValue="(val: string) => form.category_id = Number(val)"
+                                >
+                                    <SelectTrigger class="bg-white h-9 text-xs">
+                                        <SelectValue placeholder="Pilih Kategori Masalah" />
+                                    </SelectTrigger>
+                                    <SelectContent class="max-h-56">
+                                        <SelectItem 
+                                             v-for="cat in availableCategories" 
+                                            :key="cat.id" 
+                                            :value="String(cat.id)"
+                                        >
+                                            {{ cat.name }}
+                                        </SelectItem>
+                                        <SelectItem v-if="availableCategories.length === 0" value="none" disabled>
+                                            Pilih infrastruktur dahulu
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError :message="form.errors.category_id" class="mt-1" />
                             </div>
                         </div>
 
@@ -467,11 +560,11 @@ const submitResolution = () => {
                             </div>
 
                             <div>
-                                <InputLabel for="test_parameters" value="Parameter Pengujian (Nilai Riil) *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
+                                <InputLabel for="test_parameters" value="Parameter Pengujian *" class="text-xs font-semibold text-slate-700 block mb-1.5" />
                                 <Textarea 
                                     id="test_parameters" 
                                     v-model="form.test_parameters" 
-                                    rows="3"
+                                    rows="3" 
                                     placeholder="Cth: OPM -18.2 dBm / Ping 8.8.8.8 2ms (0% Loss) / Speedtest: Download 50 Mbps, Upload 20 Mbps..."
                                     class="bg-white text-xs font-mono"
                                     required
@@ -595,27 +688,77 @@ const submitResolution = () => {
                     <!-- Satu-Satunya Action Button di Paling Bawah Form -->
                     <div class="px-5 py-4 sm:px-6 sm:py-4 border-t border-slate-200 bg-slate-50/75 flex flex-col sm:flex-row items-center justify-between gap-3">
                         <span class="text-xs text-slate-500">
-                            Pastikan data berita acara terisi lengkap sebelum dikirim ke Admin Diskominfo.
+                            Pastikan data rincian teknis terisi lengkap sebelum dikirim ke Admin Diskominfo.
                         </span>
                         <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                             <Link :href="route('tickets.show', ticket.id)" class="w-full sm:w-auto">
-                                <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto">
+                                <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto cursor-pointer">
                                     Batal
                                 </Button>
                             </Link>
                             <Button 
-                                type="submit" 
+                                type="button" 
+                                @click="openConfirmModal"
                                 :disabled="form.processing || !form.action_taken || !selectedAffectedDevice || !form.actual_repair_location"
                                 size="sm"
-                                class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium w-full sm:w-auto px-5"
+                                class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium w-full sm:w-auto px-5 cursor-pointer"
                             >
-                                {{ form.processing ? 'Mengirim...' : 'Kirim' }}
+                                <CheckCircle2 class="w-4 h-4 mr-1.5" />
+                                Kirim Laporan Perbaikan
                             </Button>
                         </div>
                     </div>
 
                 </Card>
             </form>
+
+            <!-- Modal Konfirmasi Kirim Laporan Perbaikan (Teknisi) -->
+            <Dialog v-model:open="isConfirmModalOpen">
+                <DialogContent class="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <DialogTitle class="flex items-center gap-2 text-slate-900">
+                            <CheckCircle2 class="w-5 h-5 text-emerald-600" />
+                            Konfirmasi Kirim Laporan Perbaikan
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div class="py-2 text-xs">
+                        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2 text-slate-700">
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Lokasi Penanganan:</span>
+                                <span class="font-semibold text-slate-900 text-right">{{ form.actual_repair_location || '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Perangkat Terdampak:</span>
+                                <span class="font-semibold text-slate-900 text-right">{{ selectedAffectedDevice || '-' }}</span>
+                            </div>
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Infrastruktur & Kategori:</span>
+                                <span class="font-semibold text-slate-900 text-right">{{ form.infrastructure_type }} — {{ selectedCategoryName }}</span>
+                            </div>
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Hasil Uji Koneksi:</span>
+                                <span class="font-semibold text-emerald-700 text-right">{{ selectedTestResult }}</span>
+                            </div>
+                            <div class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Foto Dokumentasi:</span>
+                                <span class="font-semibold text-slate-900 text-right">{{ form.resolution_proofs.length }} berkas foto</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button 
+                            type="button" 
+                            @click="handleFinalSubmit" 
+                            :disabled="form.processing"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium cursor-pointer w-full sm:w-auto"
+                        >
+                            {{ form.processing ? 'Mengirim...' : 'Ya, Kirim Laporan' }}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
         </div>
     </AuthenticatedLayout>

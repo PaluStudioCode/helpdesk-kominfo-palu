@@ -246,6 +246,7 @@ class TicketController extends Controller
             'technicians:id,name,phone_number',
             'category:id,name,infrastructure_type',
             'attachments',
+            'statusHistories.changer:id,name,role',
         ]);
 
         $categories = TicketCategory::where('status', 'active')
@@ -271,15 +272,15 @@ class TicketController extends Controller
     }
 
     /**
-     * Show the dedicated read-only Berita Acara & technical details document page.
+     * Show the dedicated read-only technical details document page.
      */
-    public function beritaAcara(Ticket $ticket)
+    public function rincianTeknis(Ticket $ticket)
     {
         $this->authorize('view', $ticket);
 
         $user = auth()->user();
         if (!in_array($user->role, ['admin', 'technician'])) {
-            abort(403, 'Hanya Administrator dan Tim Teknisi yang dapat mengakses Berita Acara teknis.');
+            abort(403, 'Hanya Administrator dan Tim Teknisi yang dapat mengakses rincian teknis.');
         }
 
         $ticket->load([

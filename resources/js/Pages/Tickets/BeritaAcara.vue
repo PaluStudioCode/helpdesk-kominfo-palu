@@ -16,19 +16,14 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { 
-    getStatusLabel,
-    getStatusColor,
-    getPriorityLabel, 
-    getPriorityColor, 
     getInfrastructureLabel,
-    formatDateWithWita as formatDate 
+    formatDateWithWita as formatDate,
+    getRevisionInfo 
 } from '@/lib/ticket-helpers';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
 import {
     ArrowLeft,
     Paperclip,
-    CheckCircle2,
-    RotateCcw,
 } from 'lucide-vue-next';
 
 const props = defineProps<{
@@ -119,6 +114,8 @@ const approvalInfo = computed(() => {
     };
 });
 
+const revisionInfo = computed(() => getRevisionInfo(props.ticket));
+
 // Image preview gallery modal
 const previewModalOpen = ref(false);
 const previewImages = ref<Array<{ url: string; name: string }>>([]);
@@ -163,7 +160,7 @@ const submitRevision = () => {
 </script>
 
 <template>
-    <Head :title="`Berita Acara - #${ticket.ticket_number}`" />
+    <Head :title="`Rincian Teknis - #${ticket.ticket_number}`" />
 
     <AuthenticatedLayout>
         <div class="max-w-5xl mx-auto space-y-4 pb-12">
@@ -178,211 +175,183 @@ const submitRevision = () => {
                     Kembali ke Tiket {{ ticket.ticket_number }}
                 </Link>
                 <h1 class="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                    Berita Acara & Rincian Teknis Penanganan
+                    Rincian Teknis Penanganan
                 </h1>
             </div>
 
-            <!-- Main Unified Docket Card (Format Dokumen Formal & Rapi) -->
-            <Card class="border-slate-200 shadow-xs bg-white rounded-xl overflow-hidden">
+            <!-- Banner Catatan Revisi (Khusus Teknisi bila ada revisi aktif) -->
+            <div v-if="role === 'technician' && revisionInfo" class="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 space-y-1">
+                <p class="font-bold text-amber-950">Permintaan Revisi dari Administrator</p>
+                <p class="text-amber-800 text-xs sm:text-sm leading-relaxed">
+                    {{ revisionInfo.instruction }}
+                </p>
+            </div>
+
+            <!-- Main Technical Docket Card -->
+            <Card class="border-slate-200 shadow-xs bg-white rounded-xl">
                 
-                <!-- Header Kartu Utama -->
-                <div class="px-5 py-3.5 border-b border-slate-200 bg-slate-50/75 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div class="min-w-0">
-                        <span class="text-[11px] font-medium text-slate-500 block">Subjek Gangguan:</span>
-                        <h2 class="text-sm sm:text-base font-bold text-slate-900 tracking-tight leading-snug truncate">
-                            {{ ticket.title }}
-                        </h2>
-                    </div>
-                    <div class="flex items-center gap-3 shrink-0 text-xs sm:text-sm flex-wrap">
-                        <div>
-                            <span class="text-slate-400">Nomor:</span>
-                            <span class="font-mono font-bold text-slate-900 ml-1">{{ ticket.ticket_number }}</span>
-                        </div>
-                        <span class="text-slate-300">•</span>
-                        <div>
-                            <span class="text-slate-400">Status:</span>
-                            <span :class="['ml-1 font-medium', getStatusColor(ticket.status)]">
-                                {{ getStatusLabel(ticket.status) }}
-                            </span>
-                        </div>
-                        <span class="text-slate-300">•</span>
-                        <div>
-                            <span class="text-slate-400">Prioritas:</span>
-                            <span :class="['font-semibold ml-1', getPriorityColor(ticket.priority)]">
-                                {{ getPriorityLabel(ticket.priority) }}
-                            </span>
-                        </div>
-                    </div>
+                <!-- Header Kartu: Judul Dokumen -->
+                <div class="px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                    <h2 class="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                        Dokumen Rincian Teknis
+                    </h2>
+                    <span class="font-mono text-xs font-semibold text-slate-500">
+                        #{{ ticket.ticket_number }}
+                    </span>
                 </div>
 
                 <CardContent class="p-5 sm:p-6 space-y-5">
                     
-                    <!-- Panel Ringkas Informasi Tiket Rujukan -->
-                    <div class="p-3.5 bg-slate-50/80 rounded-lg border border-slate-200">
-                        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <!-- SEKSI 1: IDENTIFIKASI TEKNIS LAPANGAN -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
+                            Identifikasi Teknis Lapangan
+                        </h3>
+
+                        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-3 gap-x-5">
                             <div>
-                                <dt class="text-slate-500 font-medium">Instansi Pelapor</dt>
-                                <dd class="text-slate-900 font-semibold mt-0.5 text-xs sm:text-sm truncate">{{ ticket.department?.name || '-' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500 font-medium">Nama Pelapor</dt>
-                                <dd class="text-slate-900 font-semibold mt-0.5 text-xs sm:text-sm truncate">{{ ticket.reporter?.name || ticket.user?.name || '-' }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-slate-500 font-medium">Tim Teknisi Lapangan</dt>
-                                <dd class="text-slate-900 font-medium mt-0.5 text-xs sm:text-sm truncate">
-                                    <span v-if="ticket.technicians && ticket.technicians.length > 0">
-                                        {{ ticket.technicians.map((t: any) => t.name).join(', ') }}
-                                    </span>
-                                    <span v-else-if="ticket.assignee">
-                                        {{ ticket.assignee.name }}
-                                    </span>
-                                    <span v-else class="text-slate-400 italic">
-                                        -
-                                    </span>
+                                <dt class="text-xs text-slate-500 font-medium">Perangkat / Komponen</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ ticket.affected_device || '-' }}
                                 </dd>
                             </div>
+
                             <div>
-                                <dt class="text-slate-500 font-medium">Waktu Selesai Penanganan</dt>
-                                <dd class="text-slate-800 font-semibold mt-0.5 text-xs sm:text-sm">{{ ticket.resolved_at ? formatDate(ticket.resolved_at) : '-' }}</dd>
+                                <dt class="text-xs text-slate-500 font-medium">Titik Lokasi Perbaikan</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ ticket.actual_repair_location || ticket.location_details || '-' }}
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Jenis Infrastruktur</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getInfrastructureLabel(ticket.infrastructure_type || ticket.network_type) : '-' }}
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Kategori Masalah</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ ticket.category?.name || '-' }}
+                                </dd>
                             </div>
                         </dl>
                     </div>
 
-                    <!-- Baris 1: Identifikasi Lapangan & Lokasi Riil -->
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200">
-                            <span class="text-[11px] font-medium text-slate-500 block">Perangkat / Komponen Terdampak</span>
-                            <span class="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5 block">
-                                {{ ticket.affected_device || '-' }}
-                            </span>
-                        </div>
+                    <!-- SEKSI 2: PEMERIKSAAN & TINDAKAN TEKNIS (Hasil Pemeriksaan, Penyebab Utama, Langkah Tindakan, Hasil Pengujian, Parameter) -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-3 border-b border-slate-200 uppercase tracking-wider">
+                            Pemeriksaan & Tindakan Teknis
+                        </h3>
 
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200">
-                            <span class="text-[11px] font-medium text-slate-500 block">Titik Lokasi Riil Perbaikan</span>
-                            <span class="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5 block">
-                                {{ ticket.actual_repair_location || ticket.location_details || '-' }}
-                            </span>
-                        </div>
+                        <dl class="grid grid-cols-1 md:grid-cols-2 gap-y-3.5 gap-x-5">
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Hasil Pemeriksaan Awal (Kondisi Lapangan)</dt>
+                                <dd class="text-sm text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
+                                    {{ ticket.inspection_result || '-' }}
+                                </dd>
+                            </div>
 
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200">
-                            <span class="text-[11px] font-medium text-slate-500 block">Jenis Infrastruktur Riil</span>
-                            <span class="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5 block">
-                                {{ (ticket.infrastructure_type || ticket.network_type) ? getInfrastructureLabel(ticket.infrastructure_type || ticket.network_type) : '-' }}
-                            </span>
-                        </div>
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Penyebab Utama Gangguan (Root Cause)</dt>
+                                <dd class="text-sm text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
+                                    {{ ticket.root_cause || '-' }}
+                                </dd>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <dt class="text-xs text-slate-500 font-medium">Rincian Tindakan Penanganan / Perbaikan</dt>
+                                <dd class="text-sm font-mono text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
+                                    {{ ticket.action_taken || ticket.resolution_note || '-' }}
+                                </dd>
+                                <div v-if="ticket.resolution_note && ticket.action_taken && ticket.resolution_note !== ticket.action_taken" class="mt-2 text-xs text-slate-600">
+                                    <span class="font-medium text-slate-700">Catatan Tambahan:</span> {{ ticket.resolution_note }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Status Hasil Pengujian</dt>
+                                <dd class="text-sm font-semibold text-slate-900 mt-0.5">
+                                    {{ ticket.test_result || 'Normal / Berfungsi Baik' }}
+                                </dd>
+                            </div>
+
+                            <div>
+                                <dt class="text-xs text-slate-500 font-medium">Parameter Pengujian</dt>
+                                <dd class="text-sm font-mono text-slate-800 whitespace-pre-wrap mt-0.5">
+                                    {{ ticket.test_parameters || '-' }}
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
 
-                    <!-- Baris 2: Diagnosa Lapangan & Akar Masalah (2 Kolom Sejajar) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200 space-y-1">
-                            <span class="text-[11px] font-medium text-slate-500 block">Hasil Pemeriksaan Awal (Kondisi Lapangan)</span>
-                            <p class="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                                {{ ticket.inspection_result || '-' }}
-                            </p>
-                        </div>
+                    <!-- SEKSI 3: MATERIAL & SUKU CADANG (Format Ringkas, Tanpa Tabel & Tanpa Badge BG) -->
+                    <div>
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-2.5 border-b border-slate-200 uppercase tracking-wider">
+                            Material & Suku Cadang
+                        </h3>
 
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200 space-y-1">
-                            <span class="text-[11px] font-medium text-slate-500 block">Penyebab Utama Gangguan (Root Cause)</span>
-                            <p class="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                                {{ ticket.root_cause || '-' }}
-                            </p>
+                        <div v-if="parsedMaterialsList.length > 0" class="text-sm text-slate-800 flex flex-wrap gap-x-4 gap-y-1.5">
+                            <span v-for="(mat, idx) in parsedMaterialsList" :key="idx" class="inline-flex items-center gap-1.5">
+                                <span class="font-medium text-slate-900">{{ mat.material }}</span>
+                                <span class="text-slate-500 text-xs">({{ mat.quantity }} {{ mat.unit }})</span>
+                                <span v-if="idx < parsedMaterialsList.length - 1" class="text-slate-300 ml-2.5">•</span>
+                            </span>
                         </div>
-                    </div>
-
-                    <!-- Baris 3: Rincian Tindakan Penanganan / Perbaikan Teknis -->
-                    <div class="p-3.5 bg-slate-50/60 rounded-lg border border-slate-200 space-y-1.5">
-                        <span class="text-[11px] font-medium text-slate-500 block">Rincian Tindakan Penanganan / Perbaikan Teknis</span>
-                        <div class="text-xs sm:text-sm font-mono text-slate-800 leading-relaxed whitespace-pre-wrap">
-                            {{ ticket.action_taken || ticket.resolution_note || '-' }}
-                        </div>
-                        <div v-if="ticket.resolution_note && ticket.action_taken && ticket.resolution_note !== ticket.action_taken" class="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-600">
-                            <span class="font-semibold text-slate-800">Catatan Tambahan:</span> {{ ticket.resolution_note }}
-                        </div>
-                    </div>
-
-                    <!-- Baris 4: Material & Suku Cadang yang Digunakan -->
-                    <div class="space-y-1.5">
-                        <span class="text-xs font-semibold text-slate-700 block">Material & Suku Cadang yang Digunakan</span>
-                        <div v-if="parsedMaterialsList.length > 0" class="border border-slate-200 rounded-lg overflow-hidden">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600">
-                                    <tr>
-                                        <th class="py-2 px-3 font-semibold">Nama Barang / Suku Cadang</th>
-                                        <th class="py-2 px-3 font-semibold text-right w-36">Jumlah</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 bg-white">
-                                    <tr v-for="(mat, idx) in parsedMaterialsList" :key="idx">
-                                        <td class="py-2 px-3 text-slate-800">{{ mat.material }}</td>
-                                        <td class="py-2 px-3 text-right font-semibold text-slate-900">
-                                            {{ mat.quantity }} <span class="text-slate-500 font-normal">{{ mat.unit }}</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div v-else-if="ticket.materials_used" class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700">
+                        <p v-else-if="ticket.materials_used" class="text-sm text-slate-800">
                             {{ ticket.materials_used }}
-                        </div>
-                        <div v-else class="p-3 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-xs text-slate-400 italic text-center">
-                            Tidak ada material atau suku cadang yang digunakan dalam perbaikan ini.
-                        </div>
+                        </p>
+                        <p v-else class="text-xs text-slate-400 italic">
+                            Tidak ada material atau suku cadang yang digunakan dalam penanganan ini.
+                        </p>
                     </div>
 
-                    <!-- Baris 5: Hasil Pengujian & Parameter Teknis Akhir -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200">
-                            <span class="text-[11px] font-medium text-slate-500 block">Status Hasil Pengujian Akhir</span>
-                            <span class="text-xs sm:text-sm font-semibold text-emerald-700 mt-0.5 block">
-                                {{ ticket.test_result || 'Normal / Berfungsi Baik' }}
-                            </span>
-                        </div>
+                    <!-- SEKSI 4: DOKUMENTASI FOTO BUKTI PERBAIKAN -->
+                    <div v-if="resolutionProofs.length > 0">
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-2.5 border-b border-slate-200 uppercase tracking-wider">
+                            Dokumentasi Foto Bukti Perbaikan
+                        </h3>
 
-                        <div class="p-3 bg-slate-50/60 rounded-lg border border-slate-200 space-y-1">
-                            <span class="text-[11px] font-medium text-slate-500 block">Parameter Pengujian (Nilai Riil)</span>
-                            <p class="text-xs sm:text-sm font-mono text-slate-800 whitespace-pre-wrap leading-relaxed">
-                                {{ ticket.test_parameters || '-' }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <!-- Baris 6: Dokumentasi Foto Hasil Perbaikan Lapangan -->
-                    <div v-if="resolutionProofs.length > 0" class="space-y-2">
-                        <span class="text-xs font-semibold text-slate-700 block">Dokumentasi Foto Bukti Perbaikan Lapangan</span>
-                        <div class="flex flex-wrap gap-2.5">
+                        <div class="flex flex-wrap gap-2">
                             <button 
                                 type="button"
                                 v-for="(att, idx) in resolutionProofs" 
                                 :key="att.id"
                                 @click="openImagePreview(resolutionProofs.map((a: any) => ({ url: `/storage/${a.file_path}`, name: a.file_name })), idx)"
-                                class="inline-flex items-center gap-2 px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 hover:text-kominfo-primary hover:border-slate-300 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
+                                class="inline-flex items-center gap-2 px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:text-slate-900 hover:border-slate-300 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
                             >
                                 <Paperclip class="w-3.5 h-3.5 text-slate-400" />
-                                <span class="truncate max-w-[220px] font-medium">{{ att.file_name }}</span>
+                                <span class="truncate max-w-[200px]">{{ att.file_name }}</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Baris 7: Pengesahan & Verifikasi Mutu Admin (Bila Selesai / Closed) -->
-                    <div v-if="approvalInfo" class="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1 text-xs">
-                        <div class="flex flex-wrap items-center justify-between gap-2 text-slate-500">
-                            <span class="font-semibold text-slate-800">Verifikator Mutu: {{ approvalInfo.adminName }}</span>
-                            <span v-if="approvalInfo.approvedAt" class="font-mono text-[11px] text-slate-500">{{ formatDate(approvalInfo.approvedAt) }}</span>
+                    <!-- SEKSI 5: VERIFIKASI MUTU ADMINISTRATOR (Bila Tiket Telah Ditutup / Closed) -->
+                    <div v-if="approvalInfo">
+                        <h3 class="text-xs font-bold text-slate-900 pb-1.5 mb-2.5 border-b border-slate-200 uppercase tracking-wider">
+                            Verifikasi Mutu Administrator
+                        </h3>
+
+                        <div class="space-y-1 text-xs">
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-slate-500">
+                                <span class="font-semibold text-slate-800 text-sm">Verifikator: {{ approvalInfo.adminName }}</span>
+                                <span v-if="approvalInfo.approvedAt" class="font-mono text-xs text-slate-500">{{ formatDate(approvalInfo.approvedAt) }}</span>
+                            </div>
+                            <p class="text-slate-700 text-sm italic pt-0.5">"{{ approvalInfo.comment }}"</p>
                         </div>
-                        <p class="text-slate-800 italic pt-1">"{{ approvalInfo.comment }}"</p>
                     </div>
 
                 </CardContent>
 
                 <!-- Footer Aksi -->
-                <div class="px-5 py-4 sm:px-6 sm:py-4 border-t border-slate-200 bg-slate-50/75 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="px-5 py-4 sm:px-6 sm:py-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <div class="text-xs text-slate-500">
-                        Dokumen Berita Acara Perbaikan Resmi Diskominfo Kota Palu.
+                        Dokumen Rincian Teknis Resmi Diskominfo Kota Palu.
                     </div>
                     <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                         <Link :href="route('tickets.show', ticket.id)" class="w-full sm:w-auto">
-                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto">
+                            <Button type="button" variant="outline" size="sm" class="w-full sm:w-auto cursor-pointer">
                                 Kembali ke Detail Tiket
                             </Button>
                         </Link>
@@ -392,22 +361,20 @@ const submitRevision = () => {
                             v-if="canRequestRevision" 
                             type="button" 
                             variant="outline" 
-                            size="sm"
+                            size="sm" 
                             @click="isRevisionModalOpen = true"
-                            class="border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 w-full sm:w-auto"
+                            class="border-amber-300 text-amber-900 bg-amber-50 hover:bg-amber-100 w-full sm:w-auto cursor-pointer font-medium"
                         >
-                            <RotateCcw class="w-3.5 h-3.5 mr-1 text-amber-700" />
                             Minta Revisi
                         </Button>
 
                         <Button 
                             v-if="canApprove" 
                             type="button" 
-                            size="sm"
+                            size="sm" 
                             @click="isApproveModalOpen = true"
-                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium w-full sm:w-auto"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium w-full sm:w-auto cursor-pointer shadow-xs"
                         >
-                            <CheckCircle2 class="w-3.5 h-3.5 mr-1" />
                             Setujui Hasil Kerja
                         </Button>
                     </div>
@@ -457,7 +424,7 @@ const submitRevision = () => {
                 <DialogHeader>
                     <DialogTitle>Permintaan Revisi / Perbaikan Ulang</DialogTitle>
                     <DialogDescription>
-                        Tiket akan dikembalikan ke tim teknisi untuk dilakukan perbaikan ulang atau melengkapi data berita acara.
+                        Tiket akan dikembalikan ke tim teknisi untuk dilakukan perbaikan ulang atau melengkapi data rincian teknis.
                     </DialogDescription>
                 </DialogHeader>
 

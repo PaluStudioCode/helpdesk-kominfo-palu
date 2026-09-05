@@ -236,3 +236,41 @@ export const getSlaStatus = (ticket: Partial<Ticket>): { label: string; color: s
         return { status: 'on_track', label: 'Dalam Target', color: 'text-emerald-600 font-medium' };
     }
 };
+
+/**
+ * Helper untuk mengekstrak informasi revisi aktif (jika tiket dalam status in_progress setelah diminta revisi).
+ */
+export const getRevisionInfo = (ticket: any): { adminName: string; instruction: string; requestedAt: string } | null => {
+    if (!ticket || ticket.status !== 'in_progress' || !ticket.status_histories || !Array.isArray(ticket.status_histories)) {
+        return null;
+    }
+
+    const revisionHistories = ticket.status_histories.filter((h: any) => 
+        h.previous_status === 'pending_approval' && h.new_status === 'in_progress'
+    );
+
+    if (revisionHistories.length === 0) return null;
+
+    const latestRevision = revisionHistories.reduce((prev: any, curr: any) => {
+        return (new Date(curr.created_at).getTime() > new Date(prev.created_at).getTime()) ? curr : prev;
+    }, revisionHistories[0]);
+
+    // Pastikan tidak ada transisi status pending_approval atau closed setelah riwayat revisi ini
+    const newerTransitions = ticket.status_histories.some((h: any) => 
+        new Date(h.created_at).getTime() > new Date(latestRevision.created_at).getTime() &&
+        ['pending_approval', 'closed'].includes(h.new_status)
+    );
+    if (newerTransitions) return null;
+
+    let instruction = latestRevision.comment || '';
+    if (instruction.startsWith('Admin meminta perbaikan ulang/revisi. Instruksi: ')) {
+        instruction = instruction.replace('Admin meminta perbaikan ulang/revisi. Instruksi: ', '');
+    }
+
+    return {
+        adminName: latestRevision.changer?.name || 'Administrator Diskominfo',
+        instruction: instruction,
+        requestedAt: latestRevision.created_at,
+    };
+};
+

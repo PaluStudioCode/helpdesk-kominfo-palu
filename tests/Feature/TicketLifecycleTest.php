@@ -202,7 +202,7 @@ class TicketLifecycleTest extends TestCase
             'action_taken' => 'Splicing FO dan penggantian dropcore',
         ]);
 
-        $response = $this->actingAs($tech)->get("/tickets/{$ticket->id}/berita-acara");
+        $response = $this->actingAs($tech)->get("/tickets/{$ticket->id}/rincian-teknis");
 
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
@@ -211,7 +211,7 @@ class TicketLifecycleTest extends TestCase
         );
 
         $admin = $this->createAdmin();
-        $adminResponse = $this->actingAs($admin)->get("/tickets/{$ticket->id}/berita-acara");
+        $adminResponse = $this->actingAs($admin)->get("/tickets/{$ticket->id}/rincian-teknis");
         $adminResponse->assertOk();
         $adminResponse->assertInertia(fn ($page) => $page
             ->component('Tickets/BeritaAcara')

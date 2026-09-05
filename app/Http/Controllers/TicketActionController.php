@@ -505,7 +505,7 @@ class TicketActionController extends Controller
             // Dispatch Notification
             NotificationDispatcher::ticketClosed($lockedTicket);
 
-            return back()->with('success', 'Hasil perbaikan disetujui dan tiket resmi ditutup.');
+            return redirect()->route('tickets.show', $lockedTicket->id)->with('success', 'Hasil perbaikan disetujui dan tiket resmi ditutup.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -563,7 +563,7 @@ class TicketActionController extends Controller
             // Dispatch Notification
             NotificationDispatcher::ticketRevision($lockedTicket, $validated['comment']);
 
-            return back()->with('success', 'Instruksi revisi telah dikirimkan ke tim teknisi.');
+            return redirect()->route('tickets.show', $lockedTicket->id)->with('success', 'Instruksi revisi telah dikirimkan ke tim teknisi.');
 
         } catch (\Exception $e) {
             DB::rollBack();
