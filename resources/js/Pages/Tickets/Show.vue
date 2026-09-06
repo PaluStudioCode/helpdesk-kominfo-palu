@@ -94,6 +94,11 @@ const isDepartmentMatch = computed(() => {
     return Number(currentUser.value.department_id) === Number(props.ticket.department_id);
 });
 
+const isLeadTechnician = computed(() => {
+    if (!currentUser.value) return false;
+    return Number(props.ticket.assigned_to) === Number(currentUser.value.id);
+});
+
 const isAssignedTechnician = computed(() => {
     if (!currentUser.value) return false;
     if (Number(props.ticket.assigned_to) === Number(currentUser.value.id)) return true;
@@ -135,7 +140,7 @@ const canCancelByReporter = computed(() => props.ticket.status === 'pending_admi
 const canResubmit = computed(() => props.ticket.status === 'cancelled' && role.value === 'opd_user' && isDepartmentMatch.value && isWithin72Hours.value);
 const canHold = computed(() => props.ticket.status === 'in_progress' && role.value === 'admin');
 const canResume = computed(() => props.ticket.status === 'on_hold' && role.value === 'admin');
-const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && role.value === 'technician' && isAssignedTechnician.value);
+const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && role.value === 'technician' && isLeadTechnician.value);
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
@@ -1142,11 +1147,16 @@ onUnmounted(() => {
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Tim Teknisi Lapangan</dt>
                                 <dd class="text-sm text-slate-900 mt-0.5">
-                                    <span v-if="ticket.technicians && ticket.technicians.length > 0">
-                                        {{ ticket.technicians.map((t: any) => t.name).join(', ') }}
-                                    </span>
-                                    <span v-else-if="ticket.assignee">
-                                        {{ ticket.assignee.name }}
+                                    <template v-if="ticket.technicians && ticket.technicians.length > 0">
+                                        <span v-for="(t, idx) in ticket.technicians" :key="t.id">
+                                            <span :class="Number(t.id) === Number(ticket.assigned_to) ? 'font-bold text-slate-950' : 'text-slate-700'">
+                                                {{ t.name }}<span v-if="Number(t.id) === Number(ticket.assigned_to)" class="text-[11px] font-semibold text-amber-700 ml-0.5">(Lead)</span>
+                                            </span>
+                                            <span v-if="idx < ticket.technicians.length - 1" class="text-slate-300 mx-1.5">•</span>
+                                        </span>
+                                    </template>
+                                    <span v-else-if="ticket.assignee" class="font-semibold text-slate-900">
+                                        {{ ticket.assignee.name }} <span class="text-[11px] font-semibold text-amber-700 ml-0.5">(Lead)</span>
                                     </span>
                                     <span v-else class="text-slate-400 italic">
                                         Belum ditugaskan

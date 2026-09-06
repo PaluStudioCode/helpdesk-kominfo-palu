@@ -93,4 +93,30 @@ class TicketSecurityTest extends TestCase
         $response = $this->actingAs($admin)->get("/tickets/{$ticket->id}");
         $response->assertStatus(200);
     }
+
+    public function test_non_lead_team_technician_cannot_submit_resolution_while_lead_can(): void
+    {
+        $techLead = $this->createTechnician();
+        $techMember = $this->createTechnician();
+
+        $ticket = $this->createTicket([
+            'status' => 'in_progress',
+            'assigned_to' => $techLead->id,
+        ]);
+        $ticket->technicians()->attach([$techLead->id, $techMember->id]);
+
+        // Non-lead member attempts to submit -> 403 Forbidden
+        $responseMember = $this->actingAs($techMember)->post("/tickets/{$ticket->id}/submit-resolution", [
+            'action_taken' => 'Pekerjaan oleh anggota tim.',
+        ]);
+        $responseMember->assertStatus(403);
+
+        // Lead technician attempts to submit -> Success
+        $responseLead = $this->actingAs($techLead)->post("/tickets/{$ticket->id}/submit-resolution", [
+            'action_taken' => 'Pekerjaan diselesaikan dan disahkan oleh Lead.',
+        ]);
+        $responseLead->assertSessionHasNoErrors();
+        $ticket->refresh();
+        $this->assertEquals('pending_approval', $ticket->status);
+    }
 }

@@ -131,7 +131,7 @@ class TicketPolicy
 
     /**
      * Determine whether the user can submit resolution for the ticket.
-     * Only assigned technician in the team on in_progress status.
+     * Only the Lead Technician (assigned_to) on in_progress status.
      */
     public function submitResolution(User $user, Ticket $ticket): Response
     {
@@ -140,12 +140,11 @@ class TicketPolicy
         }
 
         if ($user->role === 'technician') {
-            $isAssigned = $ticket->assigned_to === $user->id 
-                || $ticket->technicians()->where('user_id', $user->id)->exists();
+            $isLead = (int) $ticket->assigned_to === (int) $user->id;
 
-            return $isAssigned 
+            return $isLead 
                 ? Response::allow() 
-                : Response::deny('Anda bukan anggota tim teknisi penanggung jawab tiket ini.');
+                : Response::deny('Hanya Ketua / Koordinator Tim Teknisi (Lead) yang berwenang mengirimkan laporan penyelesaian.');
         }
 
         return Response::deny('Hanya teknisi penanggung jawab lapangan yang berwenang mengirimkan berita acara penyelesaian.');
