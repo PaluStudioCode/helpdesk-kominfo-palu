@@ -54,11 +54,12 @@ class MasterDataSeeder extends Seeder
             );
         }
 
-        // 3. Master Categories, Departments (with OPD Accounts), Devices & Materials
+        // 3. Master Categories, Departments (with OPD Accounts), Devices, Materials & Vendors
         $this->call([
             TicketCategorySeeder::class,
             DepartmentSeeder::class,
             NetworkDeviceAndMaterialSeeder::class,
+            VendorSeeder::class,
         ]);
     }
 }

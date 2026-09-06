@@ -693,14 +693,21 @@ class TicketActionController extends Controller
         $this->authorize('hold', $ticket);
 
         $validated = $request->validate([
+            'priority' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['emergency', 'high', 'medium', 'low'])],
             'hold_reason_category' => ['required', 'string', \Illuminate\Validation\Rule::in([
-                'vendor_isp',
-                'material_procurement',
-                'access_permit',
+                'safety_weather',
                 'weather_force_majeure',
+                'access_permit',
+                'material_procurement',
+                'external_escalation',
+                'vendor_isp',
                 'need_escalation',
             ])],
-            'hold_reason_note' => ['required', 'string', 'min:5', 'max:1000'],
+            'hold_reason_note' => ['required', 'string', 'min:3', 'max:1000'],
+            'next_action' => ['nullable', 'string', 'max:1000'],
+            'external_party_name' => ['nullable', 'string', 'max:150'],
+            'external_party_contact' => ['nullable', 'string', 'max:150'],
+            'external_ticket_number' => ['nullable', 'string', 'max:100'],
         ]);
 
         $user = $request->user();
@@ -715,33 +722,82 @@ class TicketActionController extends Controller
             }
 
             $categoryLabels = [
-                'vendor_isp' => 'Ketergantungan Pihak Ketiga (Vendor ISP / Telkom / PLN)',
-                'material_procurement' => 'Ketiadaan Material & Suku Cadang (Menunggu Pengadaan)',
+                'safety_weather' => 'Faktor Keamanan dan Cuaca Ekstrem',
+                'weather_force_majeure' => 'Faktor Keamanan dan Cuaca Ekstrem',
                 'access_permit' => 'Kendala Izin Akses Fisik / Kunci Lokasi',
-                'weather_force_majeure' => 'Faktor Keamanan & Cuaca Ekstrem',
-                'need_escalation' => 'Eskalasi ke Tim Ahli / Network Engineer',
+                'material_procurement' => 'Ketiadaan Material & Suku Cadang',
+                'external_escalation' => 'Perlu Eskalasi ke Pihak Luar',
+                'vendor_isp' => 'Perlu Eskalasi ke Pihak Luar',
+                'need_escalation' => 'Perlu Eskalasi ke Pihak Luar',
             ];
             $catLabel = $categoryLabels[$validated['hold_reason_category']] ?? $validated['hold_reason_category'];
 
-            $lockedTicket->update([
+            $noteParts = [];
+            if (!empty($validated['external_party_name'])) {
+                $extInfo = "Pihak Luar: {$validated['external_party_name']}";
+                if (!empty($validated['external_party_contact'])) {
+                    $extInfo .= " (Kontak: {$validated['external_party_contact']})";
+                }
+                if (!empty($validated['external_ticket_number'])) {
+                    $extInfo .= " [No. Tiket/Ref: {$validated['external_ticket_number']}]";
+                }
+                $noteParts[] = $extInfo;
+            }
+
+            $noteParts[] = "Keterangan Alasan: " . $validated['hold_reason_note'];
+
+            if (!empty($validated['next_action'])) {
+                $noteParts[] = "Tindakan Selanjutnya: " . $validated['next_action'];
+            }
+
+            $noteContent = implode("\n", $noteParts);
+
+            $oldPriority = $lockedTicket->priority;
+            $newPriority = $validated['priority'] ?? $oldPriority;
+            $priorityChanged = !empty($newPriority) && ($newPriority !== $oldPriority);
+
+            $updateData = [
                 'status' => 'on_hold',
                 'hold_reason_category' => $validated['hold_reason_category'],
-                'hold_reason_note' => $validated['hold_reason_note'],
+                'hold_reason_note' => $noteContent,
                 'hold_started_at' => now(),
-            ]);
+            ];
+
+            if ($priorityChanged) {
+                $updateData['priority'] = $newPriority;
+            }
+
+            $lockedTicket->update($updateData);
+
+            $priorityLabels = [
+                'emergency' => 'Darurat (Emergency)',
+                'high' => 'Tinggi (High)',
+                'medium' => 'Sedang (Medium)',
+                'low' => 'Rendah (Low)',
+            ];
+            $oldPriorityLabel = $priorityLabels[$oldPriority] ?? ucfirst($oldPriority ?? '-');
+            $newPriorityLabel = $priorityLabels[$newPriority] ?? ucfirst($newPriority ?? '-');
+
+            $historyComment = "Admin menjeda pengerjaan ({$catLabel}). Catatan: {$noteContent}";
+            if ($priorityChanged) {
+                $historyComment = "Admin menjeda pengerjaan ({$catLabel}). Prioritas disesuaikan dari {$oldPriorityLabel} ke {$newPriorityLabel}. Catatan: {$noteContent}";
+            }
 
             // Status History
             $history = $lockedTicket->statusHistories()->create([
                 'changed_by' => $user->id,
                 'previous_status' => 'in_progress',
                 'new_status' => 'on_hold',
-                'comment' => "Pengerjaan dijeda ({$catLabel}). Catatan: {$validated['hold_reason_note']}",
+                'comment' => $historyComment,
                 'created_at' => now(),
             ]);
 
             ActivityLogger::log('ticket.held', $lockedTicket, [
                 'category' => $validated['hold_reason_category'],
-                'note' => $validated['hold_reason_note'],
+                'note' => $noteContent,
+                'old_priority' => $oldPriority,
+                'new_priority' => $newPriority,
+                'priority_changed' => $priorityChanged,
             ], $user->id);
 
             DB::commit();
@@ -750,7 +806,12 @@ class TicketActionController extends Controller
 
             NotificationDispatcher::ticketHeld($lockedTicket, $catLabel, $validated['hold_reason_note']);
 
-            return back()->with('success', 'Status tiket berhasil diubah menjadi Tertunda (On-Hold). Timer SLA telah dijeda.');
+            $successMsg = 'Status tiket berhasil diubah menjadi Tertunda (On-Hold). Timer SLA telah dijeda.';
+            if ($priorityChanged) {
+                $successMsg = "Status tiket berhasil ditunda (On-Hold) dan prioritas disesuaikan ke {$newPriorityLabel}. Timer SLA telah dijeda.";
+            }
+
+            return back()->with('success', $successMsg);
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan saat menunda tiket: ' . $e->getMessage());
@@ -782,14 +843,32 @@ class TicketActionController extends Controller
 
             $totalHold = ($lockedTicket->total_hold_duration_minutes ?? 0) + $holdDurationMinutes;
 
+            $slaHours = match ($lockedTicket->priority) {
+                'emergency' => 4,
+                'high' => 8,
+                'medium' => 24,
+                'low' => 48,
+                default => 24,
+            };
+
             $updateData = [
                 'status' => 'in_progress',
                 'hold_started_at' => null,
                 'total_hold_duration_minutes' => $totalHold,
             ];
 
-            // Shift due_at forward by hold duration if due_at exists
-            if ($lockedTicket->due_at) {
+            // Recalculate or shift due_at based on priority SLA and elapsed working time
+            if ($lockedTicket->assigned_at) {
+                $assignedAt = \Carbon\Carbon::parse($lockedTicket->assigned_at);
+                $totalMinutesSinceAssigned = max(0, (int) $assignedAt->diffInMinutes($holdStartedAt));
+                $previousHoldMinutes = (int) ($lockedTicket->total_hold_duration_minutes ?? 0);
+                $elapsedWorkingMinutes = max(0, $totalMinutesSinceAssigned - $previousHoldMinutes);
+
+                $totalSlaMinutes = $slaHours * 60;
+                $remainingSlaMinutes = max(0, $totalSlaMinutes - $elapsedWorkingMinutes);
+
+                $updateData['due_at'] = now()->addMinutes($remainingSlaMinutes);
+            } elseif ($lockedTicket->due_at) {
                 $updateData['due_at'] = \Carbon\Carbon::parse($lockedTicket->due_at)->addMinutes($holdDurationMinutes);
             }
 
@@ -800,13 +879,14 @@ class TicketActionController extends Controller
                 'changed_by' => $user->id,
                 'previous_status' => 'on_hold',
                 'new_status' => 'in_progress',
-                'comment' => "Pekerjaan lapangan dilanjutkan kembali. Durasi jeda: {$holdDurationMinutes} menit (Target SLA diperpanjang).",
+                'comment' => "Pekerjaan lapangan dilanjutkan kembali. Durasi jeda: {$holdDurationMinutes} menit (Target SLA disesuaikan).",
                 'created_at' => now(),
             ]);
 
             ActivityLogger::log('ticket.resumed', $lockedTicket, [
                 'hold_duration_minutes' => $holdDurationMinutes,
                 'total_hold_duration_minutes' => $totalHold,
+                'priority' => $lockedTicket->priority,
             ], $user->id);
 
             DB::commit();

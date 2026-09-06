@@ -179,8 +179,8 @@ const submitRevision = () => {
                 </h1>
             </div>
 
-            <!-- Banner Catatan Revisi (Khusus Teknisi bila ada revisi aktif) -->
-            <div v-if="role === 'technician' && revisionInfo" class="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 space-y-1">
+            <!-- Banner Catatan Revisi (Teknisi & Admin) -->
+            <div v-if="(role === 'admin' || role === 'technician') && revisionInfo" class="p-3.5 sm:p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 space-y-1">
                 <p class="font-bold text-amber-950">Permintaan Revisi dari Administrator</p>
                 <p class="text-amber-800 text-xs sm:text-sm leading-relaxed">
                     {{ revisionInfo.instruction }}

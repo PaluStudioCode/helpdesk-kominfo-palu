@@ -217,12 +217,12 @@ const slaData = computed(() => {
         </template>
         <template v-else-if="slaData.type === 'approaching'">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                <Hourglass class="w-3.5 h-3.5 text-amber-600 animate-spin" />
+                <Hourglass class="w-3.5 h-3.5 text-amber-600" />
                 <span>Sisa SLA: {{ slaData.digital }}</span>
             </span>
         </template>
         <template v-else-if="slaData.type === 'overdue'">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-rose-100 text-rose-700 border border-rose-200">
                 <AlertTriangle class="w-3.5 h-3.5 text-rose-600" />
                 <span>Overdue SLA: {{ slaData.digital }}</span>
             </span>
@@ -244,8 +244,8 @@ const slaData = computed(() => {
                     :class="slaData.color"
                 >
                     <Timer v-if="slaData.type === 'safe'" class="w-4 h-4 text-emerald-600" />
-                    <Hourglass v-else-if="slaData.type === 'approaching'" class="w-4 h-4 text-amber-600 animate-spin" />
-                    <AlertTriangle v-else class="w-4 h-4 text-rose-600 animate-pulse" />
+                    <Hourglass v-else-if="slaData.type === 'approaching'" class="w-4 h-4 text-amber-600" />
+                    <AlertTriangle v-else class="w-4 h-4 text-rose-600" />
                     <span>{{ slaData.digital }}</span>
                 </div>
             </div>
@@ -284,9 +284,9 @@ const slaData = computed(() => {
                         <span 
                             class="w-2 h-2 rounded-full"
                             :class="[
-                                slaData.type === 'overdue' ? 'bg-rose-600 animate-ping' :
-                                (slaData.type === 'approaching' ? 'bg-amber-600 animate-pulse' :
-                                (slaData.type === 'safe' ? 'bg-emerald-600 animate-pulse' :
+                                slaData.type === 'overdue' ? 'bg-rose-600' :
+                                (slaData.type === 'approaching' ? 'bg-amber-600' :
+                                (slaData.type === 'safe' ? 'bg-emerald-600' :
                                 (slaData.type === 'on_hold' ? 'bg-amber-600' : 'bg-slate-500')))
                             ]"
                         />

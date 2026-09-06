@@ -8,6 +8,7 @@ use App\Models\NetworkDevice;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
 use App\Models\User;
+use App\Models\Vendor;
 use App\Services\TicketService;
 use App\Http\Requests\StoreTicketRequest;
 use Illuminate\Http\Request;
@@ -222,12 +223,18 @@ class TicketController extends Controller
             ->select('name', 'default_unit')
             ->get();
 
+        $availableVendors = Vendor::where('status', 'active')
+            ->orderBy('name')
+            ->select('id', 'name', 'category', 'phone')
+            ->get();
+
         return Inertia::render('Tickets/Show', [
             'ticket' => $ticket,
             'categoriesMap' => $categories,
             'technicians' => $technicians,
             'availableDevices' => $availableDevices,
             'availableMaterials' => $availableMaterials,
+            'availableVendors' => $availableVendors,
             'initialUnreadCount' => $unreadRepliesCount,
         ]);
     }

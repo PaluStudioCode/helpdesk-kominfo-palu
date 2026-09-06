@@ -8,6 +8,7 @@ use App\Models\Material;
 use App\Models\NetworkDevice;
 use App\Models\TicketCategory;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -114,6 +115,30 @@ class MasterDataController extends Controller
         }
         $materials = $materialQuery->paginate(10, ['*'], 'mat_page')->withQueryString();
 
+        // 6. Vendors Query
+        $vendorQuery = Vendor::query();
+        if ($activeTab === 'vendors' && $request->has('search')) {
+            $search = $request->input('search');
+            $vendorQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('category', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('address', 'like', "%{$search}%");
+            });
+        }
+        if ($activeTab === 'vendors' && $request->has('vendor_category') && $request->input('vendor_category') !== 'all') {
+            $vendorQuery->where('category', $request->input('vendor_category'));
+        }
+        if ($activeTab === 'vendors' && $request->has('status') && $request->input('status') !== 'all') {
+            $vendorQuery->where('status', $request->input('status'));
+        }
+        if ($activeTab === 'vendors' && $request->has('sort')) {
+            $vendorQuery->orderBy($request->input('sort'), $request->input('direction', 'asc'));
+        } else {
+            $vendorQuery->orderBy('name', 'asc');
+        }
+        $vendors = $vendorQuery->paginate(10, ['*'], 'ven_page')->withQueryString();
+
         // All active departments for User Create/Edit dropdown
         $allDepartments = Department::select('id', 'name')->where('status', 'active')->orderBy('name')->get();
 
@@ -124,6 +149,7 @@ class MasterDataController extends Controller
             'users' => User::count(),
             'devices' => NetworkDevice::count(),
             'materials' => Material::count(),
+            'vendors' => Vendor::count(),
         ];
 
         return Inertia::render('Admin/MasterData/Index', [
@@ -133,9 +159,10 @@ class MasterDataController extends Controller
             'users' => $users,
             'devices' => $devices,
             'materials' => $materials,
+            'vendors' => $vendors,
             'counts' => $counts,
             'allDepartments' => $allDepartments,
-            'filters' => $request->only(['tab', 'search', 'sort', 'direction', 'role', 'infrastructure_type', 'network_type']),
+            'filters' => $request->only(['tab', 'search', 'sort', 'direction', 'role', 'infrastructure_type', 'network_type', 'vendor_category', 'status']),
         ]);
     }
 }

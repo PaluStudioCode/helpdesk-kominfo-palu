@@ -101,7 +101,7 @@ class TicketPolicy
 
     /**
      * Determine whether the user can put the ticket on hold.
-     * Only assigned technician in the team on in_progress status.
+     * Admin only on in_progress status.
      */
     public function hold(User $user, Ticket $ticket): Response
     {
@@ -109,21 +109,14 @@ class TicketPolicy
             return Response::deny('Tiket tidak sedang dalam status pengerjaan (In Progress).');
         }
 
-        if ($user->role === 'technician') {
-            $isAssigned = $ticket->assigned_to === $user->id 
-                || $ticket->technicians()->where('user_id', $user->id)->exists();
-
-            return $isAssigned 
-                ? Response::allow() 
-                : Response::deny('Hanya tim teknisi yang ditugaskan yang dapat menunda tiket ini.');
-        }
-
-        return Response::deny('Hanya teknisi penanggung jawab lapangan yang berwenang menunda penanganan tiket.');
+        return $user->role === 'admin'
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang berwenang menetapkan status penundaan penanganan tiket.');
     }
 
     /**
      * Determine whether the user can resume a held ticket.
-     * Only assigned technician in the team on on_hold status.
+     * Admin only on on_hold status.
      */
     public function resume(User $user, Ticket $ticket): Response
     {
@@ -131,16 +124,9 @@ class TicketPolicy
             return Response::deny('Tiket tidak sedang dalam status tertunda (On-Hold).');
         }
 
-        if ($user->role === 'technician') {
-            $isAssigned = $ticket->assigned_to === $user->id 
-                || $ticket->technicians()->where('user_id', $user->id)->exists();
-
-            return $isAssigned 
-                ? Response::allow() 
-                : Response::deny('Hanya tim teknisi yang ditugaskan yang dapat melanjutkan pengerjaan tiket ini.');
-        }
-
-        return Response::deny('Hanya teknisi penanggung jawab lapangan yang berwenang melanjutkan penanganan tiket.');
+        return $user->role === 'admin'
+            ? Response::allow()
+            : Response::deny('Hanya Administrator yang berwenang melanjutkan penanganan tiket.');
     }
 
     /**

@@ -7,6 +7,7 @@ import CategoryTab from './Partials/CategoryTab.vue';
 import UserTab from './Partials/UserTab.vue';
 import DeviceTab from './Partials/DeviceTab.vue';
 import MaterialTab from './Partials/MaterialTab.vue';
+import VendorTab from './Partials/VendorTab.vue';
 
 const props = defineProps<{
     activeTab: string;
@@ -15,12 +16,14 @@ const props = defineProps<{
     users: any;
     devices: any;
     materials: any;
+    vendors: any;
     counts: {
         departments: number;
         categories: number;
         users: number;
         devices: number;
         materials: number;
+        vendors: number;
     };
     allDepartments: any[];
     filters: any;
@@ -40,6 +43,7 @@ const tabs = computed(() => [
     { id: 'users', label: 'Manajemen Pengguna', count: props.counts?.users ?? 0 },
     { id: 'devices', label: 'Perangkat / Node Jaringan', count: props.counts?.devices ?? 0 },
     { id: 'materials', label: 'Material / Suku Cadang', count: props.counts?.materials ?? 0 },
+    { id: 'vendors', label: 'Mitra & Rekanan Vendor', count: props.counts?.vendors ?? 0 },
 ]);
 
 const handleTabChange = (val: string) => {
@@ -104,6 +108,7 @@ const handleTabChange = (val: string) => {
                 <UserTab v-else-if="currentTab === 'users'" :users="users" :departments="allDepartments" :filters="filters" />
                 <DeviceTab v-else-if="currentTab === 'devices'" :devices="devices" :filters="filters" />
                 <MaterialTab v-else-if="currentTab === 'materials'" :materials="materials" :filters="filters" />
+                <VendorTab v-else-if="currentTab === 'vendors'" :vendors="vendors" :filters="filters" />
             </div>
         </div>
     </AuthenticatedLayout>

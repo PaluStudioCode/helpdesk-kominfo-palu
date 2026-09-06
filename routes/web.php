@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\CategoryController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\NetworkDeviceController;
 use App\Http\Controllers\Admin\MaterialController;
+use App\Http\Controllers\Admin\VendorController;
 use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\ReportController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class)->except(['create', 'show', 'edit']);
         Route::resource('devices', NetworkDeviceController::class)->except(['create', 'show', 'edit']);
         Route::resource('materials', MaterialController::class)->except(['create', 'show', 'edit']);
+        Route::resource('vendors', VendorController::class)->except(['create', 'show', 'edit']);
 
         // Reports & Export
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
