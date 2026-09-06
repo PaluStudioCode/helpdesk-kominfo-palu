@@ -324,7 +324,9 @@ class TicketActionController extends Controller
 
         // If resolution_note is not explicitly provided, synthesize from notes or action_taken
         if (!$request->filled('resolution_note')) {
-            $note = $request->input('notes') ?? $request->input('action_taken') ?? 'Tindakan perbaikan telah selesai dilaksanakan.';
+            $note = $request->filled('notes') 
+                ? $request->input('notes') 
+                : ($request->input('action_taken') ?? 'Tindakan perbaikan telah selesai dilaksanakan.');
             $request->merge(['resolution_note' => $note]);
         }
 
@@ -357,7 +359,9 @@ class TicketActionController extends Controller
                 return back()->with('error', 'Tiket tidak sedang dalam status pengerjaan (In Progress).');
             }
 
-            $finalNote = $validated['notes'] ?? $validated['resolution_note'] ?? $validated['action_taken'] ?? 'Tindakan perbaikan selesai.';
+            $finalNote = (!empty($validated['notes']) && trim((string)$validated['notes']) !== '')
+                ? $validated['notes']
+                : ((!empty($validated['resolution_note']) && trim((string)$validated['resolution_note']) !== '') ? $validated['resolution_note'] : ($validated['action_taken'] ?? 'Tindakan perbaikan selesai.'));
             $finalAction = $validated['action_taken'] ?? $validated['resolution_note'] ?? null;
 
             $materialsUsed = null;

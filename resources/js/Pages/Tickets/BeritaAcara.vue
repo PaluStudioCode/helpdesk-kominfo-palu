@@ -18,7 +18,8 @@ import {
 import { 
     getInfrastructureLabel,
     formatDateWithWita as formatDate,
-    getRevisionInfo 
+    getRevisionInfo,
+    getHandlingDuration
 } from '@/lib/ticket-helpers';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
 import {
@@ -191,10 +192,15 @@ const submitRevision = () => {
             <Card class="border-slate-200 shadow-xs bg-white rounded-xl">
                 
                 <!-- Header Kartu: Judul Dokumen -->
-                <div class="px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
-                    <h2 class="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                        Dokumen Rincian Teknis
-                    </h2>
+                <div class="px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                            Dokumen Rincian Teknis
+                        </h2>
+                        <p v-if="ticket.resolved_at || ticket.closed_at" class="text-xs text-slate-500 mt-0.5">
+                            Total Waktu Pengerjaan: <strong class="text-slate-800 font-mono">{{ getHandlingDuration(ticket, { fullText: true }) }}</strong>
+                        </p>
+                    </div>
                     <span class="font-mono text-xs font-semibold text-slate-500">
                         #{{ ticket.ticket_number }}
                     </span>

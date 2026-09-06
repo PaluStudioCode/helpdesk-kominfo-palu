@@ -153,43 +153,69 @@ export const getRoleColor = (role: UserRole | string | null | undefined): string
 };
 
 /**
- * Hitung durasi penanganan tiket (contoh: 2h 4j 15m).
+ * Hitung durasi penanganan tiket (contoh: 2 jam 15 menit atau 2h 4j 15m).
+ * Dihitung dari waktu penugasan (assigned_at, fallback: created_at) ke waktu selesai (resolved_at || closed_at),
+ * dikurangi total jeda penundaan (total_hold_duration_minutes).
  */
-export const getHandlingDuration = (ticket: Partial<Ticket>): string => {
-    if (!ticket.created_at || ticket.status === 'cancelled') return '-';
+export const getHandlingDuration = (
+    ticket: Partial<Ticket> | any, 
+    options?: { fullText?: boolean; includeHoldNote?: boolean }
+): string => {
+    if (!ticket || ticket.status === 'cancelled') return '-';
+    const startStr = ticket.assigned_at || ticket.created_at;
+    if (!startStr) return '-';
 
-    const start = new Date(ticket.created_at).getTime();
+    const start = new Date(startStr).getTime();
     let end: number;
 
-    if (ticket.status && ['resolved', 'closed'].includes(ticket.status)) {
+    if (ticket.status && ['resolved', 'closed', 'pending_approval'].includes(ticket.status)) {
         if (ticket.resolved_at) {
             end = new Date(ticket.resolved_at).getTime();
         } else if (ticket.closed_at) {
             end = new Date(ticket.closed_at).getTime();
         } else {
-            return '-';
+            end = new Date().getTime();
         }
     } else {
         end = new Date().getTime();
     }
 
-    const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
-    const days = Math.floor(diffMinutes / (60 * 24));
-    const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
-    const minutes = diffMinutes % 60;
+    const grossMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
+    const holdMinutes = Number(ticket.total_hold_duration_minutes || 0);
+    // Net active working time (excluding paused hold time)
+    const netMinutes = Math.max(0, grossMinutes - holdMinutes);
 
-    const parts = [];
-    if (days > 0) parts.push(`${days}h`);
-    if (hours > 0) parts.push(`${hours}j`);
-    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+    const formatMinutes = (mins: number, isFull: boolean) => {
+        const days = Math.floor(mins / (60 * 24));
+        const hours = Math.floor((mins % (60 * 24)) / 60);
+        const minutes = mins % 60;
 
-    const formattedDuration = parts.join(' ');
+        const parts = [];
+        if (isFull) {
+            if (days > 0) parts.push(`${days} hari`);
+            if (hours > 0) parts.push(`${hours} jam`);
+            if (minutes > 0 || parts.length === 0) parts.push(`${minutes} menit`);
+        } else {
+            if (days > 0) parts.push(`${days}h`);
+            if (hours > 0) parts.push(`${hours}j`);
+            if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+        }
+        return parts.join(' ');
+    };
+
+    const isFull = Boolean(options?.fullText);
+    const formattedNet = formatMinutes(netMinutes, isFull);
 
     if (ticket.status && !['resolved', 'closed'].includes(ticket.status)) {
-        return `${formattedDuration} (berjalan)`;
+        return `${formattedNet} (berjalan)`;
     }
 
-    return formattedDuration;
+    if (options?.includeHoldNote && holdMinutes > 0) {
+        const formattedHold = formatMinutes(holdMinutes, isFull);
+        return `${formattedNet} (Jeda tunda: ${formattedHold})`;
+    }
+
+    return formattedNet;
 };
 
 /**

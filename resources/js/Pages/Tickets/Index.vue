@@ -288,7 +288,7 @@ const formatDate = (dateStr: string) => {
                 <template #actions-cell="{ item }">
                     <Link :href="route('tickets.show', item.id)">
                         <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 font-medium">
-                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> {{ currentUser?.role === 'technician' ? 'Buka' : 'Detail' }}
+                            <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Buka
                         </Button>
                     </Link>
                 </template>

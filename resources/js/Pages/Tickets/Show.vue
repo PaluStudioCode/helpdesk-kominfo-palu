@@ -11,7 +11,8 @@ import {
     getPriorityColor,
     getRoleLabel,
     getRoleColor,
-    getRevisionInfo
+    getRevisionInfo,
+    getHandlingDuration
 } from '@/lib/ticket-helpers';
 import FileUpload from '@/Components/FileUpload.vue';
 import ImagePreviewModal from '@/Components/ImagePreviewModal.vue';
@@ -1017,6 +1018,8 @@ onUnmounted(() => {
             </div>
 
 
+
+
             <!-- 3. Pending Approval Banner (Khusus Admin) -->
             <div v-if="role === 'admin' && ticket.status === 'pending_approval'" class="p-3.5 sm:p-4 bg-purple-50 border border-purple-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-purple-900">
                 <div class="flex items-start gap-3">
@@ -1156,6 +1159,17 @@ onUnmounted(() => {
                                 <dt class="text-xs text-slate-500 font-medium">Waktu Selesai</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
                                     {{ formatDate(ticket.resolved_at || ticket.closed_at) }}
+                                </dd>
+                            </div>
+
+                            <!-- Total Waktu Pengerjaan (Bila Tiket Telah Diselesaikan / Ditutup) -->
+                            <div v-if="ticket.status === 'closed' || ticket.resolved_at">
+                                <dt class="text-xs text-slate-500 font-medium">Total Waktu Pengerjaan</dt>
+                                <dd class="text-sm font-bold font-mono text-slate-900 mt-0.5">
+                                    {{ getHandlingDuration(ticket, { fullText: true }) }}
+                                </dd>
+                                <dd v-if="ticket.total_hold_duration_minutes && ticket.total_hold_duration_minutes > 0" class="text-[11px] text-amber-700 font-medium mt-0.5">
+                                    (Waktu aktif di luar jeda tunda {{ ticket.total_hold_duration_minutes }} menit)
                                 </dd>
                             </div>
                         </dl>

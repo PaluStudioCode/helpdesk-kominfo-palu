@@ -1902,8 +1902,8 @@ const techResolutionChartOptions = computed(() => ({
                                             </TableCell>
                                             <TableCell class="py-3 text-xs text-right pr-4 sm:pr-6">
                                                 <Link :href="route('tickets.show', ticket.id)">
-                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50">
-                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Detail
+                                                    <Button variant="outline" size="sm" class="h-7 text-xs px-2.5 border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 font-medium">
+                                                        <Eye class="w-3.5 h-3.5 mr-1 text-slate-500" /> Buka
                                                     </Button>
                                                 </Link>
                                             </TableCell>

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/Components/ui/dialog';
 import DataTable from '@/Components/DataTable.vue';
 import { FileSpreadsheet, Printer, RotateCcw, Loader2, Eye, FileText, Shield, Clock, ExternalLink } from 'lucide-vue-next';
+import { getHandlingDuration } from '@/lib/ticket-helpers';
 
 interface Department {
     id: number;
@@ -294,42 +295,7 @@ const getSlaReportStatus = (ticket: Ticket): { label: string; color: string } =>
     }
 };
 
-const getHandlingDuration = (ticket: Ticket): string => {
-    if (!ticket.created_at || ticket.status === 'cancelled') return '-';
 
-    const start = new Date(ticket.created_at).getTime();
-    let end: number;
-
-    if (['resolved', 'closed'].includes(ticket.status)) {
-        if (ticket.resolved_at) {
-            end = new Date(ticket.resolved_at).getTime();
-        } else if (ticket.closed_at) {
-            end = new Date(ticket.closed_at).getTime();
-        } else {
-            return '-';
-        }
-    } else {
-        end = new Date().getTime();
-    }
-
-    const diffMinutes = Math.max(0, Math.floor((end - start) / (1000 * 60)));
-    const days = Math.floor(diffMinutes / (60 * 24));
-    const hours = Math.floor((diffMinutes % (60 * 24)) / 60);
-    const minutes = diffMinutes % 60;
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}h`);
-    if (hours > 0) parts.push(`${hours}j`);
-    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
-
-    const formattedDuration = parts.join(' ');
-
-    if (!['resolved', 'closed'].includes(ticket.status)) {
-        return `${formattedDuration} (berjalan)`;
-    }
-
-    return formattedDuration;
-};
 
 const formatDateTime = (dateStr: string | null) => {
     if (!dateStr) return '-';

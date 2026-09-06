@@ -206,6 +206,10 @@ const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.mate
 const initialInfra = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
 const initialCategoryId = props.ticket.category_id || (props.categoriesMap?.[initialInfra]?.[0]?.id ?? null);
 
+const initialNotes = (props.ticket.resolution_note && props.ticket.resolution_note !== props.ticket.action_taken) 
+    ? props.ticket.resolution_note 
+    : '';
+
 const form = useForm({
     affected_device: initialDevice,
     actual_repair_location: props.ticket.actual_repair_location || props.ticket.location_details || '',
@@ -218,7 +222,7 @@ const form = useForm({
     materials_used: props.ticket.materials_used || '',
     test_result: selectedTestResult.value,
     test_parameters: props.ticket.test_parameters || '',
-    notes: props.ticket.resolution_note || '',
+    notes: initialNotes,
     resolution_proofs: [] as File[],
 });
 
@@ -669,7 +673,23 @@ const handleFinalSubmit = () => {
                             </div>
                         </div>
 
-                        <!-- Baris 6: Dokumentasi Foto Hasil Perbaikan -->
+                        <!-- Baris 6: Catatan Tambahan (Opsional) -->
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <InputLabel for="notes" value="Catatan Tambahan (Opsional)" class="text-xs font-semibold text-slate-700 block" />
+                                <span class="text-[11px] text-slate-400 font-normal">Tidak wajib diisi</span>
+                            </div>
+                            <Textarea 
+                                id="notes" 
+                                v-model="form.notes" 
+                                rows="2" 
+                                placeholder="Ketik anjuran operasional bagi OPD, saran tindak lanjut berkala, atau catatan teknis pendukung lainnya..."
+                                class="bg-white text-xs"
+                            />
+                            <InputError :message="form.errors.notes" class="mt-1" />
+                        </div>
+
+                        <!-- Baris 7: Dokumentasi Foto Hasil Perbaikan -->
                         <div class="space-y-1.5">
                             <InputLabel value="Dokumentasi Foto Hasil Perbaikan" class="text-xs font-semibold text-slate-700 block mb-1" />
                             <FileUpload 
@@ -739,6 +759,10 @@ const handleFinalSubmit = () => {
                             <div class="flex justify-between items-start gap-2">
                                 <span class="text-slate-500 font-medium shrink-0">Hasil Uji Koneksi:</span>
                                 <span class="font-semibold text-emerald-700 text-right">{{ selectedTestResult }}</span>
+                            </div>
+                            <div v-if="form.notes && form.notes.trim()" class="flex justify-between items-start gap-2">
+                                <span class="text-slate-500 font-medium shrink-0">Catatan Tambahan:</span>
+                                <span class="font-normal text-slate-800 text-right italic">{{ form.notes }}</span>
                             </div>
                             <div class="flex justify-between items-start gap-2">
                                 <span class="text-slate-500 font-medium shrink-0">Foto Dokumentasi:</span>
