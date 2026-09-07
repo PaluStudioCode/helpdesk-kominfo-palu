@@ -1,0 +1,1 @@
+import{o as e,c as t,t as o,x as n}from"./app-BGIR_bp8.js";const l={class:"block text-sm font-medium text-gray-700"},c={key:0},r={key:1},p={__name:"InputLabel",props:{value:{type:String}},setup(s){return(a,_)=>(e(),t("label",l,[s.value?(e(),t("span",c,o(s.value),1)):(e(),t("span",r,[n(a.$slots,"default")]))]))}};export{p as _};
