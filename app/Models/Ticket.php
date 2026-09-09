@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Ticket extends Model
 {
@@ -18,49 +19,41 @@ class Ticket extends Model
         'department_id',
         'reporter_id',
         'assigned_to',
-        'category_id',
-        'infrastructure_type',
-        'network_type', // backward compatibility alias
-        'affected_device',
-        'actual_repair_location',
         'title',
         'location_details',
         'description',
         'priority',
         'status',
+        'due_at',
+    ];
+
+    protected $appends = [
+        'category',
+        'category_id',
+        'infrastructure_type',
+        'network_type',
+        'rating',
+        'feedback_comment',
+        'rated_at',
         'hold_reason_category',
         'hold_reason_note',
         'hold_started_at',
-        'total_hold_duration_minutes',
-        'resolution_note',
+        'affected_device',
+        'actual_repair_location',
         'inspection_result',
         'root_cause',
         'action_taken',
         'materials_used',
         'test_result',
         'test_parameters',
-        'assigned_at',
-        'cancelled_at',
-        'due_at',
+        'resolution_note',
         'resolved_at',
-        'closed_at',
-        'rating',
-        'feedback_comment',
-        'rated_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'assigned_at' => 'datetime',
-            'cancelled_at' => 'datetime',
             'due_at' => 'datetime',
-            'resolved_at' => 'datetime',
-            'closed_at' => 'datetime',
-            'rated_at' => 'datetime',
-            'hold_started_at' => 'datetime',
-            'total_hold_duration_minutes' => 'integer',
-            'rating' => 'integer',
         ];
     }
 
@@ -84,9 +77,24 @@ class Ticket extends Model
         return $this->belongsToMany(User::class, 'ticket_technicians')->withTimestamps();
     }
 
-    public function category(): BelongsTo
+    public function resolution(): HasOne
     {
-        return $this->belongsTo(TicketCategory::class, 'category_id')->withTrashed();
+        return $this->hasOne(TicketResolution::class);
+    }
+
+    public function feedback(): HasOne
+    {
+        return $this->hasOne(TicketFeedback::class);
+    }
+
+    public function holds(): HasMany
+    {
+        return $this->hasMany(TicketHold::class);
+    }
+
+    public function latestHold(): HasOne
+    {
+        return $this->hasOne(TicketHold::class)->latestOfMany();
     }
 
     public function attachments(): HasMany
@@ -122,6 +130,127 @@ class Ticket extends Model
     public function reads(): HasMany
     {
         return $this->hasMany(TicketRead::class);
+    }
+
+    // Dynamic Accessors for Relational Data & Backward Compatibility
+    public function getCategoryAttribute()
+    {
+        return $this->resolution?->category;
+    }
+
+    public function getCategoryIdAttribute()
+    {
+        return $this->resolution?->category_id;
+    }
+
+    public function getInfrastructureTypeAttribute()
+    {
+        return $this->resolution?->category?->infrastructure_type;
+    }
+
+    public function getNetworkTypeAttribute()
+    {
+        return $this->resolution?->category?->infrastructure_type;
+    }
+
+    public function getRatingAttribute()
+    {
+        return $this->feedback?->rating;
+    }
+
+    public function getFeedbackCommentAttribute()
+    {
+        return $this->feedback?->feedback_comment;
+    }
+
+    public function getRatedAtAttribute()
+    {
+        return $this->feedback?->rated_at ?? $this->feedback?->created_at;
+    }
+
+    public function getHoldReasonCategoryAttribute()
+    {
+        return $this->latestHold?->reason_category;
+    }
+
+    public function getHoldReasonNoteAttribute()
+    {
+        return $this->latestHold?->reason_note;
+    }
+
+    public function getHoldStartedAtAttribute()
+    {
+        return $this->isOnHold() ? $this->latestHold?->started_at : null;
+    }
+
+    public function getTotalHoldDurationMinutesAttribute()
+    {
+        return (int) $this->holds()->sum('duration_minutes');
+    }
+
+    public function getAffectedDeviceAttribute()
+    {
+        return $this->resolution?->affected_device;
+    }
+
+    public function getActualRepairLocationAttribute()
+    {
+        return $this->resolution?->actual_repair_location;
+    }
+
+    public function getInspectionResultAttribute()
+    {
+        return $this->resolution?->inspection_result;
+    }
+
+    public function getRootCauseAttribute()
+    {
+        return $this->resolution?->root_cause;
+    }
+
+    public function getActionTakenAttribute()
+    {
+        return $this->resolution?->action_taken;
+    }
+
+    public function getMaterialsUsedAttribute()
+    {
+        return $this->resolution?->materials_used;
+    }
+
+    public function getTestResultAttribute()
+    {
+        return $this->resolution?->test_result;
+    }
+
+    public function getTestParametersAttribute()
+    {
+        return $this->resolution?->test_parameters;
+    }
+
+    public function getResolutionNoteAttribute()
+    {
+        return $this->resolution?->resolution_note;
+    }
+
+    public function getResolvedAtAttribute()
+    {
+        return $this->resolution?->resolved_at ?? $this->resolution?->created_at;
+    }
+
+    public function getAssignedAtAttribute()
+    {
+        return $this->statusHistories->firstWhere('new_status', 'in_progress')?->created_at;
+    }
+
+    public function getCancelledAtAttribute()
+    {
+        return $this->statusHistories->firstWhere('new_status', 'cancelled')?->created_at;
+    }
+
+    public function getClosedAtAttribute()
+    {
+        return $this->statusHistories->firstWhere('new_status', 'closed')?->created_at;
     }
 
     // Status Helper Methods
@@ -168,15 +297,5 @@ class Ticket extends Model
 
         $diffHours = (now()->getTimestamp() - $cancelledTime->getTimestamp()) / 3600;
         return $diffHours >= 0 && $diffHours < 72;
-    }
-
-    public function getNetworkTypeAttribute()
-    {
-        return $this->attributes['infrastructure_type'] ?? null;
-    }
-
-    public function setNetworkTypeAttribute($value)
-    {
-        $this->attributes['infrastructure_type'] = $value;
     }
 }

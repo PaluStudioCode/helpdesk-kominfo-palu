@@ -14,6 +14,12 @@ abstract class TestCase extends BaseTestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+    }
+
     /**
      * Helper to create an Admin user.
      */
@@ -99,23 +105,80 @@ abstract class TestCase extends BaseTestCase
         $department = $attributes['department_id'] ?? $this->createDepartment()->id;
         $reporter = $attributes['reporter_id'] ?? $this->createOpdUser(Department::find($department))->id;
 
-        $infraType = $attributes['infrastructure_type'] ?? $attributes['network_type'] ?? null;
-        unset($attributes['network_type']);
+        $categoryId = $attributes['category_id'] ?? null;
+        $cancelledAt = $attributes['cancelled_at'] ?? null;
+        $closedAt = $attributes['closed_at'] ?? null;
+        $assignedAt = $attributes['assigned_at'] ?? null;
+        $holdReasonCategory = $attributes['hold_reason_category'] ?? null;
+        $holdReasonNote = $attributes['hold_reason_note'] ?? null;
+        $holdStartedAt = $attributes['hold_started_at'] ?? null;
 
-        return Ticket::create(array_merge([
+        unset(
+            $attributes['category_id'],
+            $attributes['infrastructure_type'],
+            $attributes['network_type'],
+            $attributes['assigned_at'],
+            $attributes['cancelled_at'],
+            $attributes['closed_at'],
+            $attributes['hold_reason_category'],
+            $attributes['hold_reason_note'],
+            $attributes['hold_started_at'],
+            $attributes['total_hold_duration_minutes']
+        );
+
+        $ticket = Ticket::create(array_merge([
             'ticket_number' => 'TKT-' . date('Ymd') . '-' . rand(1000, 9999) . '-' . substr(uniqid(), -4),
             'department_id' => $department,
             'reporter_id' => $reporter,
             'assigned_to' => null,
-            'category_id' => null,
-            'infrastructure_type' => $infraType,
             'title' => 'Laporan Gangguan Testing',
             'location_details' => 'Ruang Server Lt 2',
             'description' => 'Deskripsi gangguan testing.',
             'priority' => null,
             'status' => 'pending_admin',
-            'assigned_at' => null,
             'due_at' => null,
         ], $attributes));
+
+        if ($categoryId) {
+            $ticket->resolution()->create([
+                'category_id' => $categoryId,
+                'technician_id' => $ticket->assigned_to ?? $reporter,
+                'action_taken' => 'Tindakan perbaikan testing.',
+                'resolved_at' => now(),
+            ]);
+        }
+
+        if ($ticket->status === 'on_hold' || $holdReasonCategory || $holdStartedAt) {
+            $ticket->holds()->create([
+                'user_id' => $ticket->assigned_to ?? $reporter,
+                'reason_category' => $holdReasonCategory ?? 'other',
+                'reason_note' => $holdReasonNote ?? 'Penundaan pada sesi testing.',
+                'started_at' => $holdStartedAt ?? now(),
+                'ended_at' => null,
+                'duration_minutes' => 0,
+            ]);
+        }
+
+        if ($cancelledAt || $ticket->status === 'cancelled') {
+            $ticket->statusHistories()->create([
+                'changed_by' => $reporter,
+                'previous_status' => 'pending_admin',
+                'new_status' => 'cancelled',
+                'comment' => 'Dibatalkan pada sesi testing.',
+                'created_at' => $cancelledAt ?? now(),
+            ]);
+        }
+
+        if ($closedAt || $ticket->status === 'closed') {
+            $ticket->statusHistories()->create([
+                'changed_by' => $reporter,
+                'previous_status' => 'pending_approval',
+                'new_status' => 'closed',
+                'comment' => 'Ditutup pada sesi testing.',
+                'created_at' => $closedAt ?? now(),
+            ]);
+        }
+
+        return $ticket;
     }
 }

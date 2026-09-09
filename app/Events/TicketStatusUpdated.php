@@ -21,7 +21,7 @@ class TicketStatusUpdated implements ShouldBroadcastNow
         public Ticket $ticket,
         public ?TicketStatusHistory $newHistory = null
     ) {
-        $ticket->load(['category', 'technicians:id,name,phone_number']);
+        $ticket->load(['resolution.category', 'technicians:id,name,phone_number']);
 
         $this->ticketData = [
             'id' => $ticket->id,

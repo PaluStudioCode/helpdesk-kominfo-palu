@@ -33,7 +33,7 @@ class TicketController extends Controller
         $user = $request->user();
         $query = Ticket::with([
             'department:id,name', 
-            'category:id,name', 
+            'resolution.category:id,name,infrastructure_type', 
             'assignee:id,name',
             'technicians:id,name'
         ]);
@@ -61,7 +61,9 @@ class TicketController extends Controller
         // Apply Infrastructure / Network Type Filter
         $infraTypeFilter = $request->input('infrastructure_type', $request->input('network_type'));
         if (!empty($infraTypeFilter) && $infraTypeFilter !== 'all') {
-            $query->where('infrastructure_type', $infraTypeFilter);
+            $query->whereHas('resolution.category', function ($qc) use ($infraTypeFilter) {
+                $qc->where('infrastructure_type', $infraTypeFilter);
+            });
         }
 
         // Apply Status Filter
@@ -104,16 +106,19 @@ class TicketController extends Controller
                 }
             }
 
+            $category = $t->resolution?->category;
+            $infraType = $category?->infrastructure_type;
+
             return [
                 'id' => $t->id,
                 'ticket_number' => $t->ticket_number,
                 'title' => $t->title,
                 'department' => $t->department ? ['id' => $t->department->id, 'name' => $t->department->name] : null,
-                'category' => $t->category ? ['id' => $t->category->id, 'name' => $t->category->name] : null,
+                'category' => $category ? ['id' => $category->id, 'name' => $category->name] : null,
                 'assignee' => $t->assignee ? ['id' => $t->assignee->id, 'name' => $t->assignee->name] : null,
                 'technicians' => $t->technicians ? $t->technicians->map(fn($tech) => ['id' => $tech->id, 'name' => $tech->name]) : [],
-                'infrastructure_type' => $t->infrastructure_type,
-                'network_type' => $t->infrastructure_type,
+                'infrastructure_type' => $infraType,
+                'network_type' => $infraType,
                 'priority' => $t->priority,
                 'status' => $t->status,
                 'due_at' => $t->due_at ? $t->due_at->format('d M Y, H:i') : null,
@@ -170,7 +175,11 @@ class TicketController extends Controller
             'reporter', 
             'assignee', 
             'technicians:id,name,phone_number',
-            'category', 
+            'resolution.category:id,name,infrastructure_type',
+            'resolution.resolver:id,name,role',
+            'feedback.rater:id,name,role',
+            'holds.user:id,name,role',
+            'latestHold.user:id,name,role',
             'attachments',
             'statusHistories.changer'
         ]);
@@ -251,7 +260,7 @@ class TicketController extends Controller
             'reporter:id,name,phone_number',
             'assignee:id,name,phone_number',
             'technicians:id,name,phone_number',
-            'category:id,name,infrastructure_type',
+            'resolution.category:id,name,infrastructure_type',
             'attachments',
             'statusHistories.changer:id,name,role',
         ]);
@@ -295,7 +304,8 @@ class TicketController extends Controller
             'reporter:id,name,phone_number',
             'assignee:id,name,phone_number',
             'technicians:id,name,phone_number',
-            'category:id,name,infrastructure_type',
+            'resolution.category:id,name,infrastructure_type',
+            'resolution.resolver:id,name,role',
             'attachments',
             'statusHistories.changer:id,name,role',
         ]);

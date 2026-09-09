@@ -5,7 +5,10 @@ namespace Database\Seeders;
 use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
+use App\Models\TicketFeedback;
+use App\Models\TicketHold;
 use App\Models\TicketReply;
+use App\Models\TicketResolution;
 use App\Models\TicketStatusHistory;
 use App\Models\User;
 use Carbon\Carbon;
@@ -428,39 +431,7 @@ class TicketSeeder extends Seeder
         }
 
         if (Ticket::count() > 0) {
-            $this->command->info("Data tiket sudah ada (" . Ticket::count() . " tiket). Memperbarui rincian berita acara resolusi untuk tiket pending_approval & closed...");
-
-            $flatTemplates = [];
-            foreach ($issueTemplates as $netType => $tmpls) {
-                foreach ($tmpls as $t) {
-                    $flatTemplates[$t['title']] = $t;
-                }
-            }
-
-            $updatedCount = 0;
-            $ticketsToUpdate = Ticket::whereIn('status', ['pending_approval', 'closed'])->get();
-            foreach ($ticketsToUpdate as $t) {
-                $tmpl = $flatTemplates[$t->title] ?? null;
-                if (!$tmpl) {
-                    $netType = $t->infrastructure_type ?? 'Fiber optic';
-                    $tmpls = $issueTemplates[$netType] ?? $issueTemplates['Fiber optic'];
-                    $tmpl = $tmpls[array_rand($tmpls)];
-                }
-
-                $t->update([
-                    'affected_device' => $t->affected_device ?: $tmpl['affected_device'],
-                    'inspection_result' => $t->inspection_result ?: $tmpl['inspection'],
-                    'root_cause' => $t->root_cause ?: $tmpl['cause'],
-                    'action_taken' => $t->action_taken ?: $tmpl['action'],
-                    'materials_used' => $t->materials_used ?: $tmpl['materials'],
-                    'test_result' => $t->test_result ?: $tmpl['test_result'],
-                    'test_parameters' => $t->test_parameters ?: $tmpl['test_param'],
-                    'resolution_note' => $t->resolution_note ?: ($tmpl['notes'] ?? $tmpl['res'] ?? $tmpl['action']),
-                ]);
-                $updatedCount++;
-            }
-
-            $this->command->info("Berhasil memperbarui {$updatedCount} tiket dengan data resolusi dan berita acara!");
+            $this->command->info("Data tiket sudah ada (" . Ticket::count() . " tiket).");
             return;
         }
 
@@ -636,33 +607,49 @@ class TicketSeeder extends Seeder
                     'department_id' => $department->id,
                     'reporter_id' => $reporter->id,
                     'assigned_to' => $assignedTo,
-                    'category_id' => $category->id,
-                    'infrastructure_type' => $networkType,
                     'title' => $tmpl['title'],
                     'location_details' => $tmpl['loc'],
                     'description' => $tmpl['desc'],
                     'priority' => $priority,
                     'status' => $status,
-                    'resolution_note' => $finalResNote,
-                    'affected_device' => $affectedDevice,
-                    'actual_repair_location' => $actualRepairLocation,
-                    'inspection_result' => $inspectionResult,
-                    'root_cause' => $rootCause,
-                    'action_taken' => $actionTaken,
-                    'materials_used' => $materialsUsed,
-                    'test_result' => $testResult,
-                    'test_parameters' => $testParameters,
-                    'assigned_at' => $assignedAt,
-                    'cancelled_at' => $cancelledAt,
                     'due_at' => $dueAt,
-                    'resolved_at' => $resolvedAt,
-                    'closed_at' => $closedAt,
-                    'rating' => $rating,
-                    'feedback_comment' => $feedbackComment,
-                    'rated_at' => $ratedAt,
                     'created_at' => $createdAt,
                     'updated_at' => $closedAt ?? $resolvedAt ?? $cancelledAt ?? $assignedAt ?? $createdAt,
                 ]);
+
+                // Create Ticket Resolution for resolved & closed tickets
+                if ($isResolvedOrClosed) {
+                    TicketResolution::create([
+                        'ticket_id' => $ticket->id,
+                        'category_id' => $category->id,
+                        'affected_device' => $affectedDevice,
+                        'actual_repair_location' => $actualRepairLocation,
+                        'inspection_result' => $inspectionResult,
+                        'root_cause' => $rootCause,
+                        'action_taken' => $actionTaken,
+                        'materials_used' => $materialsUsed,
+                        'test_result' => $testResult,
+                        'test_parameters' => $testParameters,
+                        'resolution_note' => $finalResNote,
+                        'resolved_by' => $leadTech->id,
+                        'resolved_at' => $resolvedAt,
+                        'created_at' => $resolvedAt ?? $createdAt,
+                        'updated_at' => $resolvedAt ?? $createdAt,
+                    ]);
+                }
+
+                // Create Ticket Feedback for rated closed tickets
+                if ($rating) {
+                    TicketFeedback::create([
+                        'ticket_id' => $ticket->id,
+                        'rating' => $rating,
+                        'feedback_comment' => $feedbackComment,
+                        'rated_by' => $reporter->id,
+                        'rated_at' => $ratedAt ?? $closedAt ?? now(),
+                        'created_at' => $ratedAt ?? $closedAt ?? now(),
+                        'updated_at' => $ratedAt ?? $closedAt ?? now(),
+                    ]);
+                }
 
                 // Sync technicians for assigned tickets (Multi-Technicians: 2-4 members)
                 if (in_array($status, ['in_progress', 'pending_approval', 'closed'])) {

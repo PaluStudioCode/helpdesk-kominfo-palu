@@ -32,6 +32,51 @@ export interface TicketCategory {
     status?: 'active' | 'inactive';
 }
 
+export interface TicketResolution {
+    id: number;
+    ticket_id: number;
+    category_id: number;
+    affected_device?: string | null;
+    actual_repair_location?: string | null;
+    inspection_result?: string | null;
+    root_cause?: string | null;
+    action_taken?: string | null;
+    materials_used?: string | null;
+    test_result?: string | null;
+    test_parameters?: string | null;
+    resolution_note?: string | null;
+    resolved_by?: number | null;
+    resolved_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    category?: TicketCategory | null;
+    resolver?: User | null;
+}
+
+export interface TicketFeedback {
+    id: number;
+    ticket_id: number;
+    rating: number;
+    feedback_comment?: string | null;
+    rated_by: number;
+    rated_at: string;
+    created_at?: string;
+    rater?: User | null;
+}
+
+export interface TicketHold {
+    id: number;
+    ticket_id: number;
+    user_id: number;
+    reason_category: string;
+    reason_note?: string | null;
+    started_at: string;
+    ended_at?: string | null;
+    duration_minutes: number;
+    created_at?: string;
+    user?: User | null;
+}
+
 export interface TicketAttachment {
     id: number;
     ticket_id: number;
@@ -80,18 +125,31 @@ export interface Ticket {
     department_id: number;
     reporter_id: number;
     assigned_to?: number | null;
-    category_id?: number | null;
-    infrastructure_type?: InfrastructureType | null;
-    network_type?: InfrastructureType | null;
     title: string;
     location_details?: string | null;
     description?: string | null;
     priority?: TicketPriority | null;
     status: TicketStatus;
-    hold_reason_category?: string | null;
-    hold_reason_note?: string | null;
-    hold_started_at?: string | null;
-    total_hold_duration_minutes?: number;
+    due_at?: string | null;
+    created_at?: string;
+    updated_at?: string;
+    department?: Department | null;
+    reporter?: User | null;
+    assignee?: User | null;
+    technicians?: User[];
+    resolution?: TicketResolution | null;
+    feedback?: TicketFeedback | null;
+    holds?: TicketHold[];
+    latest_hold?: TicketHold | null;
+    attachments?: TicketAttachment[];
+    replies?: TicketReply[];
+    status_histories?: TicketStatusHistory[];
+    
+    // Accessor / Backward-compatibility fields
+    category_id?: number | null;
+    infrastructure_type?: InfrastructureType | null;
+    network_type?: InfrastructureType | null;
+    category?: TicketCategory | null;
     affected_device?: string | null;
     actual_repair_location?: string | null;
     resolution_note?: string | null;
@@ -103,20 +161,13 @@ export interface Ticket {
     test_parameters?: string | null;
     assigned_at?: string | null;
     cancelled_at?: string | null;
-    due_at?: string | null;
     resolved_at?: string | null;
     closed_at?: string | null;
     rating?: number | null;
     feedback_comment?: string | null;
     rated_at?: string | null;
-    created_at?: string;
-    updated_at?: string;
-    department?: Department | null;
-    reporter?: User | null;
-    assignee?: User | null;
-    technicians?: User[];
-    category?: TicketCategory | null;
-    attachments?: TicketAttachment[];
-    replies?: TicketReply[];
-    status_histories?: TicketStatusHistory[];
+    hold_reason_category?: string | null;
+    hold_reason_note?: string | null;
+    hold_started_at?: string | null;
+    total_hold_duration_minutes?: number;
 }

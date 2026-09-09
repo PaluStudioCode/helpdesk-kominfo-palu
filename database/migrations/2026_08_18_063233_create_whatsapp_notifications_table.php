@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('ticket_id')->constrained()->onDelete('cascade');
             $table->foreignId('recipient_id')->constrained('users')->onDelete('restrict');
             $table->string('target_phone', 30);
-            $table->enum('event_type', ['ticket_created', 'ticket_assigned', 'status_in_progress', 'status_resolved', 'status_closed', 'ticket_reopened', 'ticket_cancelled']);
+            $table->string('event_type', 50);
             $table->text('message_content');
             $table->enum('status', ['success', 'failed']);
             $table->json('response_payload')->nullable();

@@ -43,7 +43,7 @@ interface MaterialRow {
 }
 
 const parsedMaterialsList = computed<MaterialRow[]>(() => {
-    const str = props.ticket.materials_used;
+    const str = props.ticket.resolution?.materials_used || props.ticket.materials_used;
     if (!str || !str.trim()) return [];
 
     const items = str.split(/,|\n/).map((s: string) => s.trim()).filter(Boolean);
@@ -218,28 +218,28 @@ const submitRevision = () => {
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Perangkat / Komponen</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ ticket.affected_device || '-' }}
+                                    {{ ticket.resolution?.affected_device || ticket.affected_device || '-' }}
                                 </dd>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Titik Lokasi Perbaikan</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ ticket.actual_repair_location || ticket.location_details || '-' }}
+                                    {{ ticket.resolution?.actual_repair_location || ticket.actual_repair_location || ticket.location_details || '-' }}
                                 </dd>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Jenis Infrastruktur</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ (ticket.infrastructure_type || ticket.network_type) ? getInfrastructureLabel(ticket.infrastructure_type || ticket.network_type) : '-' }}
+                                    {{ (ticket.resolution?.category?.infrastructure_type || ticket.infrastructure_type || ticket.network_type) ? getInfrastructureLabel(ticket.resolution?.category?.infrastructure_type || ticket.infrastructure_type || ticket.network_type) : '-' }}
                                 </dd>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Kategori Masalah</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ ticket.category?.name || '-' }}
+                                    {{ ticket.resolution?.category?.name || ticket.category?.name || '-' }}
                                 </dd>
                             </div>
                         </dl>
@@ -255,38 +255,38 @@ const submitRevision = () => {
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Hasil Pemeriksaan Awal (Kondisi Lapangan)</dt>
                                 <dd class="text-sm text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                                    {{ ticket.inspection_result || '-' }}
+                                    {{ ticket.resolution?.inspection_result || ticket.inspection_result || '-' }}
                                 </dd>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Penyebab Utama Gangguan (Root Cause)</dt>
                                 <dd class="text-sm text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                                    {{ ticket.root_cause || '-' }}
+                                    {{ ticket.resolution?.root_cause || ticket.root_cause || '-' }}
                                 </dd>
                             </div>
 
                             <div class="md:col-span-2">
                                 <dt class="text-xs text-slate-500 font-medium">Rincian Tindakan Penanganan / Perbaikan</dt>
                                 <dd class="text-sm font-mono text-slate-800 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                                    {{ ticket.action_taken || ticket.resolution_note || '-' }}
+                                    {{ ticket.resolution?.action_taken || ticket.action_taken || ticket.resolution?.resolution_note || ticket.resolution_note || '-' }}
                                 </dd>
-                                <div v-if="ticket.resolution_note && ticket.action_taken && ticket.resolution_note !== ticket.action_taken" class="mt-2 text-xs text-slate-600">
-                                    <span class="font-medium text-slate-700">Catatan Tambahan:</span> {{ ticket.resolution_note }}
+                                <div v-if="(ticket.resolution?.resolution_note || ticket.resolution_note) && (ticket.resolution?.action_taken || ticket.action_taken) && (ticket.resolution?.resolution_note || ticket.resolution_note) !== (ticket.resolution?.action_taken || ticket.action_taken)" class="mt-2 text-xs text-slate-600">
+                                    <span class="font-medium text-slate-700">Catatan Tambahan:</span> {{ ticket.resolution?.resolution_note || ticket.resolution_note }}
                                 </div>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Status Hasil Pengujian</dt>
                                 <dd class="text-sm font-semibold text-slate-900 mt-0.5">
-                                    {{ ticket.test_result || 'Normal / Berfungsi Baik' }}
+                                    {{ ticket.resolution?.test_result || ticket.test_result || 'Normal / Berfungsi Baik' }}
                                 </dd>
                             </div>
 
                             <div>
                                 <dt class="text-xs text-slate-500 font-medium">Parameter Pengujian</dt>
                                 <dd class="text-sm font-mono text-slate-800 whitespace-pre-wrap mt-0.5">
-                                    {{ ticket.test_parameters || '-' }}
+                                    {{ ticket.resolution?.test_parameters || ticket.test_parameters || '-' }}
                                 </dd>
                             </div>
                         </dl>

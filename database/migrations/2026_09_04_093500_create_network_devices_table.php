@@ -20,16 +20,6 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
         });
-
-        Schema::create('materials', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->string('default_unit', 50)->default('pcs');
-            $table->text('description')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->timestamps();
-            $table->softDeletes();
-        });
     }
 
     /**
@@ -37,7 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('materials');
         Schema::dropIfExists('network_devices');
     }
 };

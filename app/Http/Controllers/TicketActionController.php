@@ -66,19 +66,18 @@ class TicketActionController extends Controller
             $updateData = [
                 'priority' => $validated['priority'],
                 'assigned_to' => $leadTechnicianId,
-                'assigned_at' => $assignedAt,
                 'due_at' => $dueAt,
                 'status' => 'in_progress',
             ];
 
-            if (!empty($validated['infrastructure_type'])) {
-                $updateData['infrastructure_type'] = $validated['infrastructure_type'];
-            }
-            if ($category) {
-                $updateData['category_id'] = $category->id;
-            }
-
             $lockedTicket->update($updateData);
+
+            if ($category) {
+                $lockedTicket->resolution()->updateOrCreate(
+                    ['ticket_id' => $lockedTicket->id],
+                    ['category_id' => $category->id]
+                );
+            }
 
             // Sync multi-technicians
             $lockedTicket->technicians()->sync($validated['technician_ids']);
@@ -139,7 +138,6 @@ class TicketActionController extends Controller
 
             $lockedTicket->update([
                 'status' => 'cancelled',
-                'cancelled_at' => now(),
             ]);
 
             // Status History
@@ -200,7 +198,6 @@ class TicketActionController extends Controller
 
             $lockedTicket->update([
                 'status' => 'cancelled',
-                'cancelled_at' => now(),
             ]);
 
             // Status History
@@ -264,7 +261,6 @@ class TicketActionController extends Controller
                 'location_details' => $validated['location_details'],
                 'description' => $validated['description'],
                 'status' => 'pending_admin',
-                'cancelled_at' => null,
             ]);
 
             // Handle Attachments
@@ -383,31 +379,41 @@ class TicketActionController extends Controller
                 }
             }
 
-            $updateData = [
-                'affected_device' => $validated['affected_device'] ?? null,
-                'actual_repair_location' => $validated['actual_repair_location'] ?? null,
-                'inspection_result' => $validated['inspection_result'] ?? null,
-                'root_cause' => $validated['root_cause'] ?? null,
-                'action_taken' => $finalAction,
-                'materials_used' => $materialsUsed,
-                'test_result' => $validated['test_result'] ?? null,
-                'test_parameters' => $validated['test_parameters'] ?? null,
-                'resolution_note' => $finalNote,
+            $lockedTicket->update([
                 'status' => 'pending_approval',
-                'resolved_at' => now(),
-            ];
+            ]);
 
-            // Category & Infrastructure assignment by technician
-            $infraType = $validated['infrastructure_type'] ?? $validated['network_type'] ?? null;
-            if (!empty($infraType)) {
-                $updateData['infrastructure_type'] = $infraType;
+            $catId = $validated['category_id'] ?? $lockedTicket->resolution?->category_id;
+            if (!$catId) {
+                $cat = \App\Models\TicketCategory::first();
+                if (!$cat) {
+                    $cat = \App\Models\TicketCategory::create([
+                        'name' => 'Umum / Lainnya',
+                        'infrastructure_type' => 'Fiber optic',
+                        'status' => 'active',
+                    ]);
+                }
+                $catId = $cat->id;
             }
 
-            if (!empty($validated['category_id'])) {
-                $updateData['category_id'] = $validated['category_id'];
-            }
-
-            $lockedTicket->update($updateData);
+            // Save or Update Resolution Details in ticket_resolutions table
+            $lockedTicket->resolution()->updateOrCreate(
+                ['ticket_id' => $lockedTicket->id],
+                [
+                    'category_id' => $catId,
+                    'affected_device' => $validated['affected_device'] ?? null,
+                    'actual_repair_location' => $validated['actual_repair_location'] ?? null,
+                    'inspection_result' => $validated['inspection_result'] ?? null,
+                    'root_cause' => $validated['root_cause'] ?? null,
+                    'action_taken' => $finalAction,
+                    'materials_used' => $materialsUsed,
+                    'test_result' => $validated['test_result'] ?? null,
+                    'test_parameters' => $validated['test_parameters'] ?? null,
+                    'resolution_note' => $finalNote,
+                    'resolved_by' => $user->id,
+                    'resolved_at' => now(),
+                ]
+            );
 
             // Handle Resolution Proof Uploads
             if ($request->hasFile('resolution_proofs')) {
@@ -434,7 +440,7 @@ class TicketActionController extends Controller
 
             // Activity Log
             ActivityLogger::log('ticket.resolution_submitted', $lockedTicket, [
-                'category_id' => $lockedTicket->category_id,
+                'category_id' => $validated['category_id'] ?? null,
                 'due_at' => $lockedTicket->due_at?->toDateTimeString(),
             ], $user->id);
 
@@ -478,8 +484,6 @@ class TicketActionController extends Controller
 
             $lockedTicket->update([
                 'status' => 'closed',
-                'resolved_at' => $lockedTicket->resolved_at ?? now(),
-                'closed_at' => now(),
             ]);
 
             $comment = !empty($validated['admin_note']) && trim($validated['admin_note']) !== ''
@@ -542,7 +546,6 @@ class TicketActionController extends Controller
             // Status returns to in_progress (SLA due_at is NOT extended)
             $lockedTicket->update([
                 'status' => 'in_progress',
-                'resolved_at' => null,
             ]);
 
             // Status History
@@ -593,14 +596,15 @@ class TicketActionController extends Controller
         try {
             $lockedTicket = Ticket::where('id', $ticket->id)->lockForUpdate()->first();
 
-            if (!$lockedTicket->isClosed() || $lockedTicket->rating !== null) {
+            if (!$lockedTicket->isClosed() || $lockedTicket->feedback !== null) {
                 DB::rollBack();
                 return back()->with('error', 'Tiket belum selesai atau penilaian sudah pernah dikirim.');
             }
 
-            $lockedTicket->update([
+            $lockedTicket->feedback()->create([
                 'rating' => $validated['rating'],
                 'feedback_comment' => $validated['feedback_comment'] ?? null,
+                'rated_by' => $user->id,
                 'rated_at' => now(),
             ]);
 
@@ -748,7 +752,11 @@ class TicketActionController extends Controller
                 $noteParts[] = $extInfo;
             }
 
-            $noteParts[] = "Keterangan Alasan: " . $validated['hold_reason_note'];
+            if (!empty($noteParts) || !empty($validated['next_action'])) {
+                $noteParts[] = "Keterangan Alasan: " . $validated['hold_reason_note'];
+            } else {
+                $noteParts[] = $validated['hold_reason_note'];
+            }
 
             if (!empty($validated['next_action'])) {
                 $noteParts[] = "Tindakan Selanjutnya: " . $validated['next_action'];
@@ -762,9 +770,6 @@ class TicketActionController extends Controller
 
             $updateData = [
                 'status' => 'on_hold',
-                'hold_reason_category' => $validated['hold_reason_category'],
-                'hold_reason_note' => $noteContent,
-                'hold_started_at' => now(),
             ];
 
             if ($priorityChanged) {
@@ -772,6 +777,16 @@ class TicketActionController extends Controller
             }
 
             $lockedTicket->update($updateData);
+
+            // Record hold session in ticket_holds table
+            $lockedTicket->holds()->create([
+                'user_id' => $user->id,
+                'reason_category' => $validated['hold_reason_category'],
+                'reason_note' => $noteContent,
+                'started_at' => now(),
+                'ended_at' => null,
+                'duration_minutes' => 0,
+            ]);
 
             $priorityLabels = [
                 'emergency' => 'Darurat (Emergency)',
@@ -841,11 +856,19 @@ class TicketActionController extends Controller
                 return back()->with('error', 'Tiket tidak sedang dalam status tertunda (On-Hold).');
             }
 
-            // Calculate hold duration in minutes
-            $holdStartedAt = $lockedTicket->hold_started_at ? \Carbon\Carbon::parse($lockedTicket->hold_started_at) : now();
+            // Find active hold record in ticket_holds table
+            $activeHold = $lockedTicket->holds()->whereNull('ended_at')->latest()->first();
+            $holdStartedAt = $activeHold ? \Carbon\Carbon::parse($activeHold->started_at) : ($lockedTicket->latestHold ? \Carbon\Carbon::parse($lockedTicket->latestHold->started_at) : now());
             $holdDurationMinutes = max(0, (int) $holdStartedAt->diffInMinutes(now()));
 
-            $totalHold = ($lockedTicket->total_hold_duration_minutes ?? 0) + $holdDurationMinutes;
+            if ($activeHold) {
+                $activeHold->update([
+                    'ended_at' => now(),
+                    'duration_minutes' => $holdDurationMinutes,
+                ]);
+            }
+
+            $totalHoldMinutes = (int) $lockedTicket->holds()->sum('duration_minutes');
 
             $slaHours = match ($lockedTicket->priority) {
                 'emergency' => 4,
@@ -857,15 +880,13 @@ class TicketActionController extends Controller
 
             $updateData = [
                 'status' => 'in_progress',
-                'hold_started_at' => null,
-                'total_hold_duration_minutes' => $totalHold,
             ];
 
             // Recalculate or shift due_at based on priority SLA and elapsed working time
             if ($lockedTicket->assigned_at) {
                 $assignedAt = \Carbon\Carbon::parse($lockedTicket->assigned_at);
                 $totalMinutesSinceAssigned = max(0, (int) $assignedAt->diffInMinutes($holdStartedAt));
-                $previousHoldMinutes = (int) ($lockedTicket->total_hold_duration_minutes ?? 0);
+                $previousHoldMinutes = max(0, $totalHoldMinutes - $holdDurationMinutes);
                 $elapsedWorkingMinutes = max(0, $totalMinutesSinceAssigned - $previousHoldMinutes);
 
                 $totalSlaMinutes = $slaHours * 60;
@@ -889,7 +910,7 @@ class TicketActionController extends Controller
 
             ActivityLogger::log('ticket.resumed', $lockedTicket, [
                 'hold_duration_minutes' => $holdDurationMinutes,
-                'total_hold_duration_minutes' => $totalHold,
+                'total_hold_duration_minutes' => $totalHoldMinutes,
                 'priority' => $lockedTicket->priority,
             ], $user->id);
 

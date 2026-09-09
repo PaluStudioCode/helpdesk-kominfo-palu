@@ -105,7 +105,7 @@ class DashboardService
                 ->count(),
             'pending_rating' => Ticket::where('department_id', $departmentId)
                 ->where('status', 'closed')
-                ->whereNull('rating')
+                ->whereDoesntHave('feedback')
                 ->count(),
             'total_reports' => Ticket::where('department_id', $departmentId)->count(),
         ];
@@ -121,10 +121,11 @@ class DashboardService
               ->orWhereHas('technicians', fn ($qt) => $qt->where('users.id', $user->id));
         };
 
-        $ratedTicketsQuery = Ticket::whereNotNull('rating')->where($myTicketsQuery);
+        $ratedTicketsQuery = Ticket::whereHas('feedback')->where($myTicketsQuery);
         $ratingCount = (clone $ratedTicketsQuery)->count();
-        $avgRatingVal = (clone $ratedTicketsQuery)->avg('rating');
-        $avgRating = $ratingCount > 0 ? round($avgRatingVal, 1) : 0;
+        $ratedTickets = (clone $ratedTicketsQuery)->with('feedback')->get();
+        $avgRatingVal = $ratingCount > 0 ? $ratedTickets->avg(fn($t) => $t->feedback?->rating) : 0;
+        $avgRating = $ratingCount > 0 ? round((float) $avgRatingVal, 1) : 0;
 
         $stats = [
             'closed_tickets' => Ticket::where('status', 'closed')->where($myTicketsQuery)->count(),
@@ -135,7 +136,7 @@ class DashboardService
         ];
 
         // 1. Active In-Progress & On-Hold Tasks
-        $activeTasks = Ticket::with(['department:id,name,code', 'category:id,name'])
+        $activeTasks = Ticket::with(['department:id,name,code', 'resolution.category:id,name,infrastructure_type'])
             ->whereIn('status', ['in_progress', 'on_hold'])
             ->where($myTicketsQuery)
             ->orderByRaw("FIELD(priority, 'emergency', 'high', 'medium', 'low') ASC")
@@ -173,10 +174,10 @@ class DashboardService
             ->toArray();
 
         // 2. Recent Feedback Ratings
-        $recentFeedbacks = Ticket::with(['department:id,name,code', 'reporter:id,name'])
-            ->whereNotNull('rating')
+        $recentFeedbacks = Ticket::with(['department:id,name,code', 'reporter:id,name', 'feedback'])
+            ->whereHas('feedback')
             ->where($myTicketsQuery)
-            ->latest('rated_at')
+            ->latest('id')
             ->limit(5)
             ->get()
             ->map(function ($t) {
@@ -198,9 +199,9 @@ class DashboardService
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         $targetYear = (int) $request->query('year', date('Y'));
         
-        $hasTicketsThisYear = Ticket::whereYear('closed_at', $targetYear)->where($myTicketsQuery)->exists();
+        $hasTicketsThisYear = Ticket::where('status', 'closed')->whereYear('updated_at', $targetYear)->where($myTicketsQuery)->exists();
         if (!$hasTicketsThisYear) {
-            $latestYear = Ticket::whereNotNull('closed_at')->where($myTicketsQuery)->orderBy('closed_at', 'desc')->value(DB::raw('YEAR(closed_at)'));
+            $latestYear = Ticket::where('status', 'closed')->where($myTicketsQuery)->orderBy('updated_at', 'desc')->value(DB::raw('YEAR(updated_at)'));
             if ($latestYear) {
                 $targetYear = (int) $latestYear;
             }
@@ -209,15 +210,15 @@ class DashboardService
         $resolutionTimeData = [];
         for ($m = 1; $m <= 12; $m++) {
             $monthlyClosedQuery = Ticket::where('status', 'closed')
-                ->whereYear('closed_at', $targetYear)
-                ->whereMonth('closed_at', $m)
+                ->whereYear('updated_at', $targetYear)
+                ->whereMonth('updated_at', $m)
                 ->where($myTicketsQuery);
 
             $closedCount = (clone $monthlyClosedQuery)->count();
             
             if ($closedCount > 0) {
                 $avgMinutes = (clone $monthlyClosedQuery)
-                    ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, closed_at)) as avg_min')
+                    ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_min')
                     ->value('avg_min');
                 $avgHours = $avgMinutes ? round($avgMinutes / 60, 1) : 0;
             } else {
@@ -347,11 +348,11 @@ class DashboardService
             'colors' => ['#10b981', '#f59e0b', '#d97706', '#3b82f6', '#8b5cf6', '#f43f5e'],
         ];
 
-        $fiberCount = (clone $statsQuery)->where('infrastructure_type', 'Fiber optic')->count();
-        $deviceCount = (clone $statsQuery)->where('infrastructure_type', 'Perangkat/Akses')->count();
-        $powerCount = (clone $statsQuery)->where('infrastructure_type', 'Power/poe')->count();
-        $converterCount = (clone $statsQuery)->where('infrastructure_type', 'Converter')->count();
-        $serviceCount = (clone $statsQuery)->where('infrastructure_type', 'Layanan/jaringan')->count();
+        $fiberCount = (clone $statsQuery)->whereHas('resolution.category', fn ($q) => $q->where('infrastructure_type', 'Fiber optic'))->count();
+        $deviceCount = (clone $statsQuery)->whereHas('resolution.category', fn ($q) => $q->where('infrastructure_type', 'Perangkat/Akses'))->count();
+        $powerCount = (clone $statsQuery)->whereHas('resolution.category', fn ($q) => $q->where('infrastructure_type', 'Power/poe'))->count();
+        $converterCount = (clone $statsQuery)->whereHas('resolution.category', fn ($q) => $q->where('infrastructure_type', 'Converter'))->count();
+        $serviceCount = (clone $statsQuery)->whereHas('resolution.category', fn ($q) => $q->where('infrastructure_type', 'Layanan/jaringan'))->count();
 
         $infrastructureDistribution = [
             'labels' => ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'],
@@ -399,7 +400,7 @@ class DashboardService
             SUM(CASE WHEN status IN ('pending_admin', 'in_progress', 'on_hold', 'pending_approval') THEN 1 ELSE 0 END) as in_progress,
             SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed,
             SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
-            AVG(CASE WHEN status = 'closed' AND closed_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, created_at, closed_at) ELSE NULL END) as avg_resolution_minutes
+            AVG(CASE WHEN status = 'closed' THEN TIMESTAMPDIFF(MINUTE, created_at, updated_at) ELSE NULL END) as avg_resolution_minutes
         ");
 
         if ($filterStart && $filterEnd) {
@@ -435,11 +436,11 @@ class DashboardService
         $totalCancelled = array_sum(array_column($monthlyReports, 'cancelled'));
         $totalCompletionRate = $totalTickets > 0 ? round(($totalClosed / $totalTickets) * 100, 2) : 0;
 
-        $overallAvgQuery = Ticket::where('status', 'closed')->whereNotNull('closed_at');
+        $overallAvgQuery = Ticket::where('status', 'closed');
         if ($filterStart && $filterEnd) {
             $overallAvgQuery->whereBetween('created_at', [$filterStart, $filterEnd]);
         }
-        $overallAvgMinutes = $overallAvgQuery->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, closed_at)) as avg_min')->value('avg_min');
+        $overallAvgMinutes = $overallAvgQuery->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, updated_at)) as avg_min')->value('avg_min');
 
         $monthlySummary = [
             'month_name' => 'TOTAL',
@@ -526,7 +527,7 @@ class DashboardService
         $role = $user->role;
         $query = Ticket::with([
             'department:id,name,code',
-            'category:id,name',
+            'resolution.category:id,name,infrastructure_type',
             'reporter:id,name',
             'assignee:id,name',
             'technicians:id,name',

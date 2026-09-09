@@ -143,7 +143,7 @@ const canResume = computed(() => props.ticket.status === 'on_hold' && role.value
 const canSubmitResolution = computed(() => props.ticket.status === 'in_progress' && role.value === 'technician' && isLeadTechnician.value);
 const canApproveResolution = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
 const canRequestRevision = computed(() => props.ticket.status === 'pending_approval' && role.value === 'admin');
-const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && props.ticket.rating === null);
+const canRate = computed(() => props.ticket.status === 'closed' && role.value === 'opd_user' && isDepartmentMatch.value && !props.ticket.feedback && !props.ticket.rating);
 const canViewRincianTeknis = computed(() => {
     if (role.value !== 'admin' && !(role.value === 'technician' && isAssignedTechnician.value)) return false;
     return Boolean(props.ticket.resolved_at || props.ticket.action_taken || props.ticket.resolution_note || props.ticket.status === 'pending_approval' || props.ticket.status === 'closed');

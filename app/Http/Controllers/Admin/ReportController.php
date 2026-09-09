@@ -89,27 +89,27 @@ class ReportController extends Controller
         $infrastructureStats = [
             'Fiber optic' => [
                 'label' => 'Fiber optic', 
-                'count' => $tickets->where('infrastructure_type', 'Fiber optic')->count(), 
+                'count' => $tickets->filter(fn($t) => $t->infrastructure_type === 'Fiber optic')->count(), 
                 'color' => '#0f172a'
             ],
             'Perangkat/Akses' => [
                 'label' => 'Perangkat/Akses', 
-                'count' => $tickets->where('infrastructure_type', 'Perangkat/Akses')->count(), 
+                'count' => $tickets->filter(fn($t) => $t->infrastructure_type === 'Perangkat/Akses')->count(), 
                 'color' => '#334155'
             ],
             'Power/poe' => [
                 'label' => 'Power/poe', 
-                'count' => $tickets->where('infrastructure_type', 'Power/poe')->count(), 
+                'count' => $tickets->filter(fn($t) => $t->infrastructure_type === 'Power/poe')->count(), 
                 'color' => '#475569'
             ],
             'Converter' => [
                 'label' => 'Converter', 
-                'count' => $tickets->where('infrastructure_type', 'Converter')->count(), 
+                'count' => $tickets->filter(fn($t) => $t->infrastructure_type === 'Converter')->count(), 
                 'color' => '#64748b'
             ],
             'Layanan/jaringan' => [
                 'label' => 'Layanan/jaringan', 
-                'count' => $tickets->where('infrastructure_type', 'Layanan/jaringan')->count(), 
+                'count' => $tickets->filter(fn($t) => $t->infrastructure_type === 'Layanan/jaringan')->count(), 
                 'color' => '#94a3b8'
             ],
         ];
@@ -148,7 +148,7 @@ class ReportController extends Controller
         })->sortByDesc('total')->values();
 
         // Top 5 Issue Categories
-        $topCategories = $tickets->groupBy('category_id')->filter(fn($grp) => $grp->first()->category_id !== null)->map(function ($catTickets) use ($totalTickets) {
+        $topCategories = $tickets->groupBy(fn($t) => $t->category_id)->filter(fn($grp, $key) => !empty($key))->map(function ($catTickets) use ($totalTickets) {
             $categoryName = $catTickets->first()->category?->name ?? '-';
             $count = $catTickets->count();
             $percentage = $totalTickets > 0 ? round(($count / $totalTickets) * 100, 1) : 0;
@@ -205,10 +205,13 @@ class ReportController extends Controller
     {
         $query = Ticket::with([
             'department:id,name', 
-            'category:id,name', 
+            'resolution.category:id,name,infrastructure_type', 
             'assignee:id,name', 
             'technicians:id,name',
-            'reporter:id,name'
+            'reporter:id,name',
+            'feedback',
+            'latestHold',
+            'statusHistories',
         ]);
 
         // Search keyword filter
@@ -220,7 +223,7 @@ class ReportController extends Controller
                   ->orWhere('description', 'like', "%{$search}%")
                   ->orWhere('location_details', 'like', "%{$search}%")
                   ->orWhereHas('department', fn($qd) => $qd->where('name', 'like', "%{$search}%"))
-                  ->orWhereHas('category', fn($qc) => $qc->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('resolution.category', fn($qc) => $qc->where('name', 'like', "%{$search}%"))
                   ->orWhereHas('reporter', fn($qr) => $qr->where('name', 'like', "%{$search}%"))
                   ->orWhereHas('assignee', fn($qa) => $qa->where('name', 'like', "%{$search}%"))
                   ->orWhereHas('technicians', fn($qt) => $qt->where('name', 'like', "%{$search}%"));
@@ -244,7 +247,7 @@ class ReportController extends Controller
         // Filter infrastructure / network type
         $infraType = $request->input('infrastructure_type', $request->input('network_type'));
         if (!empty($infraType) && $infraType !== 'all') {
-            $query->where('infrastructure_type', $infraType);
+            $query->whereHas('resolution.category', fn($qc) => $qc->where('infrastructure_type', $infraType));
         }
 
         // Filter status

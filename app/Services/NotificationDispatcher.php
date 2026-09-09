@@ -128,7 +128,7 @@ class NotificationDispatcher
      */
     public static function ticketAssigned(Ticket $ticket): void
     {
-        $ticket->loadMissing(['department', 'reporter', 'technicians', 'category', 'assignee']);
+        $ticket->loadMissing(['department', 'reporter', 'technicians', 'resolution.category', 'assignee']);
         $technicians = $ticket->technicians;
         $reporter = $ticket->reporter;
 
@@ -270,7 +270,7 @@ class NotificationDispatcher
      */
     public static function pendingApproval(Ticket $ticket): void
     {
-        $ticket->loadMissing(['department', 'category', 'technicians']);
+        $ticket->loadMissing(['department', 'resolution.category', 'technicians']);
 
         $admins = User::where('role', 'admin')
             ->where('status', 'active')

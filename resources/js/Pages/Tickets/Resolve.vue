@@ -182,8 +182,8 @@ const parseExistingMaterials = (str: string | null | undefined): MaterialRow[] =
 };
 
 // Initial state values
-const initialDevice = props.ticket.affected_device && affectedDeviceOptions.value.includes(props.ticket.affected_device)
-    ? props.ticket.affected_device
+const initialDevice = (props.ticket.resolution?.affected_device || props.ticket.affected_device) && affectedDeviceOptions.value.includes(props.ticket.resolution?.affected_device || props.ticket.affected_device)
+    ? (props.ticket.resolution?.affected_device || props.ticket.affected_device)
     : (affectedDeviceOptions.value[0] || '');
 
 const selectedAffectedDevice = ref<string>(initialDevice);
@@ -195,33 +195,36 @@ const testResultOptions = [
     'Temporary Bypass (Monitoring Lanjut)',
 ];
 
+const initialTestResult = props.ticket.resolution?.test_result || props.ticket.test_result;
 const selectedTestResult = ref<string>(
-    props.ticket.test_result && testResultOptions.includes(props.ticket.test_result)
-        ? props.ticket.test_result
+    initialTestResult && testResultOptions.includes(initialTestResult)
+        ? initialTestResult
         : 'Normal / Berfungsi Baik'
 );
 
-const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.materials_used));
+const materialRows = ref<MaterialRow[]>(parseExistingMaterials(props.ticket.resolution?.materials_used || props.ticket.materials_used));
 
-const initialInfra = props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
-const initialCategoryId = props.ticket.category_id || (props.categoriesMap?.[initialInfra]?.[0]?.id ?? null);
+const initialInfra = props.ticket.resolution?.category?.infrastructure_type || props.ticket.infrastructure_type || props.ticket.network_type || 'Fiber optic';
+const initialCategoryId = props.ticket.resolution?.category_id || props.ticket.category_id || (props.categoriesMap?.[initialInfra]?.[0]?.id ?? null);
 
-const initialNotes = (props.ticket.resolution_note && props.ticket.resolution_note !== props.ticket.action_taken) 
-    ? props.ticket.resolution_note 
+const initialResolutionNote = props.ticket.resolution?.resolution_note || props.ticket.resolution_note;
+const initialActionTaken = props.ticket.resolution?.action_taken || props.ticket.action_taken || '';
+const initialNotes = (initialResolutionNote && initialResolutionNote !== initialActionTaken) 
+    ? initialResolutionNote 
     : '';
 
 const form = useForm({
     affected_device: initialDevice,
-    actual_repair_location: props.ticket.actual_repair_location || props.ticket.location_details || '',
+    actual_repair_location: props.ticket.resolution?.actual_repair_location || props.ticket.actual_repair_location || props.ticket.location_details || '',
     infrastructure_type: initialInfra,
     network_type: initialInfra,
     category_id: initialCategoryId,
-    inspection_result: props.ticket.inspection_result || '',
-    root_cause: props.ticket.root_cause || '',
-    action_taken: props.ticket.action_taken || '',
-    materials_used: props.ticket.materials_used || '',
+    inspection_result: props.ticket.resolution?.inspection_result || props.ticket.inspection_result || '',
+    root_cause: props.ticket.resolution?.root_cause || props.ticket.root_cause || '',
+    action_taken: initialActionTaken,
+    materials_used: props.ticket.resolution?.materials_used || props.ticket.materials_used || '',
     test_result: selectedTestResult.value,
-    test_parameters: props.ticket.test_parameters || '',
+    test_parameters: props.ticket.resolution?.test_parameters || props.ticket.test_parameters || '',
     notes: initialNotes,
     resolution_proofs: [] as File[],
 });

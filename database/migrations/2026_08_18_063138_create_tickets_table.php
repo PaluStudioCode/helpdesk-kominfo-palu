@@ -17,28 +17,18 @@ return new class extends Migration
             $table->foreignId('department_id')->constrained()->onDelete('restrict');
             $table->foreignId('reporter_id')->constrained('users')->onDelete('restrict');
             $table->foreignId('assigned_to')->nullable()->constrained('users')->onDelete('set null');
-            $table->foreignId('category_id')->nullable()->constrained('ticket_categories')->onDelete('restrict');
-            $table->enum('infrastructure_type', ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan'])->nullable();
             $table->string('title', 200);
             $table->string('location_details', 255);
             $table->text('description');
             $table->enum('priority', ['low', 'medium', 'high', 'emergency'])->nullable()->default(null);
-            $table->enum('status', ['pending_admin', 'in_progress', 'pending_approval', 'closed', 'cancelled'])->default('pending_admin');
-            $table->text('resolution_note')->nullable();
-            $table->timestamp('assigned_at')->nullable();
-            $table->timestamp('cancelled_at')->nullable();
+            $table->enum('status', ['pending_admin', 'in_progress', 'on_hold', 'pending_approval', 'closed', 'cancelled'])->default('pending_admin');
             $table->timestamp('due_at')->nullable();
-            $table->timestamp('resolved_at')->nullable();
-            $table->timestamp('closed_at')->nullable();
-            $table->unsignedTinyInteger('rating')->nullable();
-            $table->text('feedback_comment')->nullable();
-            $table->timestamp('rated_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
             
             $table->index(['department_id', 'status', 'created_at']);
             $table->index(['assigned_to', 'status']);
-            $table->index(['infrastructure_type', 'priority', 'status', 'due_at']);
+            $table->index(['priority', 'status', 'due_at']);
         });
     }
 

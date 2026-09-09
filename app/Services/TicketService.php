@@ -23,14 +23,11 @@ class TicketService
                 'department_id' => $user->department_id,
                 'reporter_id' => $user->id,
                 'assigned_to' => null,
-                'category_id' => null,
-                'infrastructure_type' => null,
                 'title' => $validated['title'],
                 'location_details' => $validated['location_details'] ?? null,
                 'description' => $validated['description'],
                 'priority' => null,
                 'status' => 'pending_admin',
-                'assigned_at' => null,
                 'due_at' => null,
             ]);
 
