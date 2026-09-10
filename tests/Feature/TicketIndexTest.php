@@ -122,11 +122,12 @@ class TicketIndexTest extends TestCase
     {
         $admin = $this->createAdmin();
 
-        $ticketOpen = $this->createTicket(['status' => 'pending_admin', 'priority' => 'high']);
-        $ticketProgress = $this->createTicket(['status' => 'in_progress', 'priority' => 'emergency']);
+        $searchKey = 'FilterTest_' . uniqid();
+        $ticketOpen = $this->createTicket(['title' => $searchKey . ' Open', 'status' => 'pending_admin', 'priority' => 'high']);
+        $ticketProgress = $this->createTicket(['title' => $searchKey . ' Progress', 'status' => 'in_progress', 'priority' => 'emergency']);
 
         // Filter status
-        $responseStatus = $this->actingAs($admin)->get('/tickets?status=in_progress');
+        $responseStatus = $this->actingAs($admin)->get('/tickets?search=' . $searchKey . '&status=in_progress');
         $responseStatus->assertStatus(200);
         $responseStatus->assertInertia(fn (Assert $page) => $page
             ->component('Tickets/Index')
@@ -135,7 +136,7 @@ class TicketIndexTest extends TestCase
         );
 
         // Filter priority
-        $responsePriority = $this->actingAs($admin)->get('/tickets?priority=high');
+        $responsePriority = $this->actingAs($admin)->get('/tickets?search=' . $searchKey . '&priority=high');
         $responsePriority->assertStatus(200);
         $responsePriority->assertInertia(fn (Assert $page) => $page
             ->component('Tickets/Index')
@@ -148,13 +149,14 @@ class TicketIndexTest extends TestCase
     {
         $admin = $this->createAdmin();
 
+        $searchKey = 'InfraTest_' . uniqid();
         $catPower = $this->createCategory(['infrastructure_type' => 'Power/poe']);
         $catAP = $this->createCategory(['infrastructure_type' => 'Perangkat/Akses']);
 
-        $ticketPower = $this->createTicket(['category_id' => $catPower->id]);
-        $ticketAP = $this->createTicket(['category_id' => $catAP->id]);
+        $ticketPower = $this->createTicket(['title' => $searchKey . ' Power', 'category_id' => $catPower->id]);
+        $ticketAP = $this->createTicket(['title' => $searchKey . ' AP', 'category_id' => $catAP->id]);
 
-        $response = $this->actingAs($admin)->get('/tickets?infrastructure_type=' . urlencode('Power/poe'));
+        $response = $this->actingAs($admin)->get('/tickets?search=' . $searchKey . '&infrastructure_type=' . urlencode('Power/poe'));
         $response->assertStatus(200);
 
         $response->assertInertia(fn (Assert $page) => $page

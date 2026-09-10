@@ -435,11 +435,11 @@ class TicketSeeder extends Seeder
             return;
         }
 
-        // Shuffle to distribute naturally across 2025
+        // Shuffle to distribute naturally across 2026
         shuffle($allTicketPlan);
         $totalTickets = count($allTicketPlan); // Expected ~260 - 280
 
-        $this->command->info("Memulai seeding {$totalTickets} tiket gangguan untuk tahun 2025...");
+        $this->command->info("Memulai seeding {$totalTickets} tiket gangguan untuk tahun 2026...");
 
         $ticketSequencePerDay = [];
 
@@ -453,57 +453,56 @@ class TicketSeeder extends Seeder
                     continue;
                 }
 
-                // Determine month and day in 2025
+                // Determine month and day in 2026 (Jan - Sep 2026)
                 $progressRatio = $index / (float) $totalTickets;
                 if ($progressRatio < 0.70) {
-                    // Jan - Oct 2025
-                    $month = (int) floor($progressRatio / 0.70 * 10) + 1; // 1 to 10
+                    // Jan - Jul 2026 (Historical months)
+                    $month = (int) floor($progressRatio / 0.70 * 7) + 1; // 1 to 7
                     $day = rand(1, 28);
                     $hour = rand(8, 16);
                     $minute = rand(0, 59);
-                    $createdAt = Carbon::create(2025, $month, $day, $hour, $minute, 0);
+                    $createdAt = Carbon::create(2026, $month, $day, $hour, $minute, 0);
 
-                    // 90% closed, 10% cancelled
-                    $status = (rand(1, 10) <= 9) ? 'closed' : 'cancelled';
-                } elseif ($progressRatio < 0.82) {
-                    // Nov 2025
-                    $month = 11;
-                    $day = rand(1, 30);
-                    $hour = rand(8, 16);
-                    $minute = rand(0, 59);
-                    $createdAt = Carbon::create(2025, $month, $day, $hour, $minute, 0);
-
-                    // 80% closed, 10% cancelled, 10% pending_approval
-                    $r = rand(1, 10);
-                    if ($r <= 8) {
-                        $status = 'closed';
-                    } elseif ($r === 9) {
-                        $status = 'cancelled';
-                    } else {
-                        $status = 'pending_approval';
-                    }
-                } else {
-                    // Dec 2025
-                    $month = 12;
+                    // 92% closed, 8% cancelled
+                    $status = (rand(1, 100) <= 92) ? 'closed' : 'cancelled';
+                } elseif ($progressRatio < 0.85) {
+                    // Aug 2026 (Historical month)
+                    $month = 8;
                     $day = rand(1, 31);
                     $hour = rand(8, 16);
                     $minute = rand(0, 59);
-                    $createdAt = Carbon::create(2025, $month, $day, $hour, $minute, 0);
+                    $createdAt = Carbon::create(2026, 8, $day, $hour, $minute, 0);
 
-                    // Dec status distribution:
-                    // 35% in_progress, 30% pending_admin, 15% pending_approval, 12% closed, 8% cancelled
+                    // 92% closed, 8% cancelled
+                    $status = (rand(1, 100) <= 92) ? 'closed' : 'cancelled';
+                } else {
+                    // Sep 2026 (Current Active Month: 1 - 10 September)
+                    $month = 9;
+                    $hour = rand(8, 16);
+                    $minute = rand(0, 59);
+
+                    // Active distribution: in_progress, pending_admin, on_hold, pending_approval, closed, cancelled
                     $r = rand(1, 100);
-                    if ($r <= 35) {
+                    if ($r <= 30) {
                         $status = 'in_progress';
-                    } elseif ($r <= 65) {
+                        $day = rand(7, 10);
+                    } elseif ($r <= 55) {
                         $status = 'pending_admin';
-                    } elseif ($r <= 80) {
+                        $day = rand(8, 10);
+                    } elseif ($r <= 70) {
+                        $status = 'on_hold';
+                        $day = rand(5, 10);
+                    } elseif ($r <= 85) {
                         $status = 'pending_approval';
-                    } elseif ($r <= 92) {
+                        $day = rand(9, 10); // Very recent (last 24-48 hours)
+                    } elseif ($r <= 95) {
                         $status = 'closed';
+                        $day = rand(1, 10);
                     } else {
                         $status = 'cancelled';
+                        $day = rand(1, 10);
                     }
+                    $createdAt = Carbon::create(2026, 9, $day, $hour, $minute, 0);
                 }
 
                 // Choose network type & issue template
@@ -548,6 +547,17 @@ class TicketSeeder extends Seeder
                 } elseif ($status === 'cancelled') {
                     $assignedTo = null;
                     $cancelledAt = (clone $createdAt)->addHours(rand(1, 8));
+                } elseif ($status === 'on_hold') {
+                    $assignedTo = $leadTech->id;
+                    $assignedAt = (clone $createdAt)->addMinutes(rand(15, 60));
+                    $slaHours = match ($priority) {
+                        'emergency' => 4,
+                        'high' => 8,
+                        'medium' => 24,
+                        'low' => 48,
+                        default => 24,
+                    };
+                    $dueAt = (clone $assignedAt)->addHours($slaHours);
                 } else {
                     // in_progress, pending_approval, closed
                     $assignedTo = $leadTech->id;
@@ -648,8 +658,22 @@ class TicketSeeder extends Seeder
                     ]);
                 }
 
+                // Create Ticket Hold for on_hold tickets
+                if ($status === 'on_hold') {
+                    $holdStartedAt = (clone $assignedAt)->addMinutes(rand(30, 90));
+                    TicketHold::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $admin->id,
+                        'reason_category' => 'vendor',
+                        'reason_note' => 'Menunggu suku cadang modul SFP dan kabel pengganti dari vendor rekanan.',
+                        'started_at' => $holdStartedAt,
+                        'ended_at' => null,
+                        'duration_minutes' => 0,
+                    ]);
+                }
+
                 // Sync technicians for assigned tickets (Multi-Technicians: 2-4 members)
-                if (in_array($status, ['in_progress', 'pending_approval', 'closed'])) {
+                if (in_array($status, ['in_progress', 'on_hold', 'pending_approval', 'closed'])) {
                     $ticket->technicians()->sync($assignedTechnicians);
                 }
 
@@ -685,6 +709,27 @@ class TicketSeeder extends Seeder
                         'new_status' => 'in_progress',
                         'comment' => "Laporan diverifikasi oleh Admin dan ditugaskan ke Tim Teknisi ({$techTeamNames}).",
                         'created_at' => $assignedAt,
+                    ]);
+                }
+
+                if ($status === 'on_hold') {
+                    $techTeamNames = $technicians->whereIn('id', $assignedTechnicians)->pluck('name')->join(', ');
+                    TicketStatusHistory::create([
+                        'ticket_id' => $ticket->id,
+                        'changed_by' => $admin->id,
+                        'previous_status' => 'pending_admin',
+                        'new_status' => 'in_progress',
+                        'comment' => "Laporan diverifikasi oleh Admin dan ditugaskan ke Tim Teknisi ({$techTeamNames}).",
+                        'created_at' => $assignedAt,
+                    ]);
+
+                    TicketStatusHistory::create([
+                        'ticket_id' => $ticket->id,
+                        'changed_by' => $admin->id,
+                        'previous_status' => 'in_progress',
+                        'new_status' => 'on_hold',
+                        'comment' => "Penanganan ditunda sementara oleh Admin. Alasan: Menunggu koordinasi suku cadang dari vendor penyedia.",
+                        'created_at' => (clone $assignedAt)->addMinutes(60),
                     ]);
                 }
 
@@ -823,6 +868,34 @@ class TicketSeeder extends Seeder
                         'created_at' => (clone $closedAt)->addMinutes(10),
                         'updated_at' => (clone $closedAt)->addMinutes(10),
                     ]);
+                } elseif ($status === 'on_hold') {
+                    TicketReply::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $reporter->id,
+                        'message' => 'Layanan jaringan kami mengalami kendala teknis di ruangan server. Mohon bantuan perbaikan segera.',
+                        'is_internal' => false,
+                        'created_at' => (clone $createdAt)->addMinutes(5),
+                        'updated_at' => (clone $createdAt)->addMinutes(5),
+                    ]);
+
+                    $techTeamNames = $technicians->whereIn('id', $assignedTechnicians)->pluck('name')->join(', ');
+                    TicketReply::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $leadTech->id,
+                        'message' => "Tim teknisi ({$techTeamNames}) telah melakukan inspeksi di lokasi. Ditemukan modul interface rusak fisik dan membutuhkan suku cadang pengganti.",
+                        'is_internal' => false,
+                        'created_at' => (clone $assignedAt)->addMinutes(30),
+                        'updated_at' => (clone $assignedAt)->addMinutes(30),
+                    ]);
+
+                    TicketReply::create([
+                        'ticket_id' => $ticket->id,
+                        'user_id' => $admin->id,
+                        'message' => 'Tiket sementara waktu di-hold (jeda) oleh Admin untuk koordinasi penyediaan unit pengganti bersama vendor rekanan.',
+                        'is_internal' => false,
+                        'created_at' => (clone $assignedAt)->addMinutes(60),
+                        'updated_at' => (clone $assignedAt)->addMinutes(60),
+                    ]);
                 } elseif ($status === 'cancelled') {
                     TicketReply::create([
                         'ticket_id' => $ticket->id,
@@ -845,7 +918,7 @@ class TicketSeeder extends Seeder
             }
 
             DB::commit();
-            $this->command->info("Berhasil melakukan seeding {$totalTickets} tiket gangguan untuk tahun 2025!");
+            $this->command->info("Berhasil melakukan seeding {$totalTickets} tiket gangguan untuk tahun 2026!");
         } catch (\Exception $e) {
             DB::rollBack();
             $this->command->error("Gagal melakukan seeding tiket: " . $e->getMessage());

@@ -159,6 +159,27 @@ class ReportController extends Controller
             ];
         })->sortByDesc('count')->take(5)->values();
 
+        $slaOnTimeCount = $slaCompliantCount;
+        $slaOverdueCount = max(0, $completedTicketsWithSla - $slaCompliantCount);
+
+        $filterDeptName = null;
+        if ($request->filled('department_id') && $request->input('department_id') !== 'all') {
+            $filterDeptName = Department::find($request->input('department_id'))?->name;
+        }
+
+        $filterStatusName = null;
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $statusLabels = [
+                'pending_admin' => 'Menunggu Verifikasi',
+                'in_progress' => 'Sedang Dikerjakan',
+                'on_hold' => 'Tertunda (On-Hold)',
+                'pending_approval' => 'Menunggu Review Admin',
+                'closed' => 'Selesai',
+                'cancelled' => 'Ditolak',
+            ];
+            $filterStatusName = $statusLabels[$request->input('status')] ?? $request->input('status');
+        }
+
         $pdf = Pdf::loadView('reports.tickets-pdf', [
             'totalTickets' => $totalTickets,
             'resolvedTickets' => $resolvedTickets,
@@ -166,6 +187,9 @@ class ReportController extends Controller
             'cancelledTickets' => $cancelledTickets,
             'resolutionRate' => $resolutionRate,
             'slaPercentage' => $slaPercentage,
+            'slaOnTimeCount' => $slaOnTimeCount,
+            'slaOverdueCount' => $slaOverdueCount,
+            'completedTicketsWithSla' => $completedTicketsWithSla,
             'avgDurationText' => $avgDurationText,
             'avgCsat' => $avgCsat,
             'csatCount' => $csatCount,
@@ -175,6 +199,8 @@ class ReportController extends Controller
             'topCategories' => $topCategories,
             'startDate' => $request->input('start_date'),
             'endDate' => $request->input('end_date'),
+            'filterDeptName' => $filterDeptName,
+            'filterStatusName' => $filterStatusName,
         ])->setPaper('a4', 'portrait');
 
         $fileName = 'Laporan-Eksekutif-Helpdesk-' . date('Ymd-His') . '.pdf';
