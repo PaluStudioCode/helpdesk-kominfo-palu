@@ -870,9 +870,6 @@ const techResolutionChartOptions = computed(() => ({
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-5">
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Dashboard Monitoring</h1>
-                    <p class="text-sm text-slate-500 mt-1">
-                        Ringkasan metrik operasional layanan helpdesk jaringan dan efisiensi kinerja penanganan.
-                    </p>
                 </div>
                 <div class="flex items-center gap-2.5 shrink-0 flex-nowrap">
                     <!-- Unified Period Filter Selector (for Admin) -->

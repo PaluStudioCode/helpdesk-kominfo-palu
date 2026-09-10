@@ -63,12 +63,9 @@ const handleTabChange = (val: string) => {
         </template>
 
         <div class="space-y-6">
-            <!-- Header Title and Description -->
+            <!-- Header Title -->
             <div class="border-b border-slate-200 pb-5">
                 <h1 class="text-xl font-bold text-slate-900 tracking-tight">Pusat Kelola Master Data</h1>
-                <p class="text-sm text-slate-500 mt-1">
-                    Kelola data referensi Organisasi Perangkat Daerah (OPD), klasifikasi kendala & target SLA, akun pengguna sistem, serta katalog perangkat dan material perbaikan.
-                </p>
             </div>
 
             <!-- Top Navigation Tabs (Grid, Style Biasa, Tanpa Ikon & Deskripsi) -->

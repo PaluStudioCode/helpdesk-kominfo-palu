@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import InputLabel from '@/Components/InputLabel.vue';
 import InputError from '@/Components/InputError.vue';
 import FileUpload from '@/Components/FileUpload.vue';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Info } from 'lucide-vue-next';
 import {
   Select,
@@ -82,9 +82,6 @@ const submitForm = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>Formulir Pengaduan Gangguan OPD</CardTitle>
-                    <CardDescription>
-                        Isi detail gangguan di ruangan kerja Anda agar dapat segera diverifikasi oleh tim Diskominfo.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form @submit.prevent="submitForm" class="space-y-6">

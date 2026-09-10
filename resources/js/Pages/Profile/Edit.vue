@@ -24,9 +24,6 @@ const user = computed(() => usePage().props.auth.user as any);
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-200 pb-5">
                 <div>
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">Pengaturan Profil Pengguna</h1>
-                    <p class="text-sm text-slate-500 mt-1">
-                        Kelola data pribadi, nomor kontak WhatsApp, dan keamanan akun Anda.
-                    </p>
                 </div>
             </div>
 

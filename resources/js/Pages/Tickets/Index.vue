@@ -169,12 +169,6 @@ const formatDate = (dateStr: string) => {
                     <h1 class="text-xl font-bold text-slate-900 tracking-tight">
                         {{ currentUser?.role === 'technician' ? 'Daftar Penugasan Tiket Lapangan' : 'Antrean & Riwayat Tiket Gangguan' }}
                     </h1>
-                    <p class="text-sm text-slate-500 mt-1">
-                        {{ currentUser?.role === 'technician' 
-                            ? 'Daftar seluruh tiket perbaikan jaringan yang ditugaskan kepada Anda, baik sebagai penanggung jawab utama maupun tim pendukung.'
-                            : 'Pantau status penanganan, kelola verifikasi dan eskalasi kendala jaringan, serta buat laporan baru.' 
-                        }}
-                    </p>
                 </div>
             </div>
 

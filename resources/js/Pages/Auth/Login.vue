@@ -40,9 +40,6 @@ const submit = () => {
 
         <div class="mb-6">
             <h2 class="text-xl font-bold text-white tracking-tight">Masuk ke Sistem</h2>
-            <p class="text-xs text-slate-400 mt-1">
-                Silakan masukkan email dan kata sandi akun resmi Anda.
-            </p>
         </div>
 
         <form @submit.prevent="submit" class="space-y-4">
