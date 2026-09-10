@@ -17,8 +17,7 @@ return new class extends Migration
             $table->unsignedTinyInteger('rating');
             $table->text('feedback_comment')->nullable();
             $table->foreignId('rated_by')->constrained('users')->onDelete('restrict');
-            $table->timestamp('rated_at')->useCurrent();
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
         });
     }
 

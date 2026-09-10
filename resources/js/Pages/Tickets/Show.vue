@@ -203,6 +203,35 @@ const getHoldCategoryLabel = (cat: string | null | undefined) => {
     return cat ? (labels[cat] || cat) : '-';
 };
 
+const holdInfo = computed(() => {
+    if (props.ticket.status !== 'on_hold') return null;
+
+    const hold = props.ticket.latest_hold || 
+                 (props.ticket.holds && props.ticket.holds.find((h: any) => !h.ended_at)) || 
+                 (props.ticket.holds && props.ticket.holds[0]) || null;
+
+    const category = hold?.reason_category || props.ticket.hold_reason_category;
+    const rawNote = hold?.reason_note || props.ticket.hold_reason_note || '';
+    const startedAt = hold?.started_at || props.ticket.hold_started_at || props.ticket.updated_at;
+
+    return {
+        category,
+        categoryLabel: getHoldCategoryLabel(category),
+        rawNote,
+        startedAt,
+    };
+});
+
+const totalHoldMinutes = computed(() => {
+    if (props.ticket.total_hold_duration_minutes && props.ticket.total_hold_duration_minutes > 0) {
+        return props.ticket.total_hold_duration_minutes;
+    }
+    if (props.ticket.holds && props.ticket.holds.length > 0) {
+        return props.ticket.holds.reduce((acc: number, h: any) => acc + (Number(h.duration_minutes) || 0), 0);
+    }
+    return 0;
+});
+
 const getSlaStatus = (ticket: any) => {
     if (ticket.status === 'closed') {
         return {
@@ -994,17 +1023,17 @@ onUnmounted(() => {
                         <p class="font-bold text-amber-950 text-sm sm:text-base">
                             Penanganan Tiket Ditunda Sementara
                         </p>
-                        <span v-if="ticket.hold_started_at" class="text-xs text-amber-700 font-medium">
-                            Ditunda sejak: {{ formatDate(ticket.hold_started_at) }}
+                        <span v-if="holdInfo?.startedAt" class="text-xs text-amber-700 font-medium">
+                            Ditunda sejak: {{ formatDate(holdInfo.startedAt) }}
                         </span>
                     </div>
 
                     <p class="text-xs sm:text-sm text-amber-900">
-                        <span class="font-semibold text-amber-950">Alasan:</span> {{ getHoldCategoryLabel(ticket.hold_reason_category) }}
+                        <span class="font-semibold text-amber-950">Alasan:</span> {{ holdInfo?.categoryLabel }}
                     </p>
 
-                    <div v-if="ticket.hold_reason_note" class="mt-2 p-3 bg-white/80 border border-amber-200/80 rounded-lg text-amber-900 text-xs sm:text-sm leading-relaxed whitespace-pre-line shadow-2xs">
-                        {{ ticket.hold_reason_note }}
+                    <div v-if="holdInfo?.rawNote" class="mt-2 p-3 bg-white/80 border border-amber-200/80 rounded-lg text-amber-900 text-xs sm:text-sm leading-relaxed whitespace-pre-line shadow-2xs">
+                        {{ holdInfo.rawNote }}
                     </div>
                 </div>
             </div>
@@ -1178,8 +1207,8 @@ onUnmounted(() => {
                                 <dd class="text-sm font-bold font-mono text-slate-900 mt-0.5">
                                     {{ getHandlingDuration(ticket, { fullText: true }) }}
                                 </dd>
-                                <dd v-if="ticket.total_hold_duration_minutes && ticket.total_hold_duration_minutes > 0" class="text-[11px] text-amber-700 font-medium mt-0.5">
-                                    (Waktu aktif di luar jeda tunda {{ ticket.total_hold_duration_minutes }} menit)
+                                <dd v-if="totalHoldMinutes > 0" class="text-[11px] text-amber-700 font-medium mt-0.5">
+                                    (Waktu aktif di luar jeda tunda {{ totalHoldMinutes }} menit)
                                 </dd>
                             </div>
                         </dl>

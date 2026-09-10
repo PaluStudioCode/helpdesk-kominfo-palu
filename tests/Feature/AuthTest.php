@@ -88,6 +88,35 @@ class AuthTest extends TestCase
         $this->assertEquals('089876543210', $admin->fresh()->phone_number);
     }
 
+    public function test_user_can_update_password(): void
+    {
+        $admin = $this->createAdmin(['password' => bcrypt('old-password-123')]);
+
+        $response = $this->actingAs($admin)->put('/password', [
+            'current_password' => 'old-password-123',
+            'password' => 'brand-new-password-123',
+            'password_confirmation' => 'brand-new-password-123',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('brand-new-password-123', $admin->fresh()->password));
+    }
+
+    public function test_user_cannot_update_password_with_incorrect_current_password(): void
+    {
+        $admin = $this->createAdmin(['password' => bcrypt('old-password-123')]);
+
+        $response = $this->actingAs($admin)->put('/password', [
+            'current_password' => 'wrong-old-password',
+            'password' => 'brand-new-password-123',
+            'password_confirmation' => 'brand-new-password-123',
+        ]);
+
+        $response->assertSessionHasErrors('current_password');
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('old-password-123', $admin->fresh()->password));
+    }
+
     public function test_user_can_logout(): void
     {
         $admin = $this->createAdmin();
@@ -97,4 +126,60 @@ class AuthTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_guest_can_view_forgot_password_page(): void
+    {
+        $response = $this->get('/forgot-password');
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('Auth/ForgotPassword'));
+    }
+
+    public function test_guest_can_request_password_reset_link(): void
+    {
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $admin = $this->createAdmin();
+
+        $response = $this->post('/forgot-password', [
+            'email' => $admin->email,
+        ]);
+
+        $response->assertSessionHas('status');
+        \Illuminate\Support\Facades\Notification::assertSentTo(
+            $admin,
+            \Illuminate\Auth\Notifications\ResetPassword::class
+        );
+    }
+
+    public function test_guest_can_view_reset_password_page(): void
+    {
+        $admin = $this->createAdmin();
+        $token = \Illuminate\Support\Facades\Password::createToken($admin);
+
+        $response = $this->get("/reset-password/{$token}?email=" . urlencode($admin->email));
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Auth/ResetPassword')
+            ->where('email', $admin->email)
+            ->where('token', $token)
+        );
+    }
+
+    public function test_guest_can_reset_password_with_valid_token(): void
+    {
+        $admin = $this->createAdmin();
+        $token = \Illuminate\Support\Facades\Password::createToken($admin);
+
+        $response = $this->post('/reset-password', [
+            'token' => $token,
+            'email' => $admin->email,
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect('/login');
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('new-password-123', $admin->fresh()->password));
+    }
 }
+

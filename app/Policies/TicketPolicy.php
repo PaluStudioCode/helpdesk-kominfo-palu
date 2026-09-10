@@ -182,7 +182,7 @@ class TicketPolicy
             return Response::deny('Hanya pihak pelapor OPD yang berhak memberikan penilaian kepuasan layanan.');
         }
 
-        return ($ticket->isClosed() && $ticket->rating === null)
+        return ($ticket->isClosed() && !$ticket->feedback()->exists())
             ? Response::allow()
             : Response::deny('Tiket belum ditutup atau sudah dinilai sebelumnya.');
     }

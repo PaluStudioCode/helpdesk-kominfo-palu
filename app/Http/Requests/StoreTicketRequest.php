@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Models\TicketCategory;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTicketRequest extends FormRequest

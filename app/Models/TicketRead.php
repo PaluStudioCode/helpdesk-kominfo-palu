@@ -14,15 +14,7 @@ class TicketRead extends Model
         'ticket_id',
         'user_id',
         'last_read_reply_id',
-        'last_read_at',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'last_read_at' => 'datetime',
-        ];
-    }
 
     public function ticket(): BelongsTo
     {

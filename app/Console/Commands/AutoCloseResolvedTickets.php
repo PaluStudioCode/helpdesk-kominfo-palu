@@ -32,8 +32,14 @@ class AutoCloseResolvedTickets extends Command
         $thresholdTime = now()->subHours(72);
 
         $ticketsToClose = Ticket::where('status', 'pending_approval')
-            ->whereNotNull('resolved_at')
-            ->where('resolved_at', '<=', $thresholdTime)
+            ->where(function ($query) use ($thresholdTime) {
+                $query->whereHas('resolution', function ($q) use ($thresholdTime) {
+                    $q->where('created_at', '<=', $thresholdTime);
+                })->orWhere(function ($fallbackQ) use ($thresholdTime) {
+                    $fallbackQ->whereDoesntHave('resolution')
+                        ->where('updated_at', '<=', $thresholdTime);
+                });
+            })
             ->get();
 
         $count = 0;
@@ -54,12 +60,11 @@ class AutoCloseResolvedTickets extends Command
                 $previousStatus = $lockedTicket->status;
                 $lockedTicket->update([
                     'status' => 'closed',
-                    'closed_at' => now(),
                 ]);
 
                 // Record Status History
                 $changedById = $lockedTicket->reporter_id ?? $lockedTicket->assigned_to;
-                $lockedTicket->statusHistories()->create([
+                $history = $lockedTicket->statusHistories()->create([
                     'changed_by' => $changedById,
                     'previous_status' => $previousStatus,
                     'new_status' => 'closed',
@@ -70,11 +75,13 @@ class AutoCloseResolvedTickets extends Command
                 // Log system activity
                 ActivityLogger::log('ticket.auto_closed', $lockedTicket, [
                     'ticket_number' => $lockedTicket->ticket_number,
-                    'resolved_at' => $lockedTicket->resolved_at?->toIso8601String(),
                     'closed_at' => now()->toIso8601String(),
                 ], null);
 
                 DB::commit();
+
+                // Broadcast Realtime Status
+                broadcast(new \App\Events\TicketStatusUpdated($lockedTicket, $history));
 
                 // Dispatch notification
                 NotificationDispatcher::ticketClosed($lockedTicket);

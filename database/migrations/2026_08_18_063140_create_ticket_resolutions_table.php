@@ -25,7 +25,6 @@ return new class extends Migration
             $table->text('test_parameters')->nullable();
             $table->text('resolution_note')->nullable();
             $table->foreignId('resolved_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
         });
     }

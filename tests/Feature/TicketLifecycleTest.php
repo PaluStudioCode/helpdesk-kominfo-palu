@@ -563,6 +563,18 @@ class TicketLifecycleTest extends TestCase
             'previous_status' => 'in_progress',
             'new_status' => 'on_hold',
         ]);
+
+        // Verify Inertia Show props contains hold information
+        $showResponse = $this->actingAs($admin)->get("/tickets/{$ticket->id}");
+        $showResponse->assertStatus(200);
+        $showResponse->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => 
+            $page->component('Tickets/Show')
+                ->where('ticket.status', 'on_hold')
+                ->where('ticket.hold_reason_category', 'vendor_isp')
+                ->where('ticket.hold_reason_note', 'Menunggu perbaikan link backbone oleh Telkom (No Tiket: INC9999).')
+                ->has('ticket.hold_started_at')
+                ->has('ticket.latest_hold')
+        );
     }
 
     public function test_admin_can_resume_held_ticket_and_sla_is_extended(): void

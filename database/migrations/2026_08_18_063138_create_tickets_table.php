@@ -24,7 +24,6 @@ return new class extends Migration
             $table->enum('status', ['pending_admin', 'in_progress', 'on_hold', 'pending_approval', 'closed', 'cancelled'])->default('pending_admin');
             $table->timestamp('due_at')->nullable();
             $table->timestamps();
-            $table->softDeletes();
             
             $table->index(['department_id', 'status', 'created_at']);
             $table->index(['assigned_to', 'status']);

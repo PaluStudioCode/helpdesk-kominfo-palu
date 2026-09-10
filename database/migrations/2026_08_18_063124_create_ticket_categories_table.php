@@ -17,7 +17,6 @@ return new class extends Migration
             $table->enum('infrastructure_type', ['Fiber optic', 'Perangkat/Akses', 'Power/poe', 'Converter', 'Layanan/jaringan']);
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
-            $table->softDeletes();
             
             $table->index(['infrastructure_type', 'status']);
         });

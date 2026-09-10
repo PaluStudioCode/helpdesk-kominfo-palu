@@ -1,4 +1,4 @@
-import type { Ticket, TicketStatus, TicketPriority, InfrastructureType, NetworkType, UserRole } from '@/types';
+import type { Ticket, TicketStatus, TicketPriority, InfrastructureType, NetworkType, UserRole, TicketStatusHistory } from '@/types';
 
 /**
  * Format tanggal dan waktu standar Indonesia (WITA / Asia/Makassar).
@@ -158,7 +158,7 @@ export const getRoleColor = (role: UserRole | string | null | undefined): string
  * dikurangi total jeda penundaan (total_hold_duration_minutes).
  */
 export const getHandlingDuration = (
-    ticket: Partial<Ticket> | any, 
+    ticket: Partial<Ticket> | null | undefined, 
     options?: { fullText?: boolean; includeHoldNote?: boolean }
 ): string => {
     if (!ticket || ticket.status === 'cancelled') return '-';
@@ -266,25 +266,27 @@ export const getSlaStatus = (ticket: Partial<Ticket>): { label: string; color: s
 /**
  * Helper untuk mengekstrak informasi revisi aktif (jika tiket dalam status in_progress setelah diminta revisi).
  */
-export const getRevisionInfo = (ticket: any): { adminName: string; instruction: string; requestedAt: string } | null => {
+export const getRevisionInfo = (
+    ticket: Partial<Ticket> | null | undefined
+): { adminName: string; instruction: string; requestedAt: string } | null => {
     if (!ticket || ticket.status !== 'in_progress' || !ticket.status_histories || !Array.isArray(ticket.status_histories)) {
         return null;
     }
 
-    const revisionHistories = ticket.status_histories.filter((h: any) => 
+    const revisionHistories = ticket.status_histories.filter((h: TicketStatusHistory) => 
         h.previous_status === 'pending_approval' && h.new_status === 'in_progress'
     );
 
     if (revisionHistories.length === 0) return null;
 
-    const latestRevision = revisionHistories.reduce((prev: any, curr: any) => {
+    const latestRevision = revisionHistories.reduce((prev: TicketStatusHistory, curr: TicketStatusHistory) => {
         return (new Date(curr.created_at).getTime() > new Date(prev.created_at).getTime()) ? curr : prev;
     }, revisionHistories[0]);
 
     // Pastikan tidak ada transisi status pending_approval atau closed setelah riwayat revisi ini
-    const newerTransitions = ticket.status_histories.some((h: any) => 
+    const newerTransitions = ticket.status_histories.some((h: TicketStatusHistory) => 
         new Date(h.created_at).getTime() > new Date(latestRevision.created_at).getTime() &&
-        ['pending_approval', 'closed'].includes(h.new_status)
+        (h.new_status === 'pending_approval' || h.new_status === 'closed')
     );
     if (newerTransitions) return null;
 

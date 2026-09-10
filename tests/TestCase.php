@@ -113,6 +113,10 @@ abstract class TestCase extends BaseTestCase
         $holdReasonNote = $attributes['hold_reason_note'] ?? null;
         $holdStartedAt = $attributes['hold_started_at'] ?? null;
 
+        $rating = $attributes['rating'] ?? null;
+        $feedbackComment = $attributes['feedback_comment'] ?? null;
+        $ratedAt = $attributes['rated_at'] ?? null;
+
         unset(
             $attributes['category_id'],
             $attributes['infrastructure_type'],
@@ -123,7 +127,10 @@ abstract class TestCase extends BaseTestCase
             $attributes['hold_reason_category'],
             $attributes['hold_reason_note'],
             $attributes['hold_started_at'],
-            $attributes['total_hold_duration_minutes']
+            $attributes['total_hold_duration_minutes'],
+            $attributes['rating'],
+            $attributes['feedback_comment'],
+            $attributes['rated_at']
         );
 
         $ticket = Ticket::create(array_merge([
@@ -142,9 +149,17 @@ abstract class TestCase extends BaseTestCase
         if ($categoryId) {
             $ticket->resolution()->create([
                 'category_id' => $categoryId,
-                'technician_id' => $ticket->assigned_to ?? $reporter,
+                'resolved_by' => $ticket->assigned_to ?? $reporter,
                 'action_taken' => 'Tindakan perbaikan testing.',
-                'resolved_at' => now(),
+            ]);
+        }
+
+        if ($rating) {
+            $ticket->feedback()->create([
+                'rating' => $rating,
+                'feedback_comment' => $feedbackComment ?? 'Feedback testing.',
+                'rated_by' => $reporter,
+                'created_at' => $ratedAt ?? now(),
             ]);
         }
 

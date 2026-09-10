@@ -8,42 +8,20 @@ use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class CategoryController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): RedirectResponse
     {
         $this->authorize('viewAny', TicketCategory::class);
 
-        $query = TicketCategory::query();
-
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        $infraType = $request->input('infrastructure_type', $request->input('network_type'));
-        if (!empty($infraType) && $infraType !== 'all') {
-            $query->where('infrastructure_type', $infraType);
-        }
-
-        if ($request->has('sort')) {
-            $query->orderBy($request->input('sort'), $request->input('direction', 'asc'));
-        } else {
-            $query->orderBy('name', 'asc');
-        }
-
-        $categories = $query->paginate(10)->withQueryString();
-
-        return Inertia::render('Admin/Categories/Index', [
-            'categories' => $categories,
-            'filters' => $request->only(['search', 'sort', 'direction', 'infrastructure_type', 'network_type']),
-        ]);
+        return redirect()->route('admin.master-data.index', array_merge(
+            ['tab' => 'categories'],
+            $request->query()
+        ));
     }
 
     /**
@@ -75,13 +53,10 @@ class CategoryController extends Controller
     {
         $this->authorize('delete', $category);
         
-        $activeTicketsCount = $category->tickets()
-            ->whereIn('status', ['pending_admin', 'in_progress', 'pending_approval'])
-            ->count();
-
-        if ($activeTicketsCount > 0) {
+        $ticketsCount = $category->tickets()->count();
+        if ($ticketsCount > 0) {
             return redirect()->back()
-                ->with('error', "Tidak dapat menghapus kategori ini karena masih digunakan oleh {$activeTicketsCount} tiket aktif.");
+                ->with('error', "Tidak dapat menghapus kategori ini karena masih digunakan oleh {$ticketsCount} data tiket.");
         }
 
         $category->delete();

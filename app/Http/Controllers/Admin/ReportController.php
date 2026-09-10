@@ -204,14 +204,15 @@ class ReportController extends Controller
     protected function buildFilteredQuery(Request $request)
     {
         $query = Ticket::with([
-            'department:id,name', 
+            'department:id,name,code', 
             'resolution.category:id,name,infrastructure_type', 
+            'resolution.resolver:id,name,role',
             'assignee:id,name', 
-            'technicians:id,name',
-            'reporter:id,name',
-            'feedback',
-            'latestHold',
-            'statusHistories',
+            'technicians:id,name,phone_number',
+            'reporter:id,name,phone_number',
+            'feedback.rater:id,name',
+            'latestHold.user:id,name',
+            'statusHistories.changer:id,name',
         ]);
 
         // Search keyword filter

@@ -4,10 +4,12 @@ namespace App\Exports;
 
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -15,6 +17,7 @@ class SimpleExcelExport
 {
     /**
      * Generate a compact, formal .xlsx Excel spreadsheet response
+     * Optimized for office reporting (10 essential columns, print-friendly, auto-filter, freeze-panes).
      */
     public static function download(Collection $tickets, string $fileName, ?string $startDate = null, ?string $endDate = null): StreamedResponse
     {
@@ -31,10 +34,17 @@ class SimpleExcelExport
             $sheet = $spreadsheet->getActiveSheet();
             $sheet->setTitle('Rekapitulasi Tiket');
 
+            // Set Page Setup: Landscape A4 & Fit all columns to 1 page width
+            $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE);
+            $sheet->getPageSetup()->setPaperSize(PageSetup::PAPERSIZE_A4);
+            $sheet->getPageSetup()->setFitToPage(true);
+            $sheet->getPageSetup()->setFitToWidth(1);
+            $sheet->getPageSetup()->setFitToHeight(0);
+
             // 1. Metadata Kop Laporan (Row 1 - 4)
             $sheet->setCellValue('A1', 'PEMERINTAH KOTA PALU');
-            $sheet->setCellValue('A2', 'DINAS KOMUNIKASI DAN INFORMATIKA - HELPDESK & LAYANAN JARINGAN');
-            $sheet->setCellValue('A3', 'Laporan Rekapitulasi Penanganan Gangguan & Tiket Masuk');
+            $sheet->setCellValue('A2', 'DINAS KOMUNIKASI DAN INFORMATIKA - BIDANG PENGELOLAAN OP & JARINGAN');
+            $sheet->setCellValue('A3', 'Laporan Rekapitulasi Penanganan Gangguan & Layanan Helpdesk TIK');
 
             $periodText = 'Semua Periode';
             if ($startDate && $endDate) {
@@ -46,29 +56,75 @@ class SimpleExcelExport
             }
 
             $printedAt = Carbon::now('Asia/Makassar')->format('d/m/Y H:i') . ' WITA';
-            $sheet->setCellValue('A4', "Periode: {$periodText} | Dicetak pada: {$printedAt}");
+            $sheet->setCellValue('A4', "Periode: {$periodText}   |   Dicetak pada: {$printedAt}");
 
-            // Styling Kop Laporan
-            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13)->getColor()->setRGB('1E3A8A');
-            $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(10.5)->getColor()->setRGB('334155');
-            $sheet->getStyle('A3')->getFont()->setItalic(true)->setSize(9.5)->getColor()->setRGB('64748B');
+            // 2. Ringkasan Singkat Kantor 1 Baris (Row 5)
+            $totalTickets = $tickets->count();
+            $resolvedTickets = $tickets->whereIn('status', ['resolved', 'closed'])->count();
+            $inProgressTickets = $tickets->whereIn('status', ['in_progress', 'pending_approval'])->count();
+            $pendingAdminTickets = $tickets->where('status', 'pending_admin')->count();
+            
+            $completedWithSla = 0;
+            $slaCompliantCount = 0;
+            foreach ($tickets as $t) {
+                $endTime = $t->resolved_at ?? $t->closed_at;
+                if (in_array($t->status, ['resolved', 'closed']) && $endTime && $t->due_at) {
+                    $completedWithSla++;
+                    if (Carbon::parse($endTime)->lte(Carbon::parse($t->due_at))) {
+                        $slaCompliantCount++;
+                    }
+                }
+            }
+            $slaRate = $completedWithSla > 0 ? round(($slaCompliantCount / $completedWithSla) * 100, 1) : 100;
+
+            $summaryText = "Ringkasan Laporan:  Total Tiket: {$totalTickets}   |   Selesai: {$resolvedTickets}   |   Dalam Proses: {$inProgressTickets}   |   Kepatuhan SLA: {$slaRate}%";
+            $sheet->setCellValue('A5', $summaryText);
+            $sheet->mergeCells('A5:J5');
+
+            // Styling Kop Laporan & Ringkasan Bar
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(12)->getColor()->setRGB('1E3A8A');
+            $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(10)->getColor()->setRGB('334155');
+            $sheet->getStyle('A3')->getFont()->setItalic(true)->setSize(9.5)->getColor()->setRGB('475569');
             $sheet->getStyle('A4')->getFont()->setSize(9)->getColor()->setRGB('64748B');
 
-            // 2. Header Tabel Data Kompak (Row 6 - 12 Kolom Terstruktur)
-            $headerRow = 6;
+            $sheet->getRowDimension(5)->setRowHeight(20);
+            $sheet->getStyle('A5:J5')->applyFromArray([
+                'font' => [
+                    'bold' => true,
+                    'size' => 9,
+                    'color' => ['rgb' => '1E293B'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'F1F5F9'],
+                ],
+                'alignment' => [
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                    'horizontal' => Alignment::HORIZONTAL_LEFT,
+                    'indent' => 1,
+                ],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
+                    'bottom' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
+                ],
+            ]);
+
+            // Row 6: Spacer
+            $sheet->getRowDimension(6)->setRowHeight(8);
+
+            // 3. Header Tabel (Row 7 - 10 Kolom Proporsional Laporan Kantor)
+            $headerRow = 7;
             $columns = [
-                'A' => ['title' => 'No', 'width' => 6, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'B' => ['title' => 'No. Tiket', 'width' => 18, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'C' => ['title' => 'Instansi / OPD', 'width' => 26, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
-                'D' => ['title' => 'Infrastruktur & Kategori', 'width' => 24, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
-                'E' => ['title' => 'Judul Masalah', 'width' => 32, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
-                'F' => ['title' => 'Prioritas', 'width' => 13, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'G' => ['title' => 'Status', 'width' => 18, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'H' => ['title' => 'Teknisi', 'width' => 20, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
-                'I' => ['title' => 'Waktu Lapor', 'width' => 17, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'J' => ['title' => 'Waktu Selesai', 'width' => 17, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
-                'K' => ['title' => 'Kinerja SLA & Durasi', 'width' => 22, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => true],
-                'L' => ['title' => 'Tindakan / Solusi', 'width' => 36, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
+                'A' => ['title' => 'No', 'width' => 5, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
+                'B' => ['title' => 'No. Tiket', 'width' => 17, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
+                'C' => ['title' => 'Tanggal Lapor', 'width' => 16, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
+                'D' => ['title' => 'Instansi (OPD)', 'width' => 26, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
+                'E' => ['title' => 'Infrastruktur', 'width' => 18, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => false],
+                'F' => ['title' => 'Kendala / Masalah', 'width' => 28, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
+                'G' => ['title' => 'Petugas Teknisi', 'width' => 22, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
+                'H' => ['title' => 'Status', 'width' => 16, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
+                'I' => ['title' => 'Tgl Selesai', 'width' => 16, 'align' => Alignment::HORIZONTAL_CENTER, 'wrap' => false],
+                'J' => ['title' => 'Tindakan / Solusi', 'width' => 36, 'align' => Alignment::HORIZONTAL_LEFT, 'wrap' => true],
             ];
 
             foreach ($columns as $col => $config) {
@@ -78,16 +134,16 @@ class SimpleExcelExport
 
             // Style Header Row
             $sheet->getRowDimension($headerRow)->setRowHeight(26);
-            $headerRange = "A{$headerRow}:L{$headerRow}";
+            $headerRange = "A{$headerRow}:J{$headerRow}";
             $sheet->getStyle($headerRange)->applyFromArray([
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF'],
-                    'size' => 10,
+                    'size' => 9.5,
                 ],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '1E40AF'], // Kominfo Royal Blue
+                    'startColor' => ['rgb' => '1E40AF'], // Royal Navy Blue Kominfo
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -102,6 +158,10 @@ class SimpleExcelExport
                 ],
             ]);
 
+            // Aktifkan Fitur Native Excel: AutoFilter & Freeze Panes
+            $sheet->setAutoFilter("A{$headerRow}:J{$headerRow}");
+            $sheet->freezePane('A8');
+
             $networkMap = [
                 'Fiber optic' => 'Fiber optic',
                 'Perangkat/Akses' => 'Perangkat/Akses',
@@ -113,105 +173,50 @@ class SimpleExcelExport
                 'wifi' => 'Layanan/jaringan',
             ];
 
-            $priorityMap = [
-                'emergency' => 'Darurat',
-                'high' => 'Tinggi',
-                'medium' => 'Sedang',
-                'low' => 'Rendah',
-            ];
-
             $statusMap = [
                 'pending_admin' => 'Menunggu Verifikasi',
                 'in_progress' => 'Sedang Dikerjakan',
+                'on_hold' => 'Tertunda (On-Hold)',
                 'pending_approval' => 'Menunggu Review',
                 'closed' => 'Selesai',
                 'cancelled' => 'Ditolak',
             ];
 
-            // 3. Populate Data Rows (Starting Row 7)
-            $currentRow = 7;
+            // 4. Populate Data Rows (Mulai Row 8)
+            $currentRow = 8;
             foreach ($tickets as $index => $ticket) {
-                $durationText = '-';
-                $slaStatus = '-';
-                $endTime = $ticket->resolved_at ?? $ticket->closed_at;
-                $startPoint = $ticket->assigned_at ?? $ticket->created_at;
+                $endTime = $ticket->resolved_at ?? $ticket->resolution?->created_at ?? $ticket->closed_at;
 
-                if ($startPoint && $ticket->status !== 'cancelled') {
-                    $start = Carbon::parse($startPoint);
-                    $end = in_array($ticket->status, ['resolved', 'closed']) && $endTime
-                        ? Carbon::parse($endTime)
-                        : now();
-
-                    $diffMinutes = max(0, $start->diffInMinutes($end));
-                    $days = floor($diffMinutes / (60 * 24));
-                    $hours = floor(($diffMinutes % (60 * 24)) / 60);
-                    $minutes = $diffMinutes % 60;
-
-                    $durParts = [];
-                    if ($days > 0) $durParts[] = "{$days}h";
-                    if ($hours > 0) $durParts[] = "{$hours}j";
-                    if ($minutes > 0 || empty($durParts)) $durParts[] = "{$minutes}m";
-
-                    $durationText = implode(' ', $durParts);
-                    if (!in_array($ticket->status, ['resolved', 'closed'])) {
-                        $durationText .= ' (berjalan)';
-                    }
-                }
-
-                if ($ticket->status === 'cancelled') {
-                    $slaStatus = 'Ditolak';
-                } elseif ($ticket->status === 'pending_admin') {
-                    $slaStatus = 'Menunggu Verifikasi';
-                } elseif ($ticket->due_at) {
-                    $due = Carbon::parse($ticket->due_at);
-                    if (in_array($ticket->status, ['resolved', 'closed']) && $endTime) {
-                        $end = Carbon::parse($endTime);
-                        if ($end->lte($due)) {
-                            $slaStatus = 'Tepat Waktu';
-                        } else {
-                            $slaStatus = 'Terlambat';
-                        }
-                    } else {
-                        if (now()->gt($due)) {
-                            $slaStatus = 'Overdue SLA';
-                        } elseif (now()->diffInHours($due, false) <= 2) {
-                            $slaStatus = 'Mendekati Batas';
-                        } else {
-                            $slaStatus = 'Dalam Target';
-                        }
-                    }
-                }
-
+                // Nama Petugas / Tim Teknisi
                 $techNames = $ticket->technicians && $ticket->technicians->count() > 0
                     ? $ticket->technicians->pluck('name')->implode(', ')
                     : ($ticket->assignee?->name ?? '-');
 
-                // Gabungan Infrastruktur & Kategori
-                $infraType = $ticket->infrastructure_type ?? $ticket->network_type;
+                // Jenis Infrastruktur
+                $infraType = $ticket->resolution?->category?->infrastructure_type 
+                    ?? $ticket->infrastructure_type 
+                    ?? $ticket->network_type;
                 $netName = $networkMap[$infraType] ?? ($infraType ? ucfirst($infraType) : '-');
-                $catName = $ticket->category?->name ?? '-';
-                $netCategoryCombined = ($netName !== '-' && $catName !== '-') 
-                    ? "{$netName} - {$catName}" 
-                    : ($netName !== '-' ? $netName : $catName);
 
-                // Gabungan Kinerja SLA & Durasi
-                $performanceCombined = "{$durationText}\n({$slaStatus})";
+                // Tindakan Penanganan Riil
+                $actionTaken = $ticket->resolution?->action_taken 
+                    ?? $ticket->action_taken 
+                    ?? $ticket->resolution_note 
+                    ?? ($ticket->status === 'in_progress' ? 'Sedang dalam pengerjaan' : '-');
 
                 $sheet->setCellValue("A{$currentRow}", $index + 1);
-                $sheet->setCellValueExplicit("B{$currentRow}", $ticket->ticket_number, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                $sheet->setCellValue("C{$currentRow}", $ticket->department?->name ?? '-');
-                $sheet->setCellValue("D{$currentRow}", $netCategoryCombined);
-                $sheet->setCellValue("E{$currentRow}", $ticket->title ?? '-');
-                $sheet->setCellValue("F{$currentRow}", $priorityMap[$ticket->priority] ?? ($ticket->priority ? ucfirst($ticket->priority) : '-'));
-                $sheet->setCellValue("G{$currentRow}", $statusMap[$ticket->status] ?? $ticket->status);
-                $sheet->setCellValue("H{$currentRow}", $techNames);
-                $sheet->setCellValue("I{$currentRow}", $ticket->created_at ? Carbon::parse($ticket->created_at)->timezone('Asia/Makassar')->format('d/m/Y H:i') : '-');
-                $sheet->setCellValue("J{$currentRow}", $endTime ? Carbon::parse($endTime)->timezone('Asia/Makassar')->format('d/m/Y H:i') : '-');
-                $sheet->setCellValue("K{$currentRow}", $performanceCombined);
-                $sheet->setCellValue("L{$currentRow}", $ticket->resolution_note ?? '-');
+                $sheet->setCellValueExplicit("B{$currentRow}", $ticket->ticket_number, DataType::TYPE_STRING);
+                $sheet->setCellValue("C{$currentRow}", $ticket->created_at ? Carbon::parse($ticket->created_at)->timezone('Asia/Makassar')->format('d/m/Y H:i') : '-');
+                $sheet->setCellValue("D{$currentRow}", $ticket->department?->name ?? '-');
+                $sheet->setCellValue("E{$currentRow}", $netName);
+                $sheet->setCellValue("F{$currentRow}", $ticket->title ?? '-');
+                $sheet->setCellValue("G{$currentRow}", $techNames);
+                $sheet->setCellValue("H{$currentRow}", $statusMap[$ticket->status] ?? $ticket->status);
+                $sheet->setCellValue("I{$currentRow}", $endTime ? Carbon::parse($endTime)->timezone('Asia/Makassar')->format('d/m/Y H:i') : '-');
+                $sheet->setCellValue("J{$currentRow}", $actionTaken);
 
                 // Row borders & Zebra Striping
-                $rowRange = "A{$currentRow}:L{$currentRow}";
+                $rowRange = "A{$currentRow}:J{$currentRow}";
                 $sheet->getStyle($rowRange)->applyFromArray([
                     'borders' => [
                         'allBorders' => [
@@ -224,13 +229,14 @@ class SimpleExcelExport
                     ],
                 ]);
 
-                if ($currentRow % 2 === 1) {
+                // Zebra striping untuk baris genap
+                if ($currentRow % 2 === 0) {
                     $sheet->getStyle($rowRange)->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()->setRGB('F8FAFC');
                 }
 
-                // Apply per-column alignments & text-wrapping
+                // Terapkan alignment & wrapText per kolom
                 foreach ($columns as $col => $config) {
                     $sheet->getStyle("{$col}{$currentRow}")->getAlignment()
                         ->setHorizontal($config['align'])

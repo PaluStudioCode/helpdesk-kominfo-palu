@@ -10,7 +10,7 @@ class TicketStatusHistory extends Model
 {
     use HasFactory;
 
-    const UPDATED_AT = null; // Table doesn't have updated_at
+    const UPDATED_AT = null;
 
     protected $fillable = [
         'ticket_id',
@@ -27,6 +27,11 @@ class TicketStatusHistory extends Model
     }
 
     public function changer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
+
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by');
     }

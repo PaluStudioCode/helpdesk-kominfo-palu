@@ -18,10 +18,6 @@ class Vendor extends Model
         'status',
     ];
 
-    protected $casts = [
-        'status' => 'string',
-    ];
-
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

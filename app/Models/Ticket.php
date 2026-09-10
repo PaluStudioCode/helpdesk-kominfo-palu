@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'ticket_number',
@@ -25,29 +25,11 @@ class Ticket extends Model
         'priority',
         'status',
         'due_at',
-    ];
-
-    protected $appends = [
-        'category',
-        'category_id',
-        'infrastructure_type',
-        'network_type',
-        'rating',
-        'feedback_comment',
-        'rated_at',
-        'hold_reason_category',
-        'hold_reason_note',
-        'hold_started_at',
-        'affected_device',
-        'actual_repair_location',
-        'inspection_result',
-        'root_cause',
-        'action_taken',
-        'materials_used',
-        'test_result',
-        'test_parameters',
-        'resolution_note',
+        // Virtual mutator attributes for mass-assignment & testing
+        'assigned_at',
         'resolved_at',
+        'closed_at',
+        'cancelled_at',
     ];
 
     protected function casts(): array
@@ -57,9 +39,38 @@ class Ticket extends Model
         ];
     }
 
+    protected $appends = [
+        'hold_reason_category',
+        'hold_reason_note',
+        'hold_started_at',
+        'total_hold_duration_minutes',
+        'category',
+        'infrastructure_type',
+        'assigned_at',
+        'resolved_at',
+        'closed_at',
+        'cancelled_at',
+        'rating',
+        'feedback_comment',
+        'rated_at',
+        'affected_device',
+        'actual_repair_location',
+        'inspection_result',
+        'root_cause',
+        'action_taken',
+        'materials_used',
+        'test_result',
+        'test_parameters',
+        'resolution_note',
+    ];
+
+    // =========================================================================
+    // ELOQUENT RELATIONSHIPS
+    // =========================================================================
+
     public function department(): BelongsTo
     {
-        return $this->belongsTo(Department::class)->withTrashed();
+        return $this->belongsTo(Department::class);
     }
 
     public function reporter(): BelongsTo
@@ -122,138 +133,15 @@ class Ticket extends Model
         return $this->hasMany(TicketStatusHistory::class);
     }
 
-    public function whatsappNotifications(): HasMany
-    {
-        return $this->hasMany(WhatsappNotification::class);
-    }
-
     public function reads(): HasMany
     {
         return $this->hasMany(TicketRead::class);
     }
 
-    // Dynamic Accessors for Relational Data & Backward Compatibility
-    public function getCategoryAttribute()
-    {
-        return $this->resolution?->category;
-    }
+    // =========================================================================
+    // STATUS HELPER METHODS
+    // =========================================================================
 
-    public function getCategoryIdAttribute()
-    {
-        return $this->resolution?->category_id;
-    }
-
-    public function getInfrastructureTypeAttribute()
-    {
-        return $this->resolution?->category?->infrastructure_type;
-    }
-
-    public function getNetworkTypeAttribute()
-    {
-        return $this->resolution?->category?->infrastructure_type;
-    }
-
-    public function getRatingAttribute()
-    {
-        return $this->feedback?->rating;
-    }
-
-    public function getFeedbackCommentAttribute()
-    {
-        return $this->feedback?->feedback_comment;
-    }
-
-    public function getRatedAtAttribute()
-    {
-        return $this->feedback?->rated_at ?? $this->feedback?->created_at;
-    }
-
-    public function getHoldReasonCategoryAttribute()
-    {
-        return $this->latestHold?->reason_category;
-    }
-
-    public function getHoldReasonNoteAttribute()
-    {
-        return $this->latestHold?->reason_note;
-    }
-
-    public function getHoldStartedAtAttribute()
-    {
-        return $this->isOnHold() ? $this->latestHold?->started_at : null;
-    }
-
-    public function getTotalHoldDurationMinutesAttribute()
-    {
-        return (int) $this->holds()->sum('duration_minutes');
-    }
-
-    public function getAffectedDeviceAttribute()
-    {
-        return $this->resolution?->affected_device;
-    }
-
-    public function getActualRepairLocationAttribute()
-    {
-        return $this->resolution?->actual_repair_location;
-    }
-
-    public function getInspectionResultAttribute()
-    {
-        return $this->resolution?->inspection_result;
-    }
-
-    public function getRootCauseAttribute()
-    {
-        return $this->resolution?->root_cause;
-    }
-
-    public function getActionTakenAttribute()
-    {
-        return $this->resolution?->action_taken;
-    }
-
-    public function getMaterialsUsedAttribute()
-    {
-        return $this->resolution?->materials_used;
-    }
-
-    public function getTestResultAttribute()
-    {
-        return $this->resolution?->test_result;
-    }
-
-    public function getTestParametersAttribute()
-    {
-        return $this->resolution?->test_parameters;
-    }
-
-    public function getResolutionNoteAttribute()
-    {
-        return $this->resolution?->resolution_note;
-    }
-
-    public function getResolvedAtAttribute()
-    {
-        return $this->resolution?->resolved_at ?? $this->resolution?->created_at;
-    }
-
-    public function getAssignedAtAttribute()
-    {
-        return $this->statusHistories->firstWhere('new_status', 'in_progress')?->created_at;
-    }
-
-    public function getCancelledAtAttribute()
-    {
-        return $this->statusHistories->firstWhere('new_status', 'cancelled')?->created_at;
-    }
-
-    public function getClosedAtAttribute()
-    {
-        return $this->statusHistories->firstWhere('new_status', 'closed')?->created_at;
-    }
-
-    // Status Helper Methods
     public function isPendingAdmin(): bool
     {
         return $this->status === 'pending_admin';
@@ -291,11 +179,215 @@ class Ticket extends Model
         }
 
         $cancelledTime = $this->cancelled_at ?? $this->updated_at;
+
         if (!$cancelledTime) {
             return false;
         }
 
-        $diffHours = (now()->getTimestamp() - $cancelledTime->getTimestamp()) / 3600;
+        $cancelledCarbon = $cancelledTime instanceof Carbon ? $cancelledTime : Carbon::parse($cancelledTime);
+
+        $diffHours = (now()->getTimestamp() - $cancelledCarbon->getTimestamp()) / 3600;
         return $diffHours >= 0 && $diffHours < 72;
+    }
+
+    // =========================================================================
+    // NORMALIZED RELATIONAL ACCESSORS
+    // =========================================================================
+
+    public function getResolutionNoteAttribute(): ?string
+    {
+        return $this->resolution?->resolution_note;
+    }
+
+    public function getAffectedDeviceAttribute(): ?string
+    {
+        return $this->resolution?->affected_device;
+    }
+
+    public function getActualRepairLocationAttribute(): ?string
+    {
+        return $this->resolution?->actual_repair_location;
+    }
+
+    public function getInspectionResultAttribute(): ?string
+    {
+        return $this->resolution?->inspection_result;
+    }
+
+    public function getRootCauseAttribute(): ?string
+    {
+        return $this->resolution?->root_cause;
+    }
+
+    public function getActionTakenAttribute(): ?string
+    {
+        return $this->resolution?->action_taken;
+    }
+
+    public function getMaterialsUsedAttribute(): ?string
+    {
+        return $this->resolution?->materials_used;
+    }
+
+    public function getTestResultAttribute(): ?string
+    {
+        return $this->resolution?->test_result;
+    }
+
+    public function getTestParametersAttribute(): ?string
+    {
+        return $this->resolution?->test_parameters;
+    }
+
+    public function getCategoryIdAttribute(): ?int
+    {
+        return $this->resolution?->category_id;
+    }
+
+    public function getCategoryAttribute(): ?TicketCategory
+    {
+        return $this->resolution?->category;
+    }
+
+    public function getInfrastructureTypeAttribute(): ?string
+    {
+        return $this->resolution?->category?->infrastructure_type;
+    }
+
+    public function getRatingAttribute(): ?int
+    {
+        return $this->feedback?->rating;
+    }
+
+    public function getFeedbackCommentAttribute(): ?string
+    {
+        return $this->feedback?->feedback_comment;
+    }
+
+    public function getRatedAtAttribute(): ?Carbon
+    {
+        $time = $this->feedback?->rated_at ?? $this->feedback?->created_at;
+        return $time ? Carbon::parse($time) : null;
+    }
+
+    // =========================================================================
+    // VIRTUAL TIMELINE ATTRIBUTES (BACKWARD COMPATIBILITY & TESTING)
+    // =========================================================================
+
+    protected ?Carbon $virtualCancelledAt = null;
+    protected ?Carbon $virtualClosedAt = null;
+    protected ?Carbon $virtualResolvedAt = null;
+    protected ?Carbon $virtualAssignedAt = null;
+
+    public function setCancelledAtAttribute($value): void
+    {
+        $this->virtualCancelledAt = $value ? Carbon::parse($value) : null;
+    }
+
+    public function setClosedAtAttribute($value): void
+    {
+        $this->virtualClosedAt = $value ? Carbon::parse($value) : null;
+    }
+
+    public function setResolvedAtAttribute($value): void
+    {
+        $this->virtualResolvedAt = $value ? Carbon::parse($value) : null;
+    }
+
+    public function setAssignedAtAttribute($value): void
+    {
+        $this->virtualAssignedAt = $value ? Carbon::parse($value) : null;
+    }
+
+    public function getResolvedAtAttribute($value = null): ?Carbon
+    {
+        if ($this->virtualResolvedAt) {
+            return $this->virtualResolvedAt;
+        }
+        if ($value) {
+            return Carbon::parse($value);
+        }
+        return $this->resolution?->created_at;
+    }
+
+    public function getClosedAtAttribute($value = null): ?Carbon
+    {
+        if ($this->virtualClosedAt) {
+            return $this->virtualClosedAt;
+        }
+        if ($value) {
+            return Carbon::parse($value);
+        }
+        if ($this->relationLoaded('statusHistories')) {
+            $history = $this->statusHistories->where('new_status', 'closed')->sortByDesc('created_at')->first();
+            return $history ? Carbon::parse($history->created_at) : null;
+        }
+        $time = $this->statusHistories()->where('new_status', 'closed')->latest()->value('created_at');
+        return $time ? Carbon::parse($time) : null;
+    }
+
+    public function getAssignedAtAttribute($value = null): ?Carbon
+    {
+        if ($this->virtualAssignedAt) {
+            return $this->virtualAssignedAt;
+        }
+        if ($value) {
+            return Carbon::parse($value);
+        }
+        if ($this->relationLoaded('statusHistories')) {
+            $history = $this->statusHistories->where('new_status', 'in_progress')->sortBy('created_at')->first();
+            return $history ? Carbon::parse($history->created_at) : null;
+        }
+        $time = $this->statusHistories()->where('new_status', 'in_progress')->oldest()->value('created_at');
+        return $time ? Carbon::parse($time) : null;
+    }
+
+    public function getCancelledAtAttribute($value = null): ?Carbon
+    {
+        if ($this->virtualCancelledAt) {
+            return $this->virtualCancelledAt;
+        }
+        if ($value) {
+            return Carbon::parse($value);
+        }
+        if ($this->relationLoaded('statusHistories')) {
+            $history = $this->statusHistories->where('new_status', 'cancelled')->sortByDesc('created_at')->first();
+            return $history ? Carbon::parse($history->created_at) : null;
+        }
+        $time = $this->statusHistories()->where('new_status', 'cancelled')->latest()->value('created_at');
+        return $time ? Carbon::parse($time) : null;
+    }
+
+    // =========================================================================
+    // HOLD & SLA ACCESSORS
+    // =========================================================================
+
+    public function getHoldReasonCategoryAttribute(): ?string
+    {
+        return $this->latestHold?->reason_category;
+    }
+
+    public function getHoldReasonNoteAttribute(): ?string
+    {
+        return $this->latestHold?->reason_note;
+    }
+
+    public function getHoldStartedAtAttribute()
+    {
+        if ($this->relationLoaded('latestHold') && $this->latestHold && !$this->latestHold->ended_at) {
+            return $this->latestHold->started_at;
+        }
+        if ($this->relationLoaded('holds')) {
+            return $this->holds->whereNull('ended_at')->sortByDesc('started_at')->first()?->started_at;
+        }
+        return $this->holds()->whereNull('ended_at')->latest()->value('started_at');
+    }
+
+    public function getTotalHoldDurationMinutesAttribute(): int
+    {
+        if ($this->relationLoaded('holds')) {
+            return (int) $this->holds->sum('duration_minutes');
+        }
+        return (int) $this->holds()->sum('duration_minutes');
     }
 }

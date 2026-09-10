@@ -87,8 +87,12 @@ class TicketController extends Controller
         }
 
         // Apply Sorting
-        if ($request->has('sort')) {
-            $query->orderBy($request->input('sort'), $request->input('direction', 'desc'));
+        $allowedSorts = ['ticket_number', 'title', 'priority', 'status', 'created_at', 'due_at'];
+        $sort = $request->input('sort');
+        $direction = strtolower($request->input('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        if ($sort && in_array($sort, $allowedSorts, true)) {
+            $query->orderBy($sort, $direction);
         } else {
             $query->latest();
         }

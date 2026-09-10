@@ -8,7 +8,7 @@ import { Input } from '@/Components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/Components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/Components/ui/dialog';
 import DataTable from '@/Components/DataTable.vue';
-import { FileSpreadsheet, Printer, RotateCcw, Loader2, Eye, FileText, Shield, Clock, ExternalLink } from 'lucide-vue-next';
+import { FileSpreadsheet, Printer, RotateCcw, Loader2, Eye, ExternalLink } from 'lucide-vue-next';
 import { getHandlingDuration } from '@/lib/ticket-helpers';
 
 interface Department {
@@ -25,17 +25,17 @@ interface Technician {
 interface Ticket {
     id: number;
     ticket_number: string;
-    department: { name: string };
-    category: { name: string } | null;
-    reporter: { name: string };
-    assignee: { name: string } | null;
-    technicians?: { id: number; name: string }[];
+    department?: { id: number; name: string; code?: string } | null;
+    category?: { id: number; name: string; infrastructure_type?: string } | null;
+    reporter?: { id: number; name: string; phone_number?: string | null } | null;
+    assignee?: { id: number; name: string; role?: string } | null;
+    technicians?: { id: number; name: string; phone_number?: string | null }[];
     infrastructure_type?: string | null;
     network_type?: string | null;
     title: string;
-    description?: string;
-    location_details?: string;
-    resolution_note?: string;
+    description?: string | null;
+    location_details?: string | null;
+    resolution_note?: string | null;
     affected_device?: string | null;
     actual_repair_location?: string | null;
     inspection_result?: string | null;
@@ -48,8 +48,45 @@ interface Ticket {
     status: string;
     created_at: string;
     due_at: string | null;
+    assigned_at?: string | null;
     resolved_at: string | null;
     closed_at: string | null;
+    cancelled_at?: string | null;
+    hold_reason_category?: string | null;
+    hold_reason_note?: string | null;
+    hold_started_at?: string | null;
+    total_hold_duration_minutes?: number;
+    rating?: number | null;
+    feedback_comment?: string | null;
+    rated_at?: string | null;
+    resolution?: {
+        id?: number;
+        category_id?: number | null;
+        affected_device?: string | null;
+        actual_repair_location?: string | null;
+        inspection_result?: string | null;
+        root_cause?: string | null;
+        action_taken?: string | null;
+        materials_used?: string | null;
+        test_result?: string | null;
+        test_parameters?: string | null;
+        resolution_note?: string | null;
+        resolved_by?: number | null;
+        created_at?: string;
+        category?: { id: number; name: string; infrastructure_type?: string } | null;
+        resolver?: { id: number; name: string; role?: string } | null;
+    } | null;
+    feedback?: {
+        rating?: number;
+        feedback_comment?: string | null;
+        rater?: { name: string } | null;
+        created_at?: string;
+    } | null;
+    latest_hold?: {
+        reason_category?: string;
+        reason_note?: string;
+        user?: { name: string };
+    } | null;
 }
 
 const props = defineProps<{
@@ -273,9 +310,11 @@ const getSlaReportStatus = (ticket: Ticket): { label: string; color: string } =>
     const dueAt = new Date(ticket.due_at).getTime();
     const completionTime = ticket.resolved_at 
         ? new Date(ticket.resolved_at).getTime() 
-        : (ticket.closed_at ? new Date(ticket.closed_at).getTime() : null);
+        : (ticket.resolution?.created_at 
+            ? new Date(ticket.resolution.created_at).getTime() 
+            : (ticket.closed_at ? new Date(ticket.closed_at).getTime() : null));
 
-    if (['resolved', 'closed'].includes(ticket.status) && completionTime) {
+    if (['resolved', 'closed', 'pending_approval'].includes(ticket.status) && completionTime) {
         if (completionTime <= dueAt) {
             return { label: 'Tepat Waktu', color: 'text-emerald-600' };
         } else {
@@ -467,11 +506,11 @@ const formatDateTime = (dateStr: string | null) => {
                     <!-- Column 3: Category & Infrastructure -->
                     <template #cell-technical_spec="{ item }">
                         <div class="space-y-0.5 max-w-xs">
-                            <p class="font-semibold text-xs" :class="getNetworkColor(item.infrastructure_type || item.network_type)">
-                                {{ getNetworkLabel(item.infrastructure_type || item.network_type) }}
+                            <p class="font-semibold text-xs" :class="getNetworkColor(item.resolution?.category?.infrastructure_type || item.infrastructure_type || item.network_type)">
+                                {{ getNetworkLabel(item.resolution?.category?.infrastructure_type || item.infrastructure_type || item.network_type) }}
                             </p>
-                            <p class="text-[11px] text-slate-500 truncate" :title="item.category?.name">
-                                {{ item.category?.name || '-' }}
+                            <p class="text-[11px] text-slate-500 truncate" :title="item.resolution?.category?.name || item.category?.name">
+                                {{ item.resolution?.category?.name || item.category?.name || '-' }}
                             </p>
                         </div>
                     </template>
@@ -511,190 +550,142 @@ const formatDateTime = (dateStr: string | null) => {
             </div>
         </div>
 
-        <!-- ================= MODAL DETAIL REKAPITULASI TIKET ================= -->
+        <!-- ================= MODAL DETAIL RINGKASAN REKAPITULASI TIKET ================= -->
         <Dialog v-model:open="isDetailModalOpen">
-            <DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader class="border-b border-slate-100 pb-3">
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                        <DialogTitle class="text-base font-bold font-mono text-slate-900">
-                            {{ selectedTicket?.ticket_number }}
-                        </DialogTitle>
-                        <span class="text-slate-300 font-light">•</span>
-                        <span v-if="selectedTicket" class="text-xs font-semibold" :class="getStatusColor(selectedTicket.status)">
-                            {{ getStatusLabel(selectedTicket.status) }}
-                        </span>
+            <DialogContent class="sm:max-w-[560px] max-h-[90vh] overflow-y-auto p-4 sm:p-5">
+                <!-- Header Ringkas & Padat -->
+                <DialogHeader class="border-b border-slate-200 pb-2.5">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Ringkasan Rekapitulasi</span>
+                            <DialogTitle class="text-base font-bold font-mono text-slate-900 mt-0.5 flex items-center gap-2 flex-wrap">
+                                <span>{{ selectedTicket?.ticket_number }}</span>
+                                <span class="text-slate-300 font-normal hidden sm:inline">•</span>
+                                <span class="text-xs font-semibold" :class="getStatusColor(selectedTicket?.status || '')">
+                                    {{ getStatusLabel(selectedTicket?.status || '') }}
+                                </span>
+                                <span class="text-slate-300 font-normal hidden sm:inline">•</span>
+                                <span class="text-xs font-medium" :class="getPriorityColor(selectedTicket?.priority || '')">
+                                    Prioritas: {{ getPriorityLabel(selectedTicket?.priority || '') }}
+                                </span>
+                            </DialogTitle>
+                        </div>
                     </div>
                 </DialogHeader>
 
-                <div v-if="selectedTicket" class="py-3 space-y-6">
-                    <!-- 1. Data Pengaduan (OPD) -->
-                    <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 pb-1 border-b border-slate-100 flex items-center gap-1.5">
-                            <FileText class="w-3.5 h-3.5 text-slate-400" /> Informasi Pengaduan (OPD)
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-slate-50/70 border border-slate-200/80 mb-3">
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Instansi (OPD)</p>
-                                <p class="font-bold text-slate-900 text-sm mt-0.5">{{ selectedTicket.department?.name || '-' }}</p>
+                <div v-if="selectedTicket" class="py-3 space-y-3 text-xs text-slate-800">
+                    <!-- Grid Parameter Rekapitulasi Inti (2 Kolom Bergaris Bersih) -->
+                    <div class="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-200">
+                        <!-- Baris 1: Instansi & Pelapor -->
+                        <div class="grid grid-cols-2 divide-x divide-slate-200">
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Instansi / OPD</span>
+                                <span class="text-xs font-semibold text-slate-900 block mt-0.5 truncate" :title="selectedTicket.department?.name">
+                                    {{ selectedTicket.department?.name || '-' }}
+                                </span>
                             </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nama Pelapor</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ selectedTicket.reporter?.name || '-' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Lokasi / Ruangan</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ (selectedTicket as any).location_details || '-' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Pengajuan</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">{{ formatDateTime(selectedTicket.created_at) }}</p>
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Pelapor</span>
+                                <span class="text-xs font-medium text-slate-900 block mt-0.5 truncate">
+                                    {{ selectedTicket.reporter?.name || '-' }}
+                                    <span v-if="selectedTicket.reporter?.phone_number" class="text-slate-500 font-normal">({{ selectedTicket.reporter.phone_number }})</span>
+                                </span>
                             </div>
                         </div>
 
-                        <div class="space-y-1">
-                            <p class="text-xs font-semibold text-slate-700">Judul Masalah:</p>
-                            <p class="text-sm font-medium text-slate-900 bg-white p-2.5 rounded-lg border border-slate-200">
-                                {{ selectedTicket.title }}
+                        <!-- Baris 2: Kategori Masalah & Infrastruktur -->
+                        <div class="grid grid-cols-2 divide-x divide-slate-200">
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Infrastruktur</span>
+                                <span class="text-xs font-bold block mt-0.5" :class="getNetworkColor(selectedTicket.resolution?.category?.infrastructure_type || selectedTicket.infrastructure_type || selectedTicket.network_type)">
+                                    {{ getNetworkLabel(selectedTicket.resolution?.category?.infrastructure_type || selectedTicket.infrastructure_type || selectedTicket.network_type) }}
+                                </span>
+                            </div>
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Kategori Masalah</span>
+                                <span class="text-xs font-medium text-slate-900 block mt-0.5 truncate" :title="selectedTicket.resolution?.category?.name || selectedTicket.category?.name">
+                                    {{ selectedTicket.resolution?.category?.name || selectedTicket.category?.name || '-' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Baris 3: Petugas Teknisi & Status Kinerja SLA -->
+                        <div class="grid grid-cols-2 divide-x divide-slate-200">
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Petugas / Tim Teknisi</span>
+                                <span class="text-xs font-medium text-slate-900 block mt-0.5 truncate">
+                                    <template v-if="selectedTicket.technicians && selectedTicket.technicians.length > 0">
+                                        {{ selectedTicket.technicians.map(t => t.name).join(', ') }}
+                                    </template>
+                                    <template v-else-if="selectedTicket.assignee">
+                                        {{ selectedTicket.assignee.name }}
+                                    </template>
+                                    <template v-else>
+                                        <span class="text-slate-400 italic">Belum ditugaskan</span>
+                                    </template>
+                                </span>
+                            </div>
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Kinerja SLA</span>
+                                <span class="text-xs font-semibold block mt-0.5" :class="getSlaReportStatus(selectedTicket).color">
+                                    {{ getSlaReportStatus(selectedTicket).label }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Baris 4: Waktu Lapor & Waktu Selesai -->
+                        <div class="grid grid-cols-2 divide-x divide-slate-200">
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Waktu Lapor</span>
+                                <span class="text-xs font-medium text-slate-900 block mt-0.5">{{ formatDateTime(selectedTicket.created_at) }}</span>
+                            </div>
+                            <div class="p-2.5">
+                                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Waktu Selesai</span>
+                                <span class="text-xs font-medium text-slate-900 block mt-0.5">
+                                    {{ (selectedTicket.resolved_at || selectedTicket.resolution?.created_at || selectedTicket.closed_at) 
+                                        ? formatDateTime(selectedTicket.resolved_at || selectedTicket.resolution?.created_at || selectedTicket.closed_at) 
+                                        : '-' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Baris 5: Total Waktu Penanganan (Durasi) -->
+                        <div class="p-2.5 bg-slate-50/50">
+                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Total Waktu Penanganan</span>
+                            <span class="text-xs font-bold font-mono text-slate-900 block mt-0.5">{{ getHandlingDuration(selectedTicket) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Uraian Singkat: Kendala & Tindakan Penanganan Inti -->
+                    <div class="border border-slate-200 rounded-lg overflow-hidden bg-white divide-y divide-slate-100">
+                        <div class="p-2.5">
+                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Masalah yang Dilaporkan</span>
+                            <p class="text-xs font-medium text-slate-900 mt-0.5 leading-snug">{{ selectedTicket.title }}</p>
+                        </div>
+                        <div class="p-2.5">
+                            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Tindakan Solusi Penanganan</span>
+                            <p class="text-xs text-slate-800 mt-0.5 leading-relaxed whitespace-pre-wrap font-medium">
+                                {{ selectedTicket.resolution?.action_taken || selectedTicket.action_taken || selectedTicket.resolution_note || (selectedTicket.status === 'in_progress' ? 'Sedang dalam pengerjaan teknisi.' : 'Belum ada tindakan penanganan.') }}
                             </p>
                         </div>
-                        <div v-if="(selectedTicket as any).description" class="space-y-1 mt-2.5">
-                            <p class="text-xs font-semibold text-slate-700">Deskripsi Kendala:</p>
-                            <div class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-3 rounded-lg border border-slate-200">
-                                {{ (selectedTicket as any).description }}
+                        <div v-if="selectedTicket.feedback || selectedTicket.rating" class="p-2.5 bg-amber-50/40">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-semibold text-amber-800 uppercase tracking-wider">Evaluasi Kepuasan (CSAT)</span>
+                                <span class="text-xs font-bold text-amber-700">⭐ {{ selectedTicket.feedback?.rating || selectedTicket.rating }} / 5</span>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- 2. Parameter Teknis (Diskominfo) -->
-                    <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 pb-1 border-b border-slate-100 flex items-center gap-1.5">
-                            <Shield class="w-3.5 h-3.5 text-slate-400" /> Parameter Penanganan Teknis
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 rounded-lg bg-slate-50/70 border border-slate-200/80">
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Infrastruktur</p>
-                                <p class="font-bold text-xs sm:text-sm mt-0.5" :class="getNetworkColor(selectedTicket.infrastructure_type || selectedTicket.network_type)">
-                                    {{ getNetworkLabel(selectedTicket.infrastructure_type || selectedTicket.network_type) }}
-                                </p>
-                                <p class="text-xs text-slate-500 mt-0.5">{{ selectedTicket.category?.name || '-' }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Prioritas</p>
-                                <p class="text-sm mt-0.5 font-bold" :class="getPriorityColor(selectedTicket.priority)">
-                                    {{ getPriorityLabel(selectedTicket.priority) }}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Target SLA</p>
-                                <p class="font-bold text-slate-900 text-xs sm:text-sm mt-0.5">{{ selectedTicket.due_at ? formatDateTime(selectedTicket.due_at) : '-' }}</p>
-                                <p class="text-xs mt-0.5 font-semibold" :class="getSlaReportStatus(selectedTicket).color">
-                                    {{ getSlaReportStatus(selectedTicket).label }}
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tim Teknisi</p>
-                                <div v-if="selectedTicket.technicians && selectedTicket.technicians.length > 0" class="flex flex-wrap gap-1 mt-1">
-                                    <span 
-                                        v-for="tech in selectedTicket.technicians" 
-                                        :key="tech.id"
-                                        class="text-xs font-semibold text-slate-800 bg-white border border-slate-200 px-1.5 py-0.5 rounded"
-                                    >
-                                        {{ tech.name }}
-                                    </span>
-                                </div>
-                                <span v-else-if="selectedTicket.assignee" class="text-xs font-bold text-slate-900 mt-0.5 block">
-                                    {{ selectedTicket.assignee.name }}
-                                </span>
-                                <span v-else class="text-xs text-slate-400 italic mt-0.5 block">Belum ditugaskan</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. Durasi & Hasil Penanganan -->
-                    <div>
-                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 pb-1 border-b border-slate-100 flex items-center gap-1.5">
-                            <Clock class="w-3.5 h-3.5 text-slate-400" /> Durasi & Hasil Penanganan
-                        </h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-slate-50/70 border border-slate-200/80 mb-3">
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Durasi Penanganan</p>
-                                <p class="font-bold font-mono text-slate-900 text-sm mt-0.5">{{ getHandlingDuration(selectedTicket) }}</p>
-                            </div>
-                            <div>
-                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Waktu Selesai</p>
-                                <p class="font-medium text-slate-800 text-sm mt-0.5">
-                                    {{ (selectedTicket.resolved_at || selectedTicket.closed_at) ? formatDateTime(selectedTicket.resolved_at || selectedTicket.closed_at) : '-' }}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div v-if="selectedTicket.action_taken || selectedTicket.resolution_note || selectedTicket.affected_device || selectedTicket.actual_repair_location" class="space-y-2.5">
-                            <div v-if="selectedTicket.affected_device" class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between">
-                                <span class="font-medium text-slate-500">Perangkat / Node Terdampak:</span>
-                                <span class="text-slate-900 font-semibold">{{ selectedTicket.affected_device }}</span>
-                            </div>
-
-                            <div v-if="selectedTicket.actual_repair_location" class="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200 flex items-center justify-between">
-                                <span class="font-medium text-slate-500">Titik Lokasi Real Perbaikan:</span>
-                                <span class="text-slate-900 font-semibold">{{ selectedTicket.actual_repair_location }}</span>
-                            </div>
-
-                            <div v-if="selectedTicket.inspection_result" class="space-y-1">
-                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Hasil Pemeriksaan Lapangan:</p>
-                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
-                                    {{ selectedTicket.inspection_result }}
-                                </div>
-                            </div>
-
-                            <div v-if="selectedTicket.root_cause" class="space-y-1">
-                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Penyebab / Akar Masalah:</p>
-                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
-                                    {{ selectedTicket.root_cause }}
-                                </div>
-                            </div>
-
-                            <div v-if="selectedTicket.action_taken || selectedTicket.resolution_note" class="space-y-1">
-                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Tindakan Penanganan yang Dilakukan:</p>
-                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
-                                    {{ selectedTicket.action_taken || selectedTicket.resolution_note }}
-                                </div>
-                            </div>
-
-                            <div v-if="selectedTicket.materials_used" class="space-y-1">
-                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Material / Perangkat yang Digunakan:</p>
-                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200 font-mono text-[11px]">
-                                    {{ selectedTicket.materials_used }}
-                                </div>
-                            </div>
-
-                            <div v-if="selectedTicket.test_result || selectedTicket.test_parameters" class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-100 text-xs">
-                                <div v-if="selectedTicket.test_result">
-                                    <span class="font-bold text-emerald-800 uppercase tracking-wider text-[10px] block mb-1">Hasil Pengujian:</span>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                        {{ selectedTicket.test_result }}
-                                    </span>
-                                </div>
-                                <div v-if="selectedTicket.test_parameters">
-                                    <span class="font-bold text-emerald-800 uppercase tracking-wider text-[10px] block mb-1">Parameter Uji:</span>
-                                    <p class="text-emerald-950 whitespace-pre-wrap font-mono font-medium text-xs">{{ selectedTicket.test_parameters }}</p>
-                                </div>
-                            </div>
-
-                            <div v-if="selectedTicket.resolution_note && selectedTicket.action_taken && selectedTicket.resolution_note !== selectedTicket.action_taken" class="space-y-1">
-                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Catatan Tambahan:</p>
-                                <div class="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap bg-white p-2.5 rounded-lg border border-slate-200">
-                                    {{ selectedTicket.resolution_note }}
-                                </div>
-                            </div>
+                            <p v-if="selectedTicket.feedback?.feedback_comment || selectedTicket.feedback_comment" class="text-xs text-slate-700 mt-1 italic">
+                                "{{ selectedTicket.feedback?.feedback_comment || selectedTicket.feedback_comment }}"
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                <DialogFooter class="border-t border-slate-100 pt-3 flex items-center justify-between sm:justify-between w-full">
+                <!-- Footer Aksi -->
+                <DialogFooter class="border-t border-slate-200 pt-3 flex items-center justify-between sm:justify-between w-full">
                     <Button 
                         type="button" 
                         variant="outline" 
-                        class="text-xs border-slate-200 text-slate-700 cursor-pointer"
+                        class="h-8 px-3 text-xs border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                         @click="isDetailModalOpen = false"
                     >
                         Tutup
@@ -703,9 +694,9 @@ const formatDateTime = (dateStr: string | null) => {
                     <Link 
                         v-if="selectedTicket"
                         :href="route('tickets.show', selectedTicket.id)" 
-                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs font-semibold transition-colors shadow-2xs"
+                        class="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-kominfo-primary hover:bg-kominfo-primary-dark text-white text-xs font-semibold transition-colors shadow-2xs"
                     >
-                        <span>Buka Lembar Tiket</span>
+                        <span>Lihat Tiket Lengkap</span>
                         <ExternalLink class="w-3.5 h-3.5" />
                     </Link>
                 </DialogFooter>

@@ -632,7 +632,6 @@ class TicketSeeder extends Seeder
                         'test_parameters' => $testParameters,
                         'resolution_note' => $finalResNote,
                         'resolved_by' => $leadTech->id,
-                        'resolved_at' => $resolvedAt,
                         'created_at' => $resolvedAt ?? $createdAt,
                         'updated_at' => $resolvedAt ?? $createdAt,
                     ]);
@@ -645,9 +644,7 @@ class TicketSeeder extends Seeder
                         'rating' => $rating,
                         'feedback_comment' => $feedbackComment,
                         'rated_by' => $reporter->id,
-                        'rated_at' => $ratedAt ?? $closedAt ?? now(),
                         'created_at' => $ratedAt ?? $closedAt ?? now(),
-                        'updated_at' => $ratedAt ?? $closedAt ?? now(),
                     ]);
                 }
 

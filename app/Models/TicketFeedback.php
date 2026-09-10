@@ -12,19 +12,20 @@ class TicketFeedback extends Model
 
     protected $table = 'ticket_feedbacks';
 
+    const UPDATED_AT = null;
+
     protected $fillable = [
         'ticket_id',
         'rating',
         'feedback_comment',
         'rated_by',
-        'rated_at',
+        'created_at',
     ];
 
     protected function casts(): array
     {
         return [
             'rating' => 'integer',
-            'rated_at' => 'datetime',
         ];
     }
 

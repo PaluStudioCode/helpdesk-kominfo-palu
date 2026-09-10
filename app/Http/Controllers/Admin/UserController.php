@@ -10,47 +10,20 @@ use App\Http\Requests\UpdateUserRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): RedirectResponse
     {
         $this->authorize('viewAny', User::class);
 
-        $query = User::with('department');
-
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->has('role') && $request->input('role') !== 'all') {
-            $query->where('role', $request->input('role'));
-        }
-
-        if ($request->has('sort')) {
-            $query->orderBy($request->input('sort'), $request->input('direction', 'asc'));
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
-
-        $users = $query->paginate(10)->withQueryString();
-        $departments = Department::select('id', 'name')->where('status', 'active')->get();
-
-        return Inertia::render('Admin/Users/Index', [
-            'users' => $users,
-            'departments' => $departments,
-            'filters' => $request->only(['search', 'sort', 'direction', 'role']),
-        ]);
+        return redirect()->route('admin.master-data.index', array_merge(
+            ['tab' => 'users'],
+            $request->query()
+        ));
     }
 
     /**
@@ -101,6 +74,15 @@ class UserController extends Controller
     {
         $this->authorize('delete', $user);
         
+        $ticketsCount = \App\Models\Ticket::where('reporter_id', $user->id)
+            ->orWhere('assigned_to', $user->id)
+            ->count();
+
+        if ($ticketsCount > 0) {
+            return redirect()->back()
+                ->with('error', "Tidak dapat menghapus akun ini karena masih terhubung dengan {$ticketsCount} data tiket.");
+        }
+
         $user->delete();
 
         return redirect()->back()

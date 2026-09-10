@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,38 +13,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
+        'department_id',
         'name',
         'email',
         'password',
-        'department_id',
         'phone_number',
         'role',
         'status',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
@@ -57,7 +40,7 @@ class User extends Authenticatable
 
     public function department(): BelongsTo
     {
-        return $this->belongsTo(Department::class)->withTrashed();
+        return $this->belongsTo(Department::class);
     }
 
     public function reportedTickets(): HasMany
@@ -78,5 +61,35 @@ class User extends Authenticatable
     public function ticketReplies(): HasMany
     {
         return $this->hasMany(TicketReply::class);
+    }
+
+    public function ticketResolutions(): HasMany
+    {
+        return $this->hasMany(TicketResolution::class, 'resolved_by');
+    }
+
+    public function ticketFeedbacks(): HasMany
+    {
+        return $this->hasMany(TicketFeedback::class, 'rated_by');
+    }
+
+    public function ticketHolds(): HasMany
+    {
+        return $this->hasMany(TicketHold::class);
+    }
+
+    public function ticketReads(): HasMany
+    {
+        return $this->hasMany(TicketRead::class);
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(TicketStatusHistory::class, 'changed_by');
+    }
+
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 }

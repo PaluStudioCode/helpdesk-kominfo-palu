@@ -111,24 +111,18 @@ class MasterDataTest extends TestCase
         $response = $this->actingAs($admin)->delete("/admin/departments/{$dept->id}");
 
         $response->assertSessionHas('error');
-        $this->assertNotSoftDeleted($dept);
+        $this->assertModelExists($dept);
     }
 
-    public function test_admin_can_delete_department_with_closed_tickets_and_preserve_history(): void
+    public function test_admin_can_delete_department_without_tickets(): void
     {
         $admin = $this->createAdmin();
         $dept = $this->createDepartment(['name' => 'Dinas Arsip Testing']);
-        $ticket = $this->createTicket(['department_id' => $dept->id, 'status' => 'closed']);
 
         $response = $this->actingAs($admin)->delete("/admin/departments/{$dept->id}");
 
         $response->assertSessionHas('success');
-        $this->assertSoftDeleted($dept);
-
-        // Historical ticket should still be able to resolve department name
-        $ticket->refresh();
-        $this->assertNotNull($ticket->department);
-        $this->assertEquals('Dinas Arsip Testing', $ticket->department->name);
+        $this->assertModelMissing($dept);
     }
 
     public function test_admin_cannot_delete_category_with_active_tickets(): void
@@ -140,7 +134,7 @@ class MasterDataTest extends TestCase
         $response = $this->actingAs($admin)->delete("/admin/categories/{$category->id}");
 
         $response->assertSessionHas('error');
-        $this->assertNotSoftDeleted($category);
+        $this->assertModelExists($category);
     }
 
     public function test_admin_can_filter_categories_by_infrastructure_type(): void
@@ -167,17 +161,12 @@ class MasterDataTest extends TestCase
             })
         );
 
-        // Test in standalone Category index
+        // Test in standalone Category index (redirects to Master Data Hub)
         $responseCategory = $this->actingAs($admin)->get('/admin/categories?infrastructure_type=Power/poe');
-        $responseCategory->assertStatus(200);
-        $responseCategory->assertInertia(fn ($page) => $page
-            ->component('Admin/Categories/Index')
-            ->where('categories.data', function ($cats) {
-                $names = collect($cats)->pluck('name');
-                return $names->contains('Kategori Power Poe Unik')
-                    && !$names->contains('Kategori Fiber Optic Unik');
-            })
-        );
+        $responseCategory->assertRedirect(route('admin.master-data.index', [
+            'tab' => 'categories',
+            'infrastructure_type' => 'Power/poe',
+        ]));
     }
 
     public function test_admin_can_manage_network_devices(): void
@@ -213,7 +202,7 @@ class MasterDataTest extends TestCase
         // 3. Delete
         $deleteResponse = $this->actingAs($admin)->delete("/admin/devices/{$device->id}");
         $deleteResponse->assertSessionHasNoErrors();
-        $this->assertSoftDeleted('network_devices', ['id' => $device->id]);
+        $this->assertModelMissing($device);
     }
 
     public function test_admin_can_manage_materials(): void
@@ -248,7 +237,47 @@ class MasterDataTest extends TestCase
         // 3. Delete
         $deleteResponse = $this->actingAs($admin)->delete("/admin/materials/{$material->id}");
         $deleteResponse->assertSessionHasNoErrors();
-        $this->assertSoftDeleted('materials', ['id' => $material->id]);
+        $this->assertModelMissing($material);
+    }
+
+    public function test_admin_can_manage_vendors(): void
+    {
+        $admin = $this->createAdmin();
+
+        // 1. Create
+        $response = $this->actingAs($admin)->post('/admin/vendors', [
+            'name' => 'PT Telkom Indonesia Witel Palu',
+            'category' => 'ISP / Penyedia Bandwidth',
+            'phone' => '0451-421000',
+            'address' => 'Jl. Sam Ratulangi No. 1 Palu',
+            'description' => 'Mitra backbone internet ASTINet',
+            'status' => 'active',
+        ]);
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('vendors', ['name' => 'PT Telkom Indonesia Witel Palu']);
+
+        $vendor = \App\Models\Vendor::where('name', 'PT Telkom Indonesia Witel Palu')->first();
+
+        // 2. Update
+        $updateResponse = $this->actingAs($admin)->put("/admin/vendors/{$vendor->id}", [
+            'name' => 'PT Telkom Indonesia Tbk Palu',
+            'category' => 'ISP / Penyedia Bandwidth',
+            'phone' => '0451-421111',
+            'address' => 'Jl. Sam Ratulangi No. 1 Palu',
+            'description' => 'Mitra utama ASTINet & Indihome',
+            'status' => 'active',
+        ]);
+        $updateResponse->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('vendors', [
+            'id' => $vendor->id,
+            'name' => 'PT Telkom Indonesia Tbk Palu',
+            'phone' => '0451-421111',
+        ]);
+
+        // 3. Delete
+        $deleteResponse = $this->actingAs($admin)->delete("/admin/vendors/{$vendor->id}");
+        $deleteResponse->assertSessionHasNoErrors();
+        $this->assertModelMissing($vendor);
     }
 
     public function test_ticket_show_loads_available_devices_and_materials_from_database(): void
@@ -275,6 +304,20 @@ class MasterDataTest extends TestCase
             ->where('availableDevices', fn ($devices) => collect($devices)->contains('Core Switch Testing Node'))
             ->where('availableMaterials', fn ($materials) => collect($materials)->pluck('name')->contains('Patch Cord Test 10m'))
         );
+    }
+
+    public function test_legacy_master_data_routes_redirect_to_unified_hub(): void
+    {
+        $admin = $this->createAdmin();
+
+        $this->actingAs($admin)->get('/admin/departments')
+            ->assertRedirect(route('admin.master-data.index', ['tab' => 'departments']));
+
+        $this->actingAs($admin)->get('/admin/users')
+            ->assertRedirect(route('admin.master-data.index', ['tab' => 'users']));
+
+        $this->actingAs($admin)->get('/admin/categories')
+            ->assertRedirect(route('admin.master-data.index', ['tab' => 'categories']));
     }
 }
 

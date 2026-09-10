@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,7 +14,7 @@ class UpdateUserRequest extends FormRequest
     public function authorize(): bool
     {
         $targetUser = $this->route('user');
-        $userModel = $targetUser instanceof \App\Models\User ? $targetUser : \App\Models\User::findOrFail($targetUser);
+        $userModel = $targetUser instanceof User ? $targetUser : User::findOrFail($targetUser);
         return $this->user()->can('update', $userModel);
     }
 
@@ -45,7 +46,7 @@ class UpdateUserRequest extends FormRequest
                     $this->input('role') === 'opd_user',
                     Rule::unique('users', 'department_id')
                         ->ignore($this->route('user'))
-                        ->where(fn ($query) => $query->where('role', 'opd_user')->whereNull('deleted_at'))
+                        ->where(fn ($query) => $query->where('role', 'opd_user'))
                 ),
             ],
         ];

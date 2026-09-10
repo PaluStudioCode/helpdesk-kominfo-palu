@@ -8,7 +8,6 @@ use App\Models\Department;
 use App\Models\Ticket;
 use App\Models\TicketCategory;
 use App\Models\User;
-use App\Models\WhatsappNotification;
 use App\Services\FonnteService;
 use App\Services\NotificationDispatcher;
 use App\Services\PhoneNormalizer;
@@ -219,7 +218,7 @@ class NotificationTest extends TestCase
         $ticket = $this->createTicket(['reporter_id' => $user->id, 'department_id' => $user->department_id]);
 
         $fonnteService = new FonnteService();
-        $log = $fonnteService->sendMessage(
+        $success = $fonnteService->sendMessage(
             ticket: $ticket,
             recipient: $user,
             rawPhone: '08123456789',
@@ -227,11 +226,7 @@ class NotificationTest extends TestCase
             message: 'Pesan test'
         );
 
-        $this->assertEquals('failed', $log->status);
-        $this->assertDatabaseHas('whatsapp_notifications', [
-            'id' => $log->id,
-            'status' => 'failed',
-        ]);
+        $this->assertFalse($success);
     }
 
     public function test_send_ticket_notification_job_executes_wa_and_email(): void
@@ -262,14 +257,11 @@ class NotificationTest extends TestCase
             return $mail->hasTo('user_test@palukota.go.id');
         });
 
-        // Assert WhatsApp logged in database
-        $this->assertDatabaseHas('whatsapp_notifications', [
-            'ticket_id' => $ticket->id,
-            'recipient_id' => $user->id,
-            'event_type' => 'ticket_created',
-            'target_phone' => '628123456789',
-            'status' => 'success',
-        ]);
+        // Assert WhatsApp HTTP request was made to Fonnte
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'api.fonnte.com/send')
+                && $request['target'] === '628123456789';
+        });
     }
 
     public function test_ticket_notification_mail_renders_html_properly(): void

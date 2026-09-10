@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('department_id')->nullable()->constrained('departments')->onDelete('set null');
             $table->string('name');
-            $table->string('email');
+            $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('phone_number', 30)->nullable();
@@ -23,9 +23,7 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->rememberToken();
             $table->timestamps();
-            $table->softDeletes();
 
-            $table->unique(['email', 'deleted_at'], 'users_email_deleted_at_unique');
             $table->index(['role', 'status', 'department_id']);
         });
 

@@ -23,15 +23,7 @@ class TicketResolution extends Model
         'test_parameters',
         'resolution_note',
         'resolved_by',
-        'resolved_at',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'resolved_at' => 'datetime',
-        ];
-    }
 
     public function ticket(): BelongsTo
     {
@@ -40,7 +32,7 @@ class TicketResolution extends Model
 
     public function category(): BelongsTo
     {
-        return $this->belongsTo(TicketCategory::class, 'category_id')->withTrashed();
+        return $this->belongsTo(TicketCategory::class, 'category_id');
     }
 
     public function resolver(): BelongsTo

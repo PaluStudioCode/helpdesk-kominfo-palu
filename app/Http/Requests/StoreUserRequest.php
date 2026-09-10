@@ -35,7 +35,7 @@ class StoreUserRequest extends FormRequest
                 'exists:departments,id',
                 Rule::when(
                     $this->input('role') === 'opd_user',
-                    Rule::unique('users', 'department_id')->where(fn ($query) => $query->where('role', 'opd_user')->whereNull('deleted_at'))
+                    Rule::unique('users', 'department_id')->where(fn ($query) => $query->where('role', 'opd_user'))
                 ),
             ],
         ];

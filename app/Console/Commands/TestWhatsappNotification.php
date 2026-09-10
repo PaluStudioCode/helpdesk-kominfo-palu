@@ -61,8 +61,8 @@ class TestWhatsappNotification extends Command
         $this->line("Normalisasi nomor: {$phone} -> {$normalized}");
 
         // Get or create dummy recipient user & ticket for logging
-        $recipient = User::where('phone_number', $phone)->first() ?? User::first() ?? User::factory()->create();
-        $ticket = Ticket::first() ?? Ticket::factory()->create();
+        $recipient = User::where('phone_number', $phone)->first() ?? User::first() ?? new User(['name' => 'Pengguna Uji Coba', 'email' => 'test@example.com']);
+        $ticket = Ticket::first() ?? new Ticket(['ticket_number' => 'TICK-TEST-001']);
 
         $customMsg = $this->option('message');
         $message = $customMsg ?: "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
@@ -76,7 +76,7 @@ class TestWhatsappNotification extends Command
 
         $this->line('Mengirim pesan ke Fonnte API...');
 
-        $log = $fonnteService->sendMessage(
+        $success = $fonnteService->sendMessage(
             ticket: $ticket,
             recipient: $recipient,
             rawPhone: $phone,
@@ -85,17 +85,14 @@ class TestWhatsappNotification extends Command
         );
 
         $this->newLine();
-        if ($log->status === 'success') {
+        if ($success) {
             $this->info('✅ Pesan WhatsApp BERHASIL dikirim!');
-            $this->line('ID Log Database: ' . $log->id);
-            $this->line('Target: ' . $log->target_phone);
-            $this->line('Response Payload: ' . json_encode($log->response_payload, JSON_PRETTY_PRINT));
+            $this->line('Target: ' . $normalized);
             return 0;
         } else {
             $this->error('❌ Pesan WhatsApp GAGAL dikirim.');
-            $this->line('ID Log Database: ' . $log->id);
-            $this->line('Target: ' . $log->target_phone);
-            $this->line('Detail Respon Error: ' . json_encode($log->response_payload, JSON_PRETTY_PRINT));
+            $this->line('Target: ' . $normalized);
+            $this->line('Silakan periksa log aplikasi (storage/logs/laravel.log) untuk rincian error Fonnte API.');
             return 1;
         }
     }

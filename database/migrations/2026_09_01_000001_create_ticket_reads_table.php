@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('ticket_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('last_read_reply_id')->nullable()->constrained('ticket_replies')->onDelete('set null');
-            $table->timestamp('last_read_at')->useCurrent();
             $table->timestamps();
 
             $table->unique(['ticket_id', 'user_id']);

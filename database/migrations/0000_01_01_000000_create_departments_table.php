@@ -18,7 +18,6 @@ return new class extends Migration
             $table->text('address');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
-            $table->softDeletes();
         });
     }
 

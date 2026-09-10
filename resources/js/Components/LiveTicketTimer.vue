@@ -98,9 +98,10 @@ const slaData = computed(() => {
 
     if (props.ticket.status === 'on_hold') {
         let frozenRemainingText = 'Dijeda';
-        if (props.ticket.due_at && props.ticket.hold_started_at) {
+        const holdStarted = props.ticket.hold_started_at || (props.ticket as any).latest_hold?.started_at;
+        if (props.ticket.due_at && holdStarted) {
             const dueTime = new Date(props.ticket.due_at).getTime();
-            const holdTime = new Date(props.ticket.hold_started_at).getTime();
+            const holdTime = new Date(holdStarted).getTime();
             const diff = dueTime - holdTime;
             if (diff > 0) {
                 const digital = formatDigital(diff);
