@@ -23,14 +23,14 @@ import { Link } from '@inertiajs/vue3';
                     <div class="-ml-2">
                         <h1 class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight leading-tight">Pemerintah Kota Palu</h1>
                         <p class="text-base text-sky-400 font-bold tracking-wide mt-0.5">Dinas Komunikasi, Informatika, Persandian dan statistik</p>
-                        <p class="text-xs text-slate-400 mt-1 font-medium">SIPINTER - Layanan Infrastruktur & Tiket Elektronik</p>
+                        <p class="text-xs text-slate-400 mt-1 font-medium">Sistem Pelayanan Infrastruktur & Tiket Elektronik (SIPINTER)</p>
                     </div>
                 </div>
 
                 <!-- Headline & Deskripsi -->
                 <div class="space-y-3 max-w-xl pt-2">
                     <h2 class="text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
-                        SIPINTER — Sistem Pelayanan Infrastruktur & Tiket Elektronik
+                        Sistem Pelayanan Infrastruktur & Tiket Elektronik (SIPINTER)
                     </h2>
                     <p class="text-sm lg:text-base text-slate-300 leading-relaxed font-normal">
                         Pusat penanganan kendala infrastruktur jaringan teknologi informasi bagi seluruh Organisasi Perangkat Daerah (OPD) di lingkungan Pemerintah Kota Palu.
@@ -57,7 +57,7 @@ import { Link } from '@inertiajs/vue3';
                 <div class="-ml-1">
                     <h1 class="text-lg font-bold text-white leading-tight">Pemerintah Kota Palu</h1>
                     <p class="text-xs font-bold text-sky-400 mt-0.5">Dinas Komunikasi, Informatika, Persandian dan statistik</p>
-                    <p class="text-[11px] text-slate-400 mt-0.5 font-medium">SIPINTER - Layanan Infrastruktur & Tiket Elektronik</p>
+                    <p class="text-[11px] text-slate-400 mt-0.5 font-medium">Sistem Pelayanan Infrastruktur & Tiket Elektronik (SIPINTER)</p>
                 </div>
             </div>
 
