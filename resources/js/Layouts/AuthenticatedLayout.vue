@@ -103,7 +103,7 @@ const navigation = computed(() => {
                     <div class="h-7 w-7 rounded-md bg-white p-0.5 flex items-center justify-center shrink-0">
                         <img src="/storage/logo-only.png" alt="Logo Kominfo" class="h-full w-full object-contain" />
                     </div>
-                    <span>SIPINTER Palu</span>
+                    <span>SIPINTER Diskominfosantik</span>
                 </div>
             </div>
             <Link :href="route('profile.edit')" class="flex items-center gap-2" title="Profil Pengguna">
@@ -132,7 +132,7 @@ const navigation = computed(() => {
                         :class="sidebarCollapsed ? 'opacity-0 md:hidden' : 'opacity-100'"
                     >
                         <span class="text-sm font-bold text-white tracking-wide leading-tight">SIPINTER</span>
-                        <span class="text-[10px] text-slate-400 font-medium">Diskominfo Palu</span>
+                        <span class="text-[10px] text-slate-400 font-medium">Diskominfosantik</span>
                     </div>
                 </Link>
                 <button 
