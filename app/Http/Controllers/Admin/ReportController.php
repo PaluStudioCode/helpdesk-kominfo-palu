@@ -203,7 +203,7 @@ class ReportController extends Controller
             'filterStatusName' => $filterStatusName,
         ])->setPaper('a4', 'portrait');
 
-        $fileName = 'Laporan-Eksekutif-Helpdesk-' . date('Ymd-His') . '.pdf';
+        $fileName = 'Laporan-Eksekutif-SIPINTER-' . date('Ymd-His') . '.pdf';
 
         return $pdf->download($fileName);
     }
@@ -214,7 +214,7 @@ class ReportController extends Controller
     public function exportExcel(Request $request)
     {
         $tickets = $this->buildFilteredQuery($request)->get();
-        $fileName = 'Laporan-Rekapitulasi-Helpdesk-' . date('Ymd-His') . '.xlsx';
+        $fileName = 'Laporan-Rekapitulasi-SIPINTER-' . date('Ymd-His') . '.xlsx';
 
         return SimpleExcelExport::download(
             $tickets, 

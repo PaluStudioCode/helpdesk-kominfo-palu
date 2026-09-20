@@ -178,7 +178,7 @@ const downloadPdf = async () => {
         const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `Laporan-Rekapitulasi-Helpdesk-${new Date().toISOString().slice(0, 10)}.pdf`);
+        link.setAttribute('download', `Laporan-Rekapitulasi-SIPINTER-${new Date().toISOString().slice(0, 10)}.pdf`);
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -201,7 +201,7 @@ const downloadExcel = async () => {
         const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `Laporan-Rekapitulasi-Helpdesk-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        link.setAttribute('download', `Laporan-Rekapitulasi-SIPINTER-${new Date().toISOString().slice(0, 10)}.xlsx`);
         document.body.appendChild(link);
         link.click();
         link.remove();

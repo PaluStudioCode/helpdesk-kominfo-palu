@@ -44,7 +44,7 @@ class SimpleExcelExport
             // 1. Metadata Kop Laporan (Row 1 - 4)
             $sheet->setCellValue('A1', 'PEMERINTAH KOTA PALU');
             $sheet->setCellValue('A2', 'DINAS KOMUNIKASI DAN INFORMATIKA - BIDANG PENGELOLAAN OP & JARINGAN');
-            $sheet->setCellValue('A3', 'Laporan Rekapitulasi Penanganan Gangguan & Layanan Helpdesk TIK');
+            $sheet->setCellValue('A3', 'Laporan Rekapitulasi Pelayanan SIPINTER (Infrastruktur & Tiket Elektronik)');
 
             $periodText = 'Semua Periode';
             if ($startDate && $endDate) {

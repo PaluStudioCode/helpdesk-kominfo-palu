@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Rekapitulasi Pelayanan SIPINTER (Infrastruktur & Tiket Elektronik)</title>
+    <title>Laporan Rekapitulasi Pelayanan SIPINTER - Diskominfo Kota Palu</title>
     <style>
         @page {
             margin: 28px 34px 28px 34px;
@@ -132,9 +132,9 @@
         <tr>
             <td class="kop-text">
                 <div class="instansi-1">Pemerintah Kota Palu</div>
-                <div class="instansi-2">Dinas Komunikasi dan Informatika</div>
-                <div class="alamat">Jalan Pemuda No. 1, Kel. Besusu Tengah, Kec. Palu Timur, Kota Palu, Sulawesi Tengah 94111</div>
-                <div class="alamat">Layanan SIPINTER Diskominfo: sipinter.palukota.go.id &nbsp;|&nbsp; Pos-el: kominfo@palukota.go.id</div>
+                <div class="instansi-2">Dinas Komunikasi, Informatika, Persandian dan Statistik</div>
+                <div class="alamat">Jalan Balai Kota No. 1, Kel. Tanamodindi, Kec. Mantikulore, Kota Palu, Sulawesi Tengah 94111</div>
+                <div class="alamat">Layanan SIPINTER (Sistem Pelayanan Infrastruktur & Tiket Elektronik): https://kominfo.gsperformance.site &nbsp;|&nbsp; Pos-el: kominfo@palukota.go.id</div>
             </td>
         </tr>
     </table>
@@ -142,8 +142,9 @@
 
     <!-- JUDUL DOKUMEN & KETERANGAN PERIODE -->
     <div class="doc-title-box">
-        <h1 class="doc-title">Laporan Rekapitulasi Pelayanan SIPINTER (Infrastruktur & Tiket Elektronik)</h1>
-        <div class="doc-meta">
+        <h1 class="doc-title">Laporan Rekapitulasi Pelayanan SIPINTER</h1>
+        <div style="font-size: 8.5pt; font-weight: bold; color: #333333; margin-top: 2px; text-transform: uppercase;">(Sistem Pelayanan Infrastruktur & Tiket Elektronik)</div>
+        <div class="doc-meta" style="margin-top: 5px;">
             Periode: <strong>{{ $startDate ? \Carbon\Carbon::parse($startDate)->translatedFormat('d F Y') : 'Semua Periode' }} s.d {{ $endDate ? \Carbon\Carbon::parse($endDate)->translatedFormat('d F Y') : 'Sekarang' }}</strong>
             @if(!empty($filterDeptName))
                 &nbsp;|&nbsp; Instansi: <strong>{{ $filterDeptName }}</strong>
