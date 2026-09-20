@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Rekapitulasi Pelayanan Helpdesk & Jaringan TIK</title>
+    <title>Laporan Rekapitulasi Pelayanan SIPINTER (Infrastruktur & Tiket Elektronik)</title>
     <style>
         @page {
             margin: 28px 34px 28px 34px;
@@ -134,7 +134,7 @@
                 <div class="instansi-1">Pemerintah Kota Palu</div>
                 <div class="instansi-2">Dinas Komunikasi dan Informatika</div>
                 <div class="alamat">Jalan Pemuda No. 1, Kel. Besusu Tengah, Kec. Palu Timur, Kota Palu, Sulawesi Tengah 94111</div>
-                <div class="alamat">Layanan Helpdesk & Jaringan: helpdesk.palukota.go.id &nbsp;|&nbsp; Pos-el: kominfo@palukota.go.id</div>
+                <div class="alamat">Layanan SIPINTER Diskominfo: sipinter.palukota.go.id &nbsp;|&nbsp; Pos-el: kominfo@palukota.go.id</div>
             </td>
         </tr>
     </table>
@@ -142,7 +142,7 @@
 
     <!-- JUDUL DOKUMEN & KETERANGAN PERIODE -->
     <div class="doc-title-box">
-        <h1 class="doc-title">Laporan Rekapitulasi Pelayanan Helpdesk & Jaringan TIK</h1>
+        <h1 class="doc-title">Laporan Rekapitulasi Pelayanan SIPINTER (Infrastruktur & Tiket Elektronik)</h1>
         <div class="doc-meta">
             Periode: <strong>{{ $startDate ? \Carbon\Carbon::parse($startDate)->translatedFormat('d F Y') : 'Semua Periode' }} s.d {{ $endDate ? \Carbon\Carbon::parse($endDate)->translatedFormat('d F Y') : 'Sekarang' }}</strong>
             @if(!empty($filterDeptName))

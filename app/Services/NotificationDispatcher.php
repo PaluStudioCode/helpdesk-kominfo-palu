@@ -22,7 +22,7 @@ class NotificationDispatcher
 
         // 1. Notify OPD Reporter
         $opdPhone = !empty($reporter?->phone_number) ? $reporter->phone_number : ($department?->operator?->phone_number ?? '');
-        $waReporterMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waReporterMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Pemberitahuan Laporan Gangguan Terdaftar*\n\n"
             . "Yth. Bapak/Ibu,\n"
             . "Laporan kendala jaringan intra pemerintah Anda telah berhasil didaftarkan ke sistem.\n\n"
@@ -53,7 +53,7 @@ class NotificationDispatcher
             ->where('status', 'active')
             ->get();
 
-        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waAdminMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Pemberitahuan Laporan Masuk (Perlu Verifikasi)*\n\n"
             . "Yth. Administrator,\n"
             . "Laporan kendala jaringan baru memerlukan verifikasi kelayakan dan penugasan tim:\n\n"
@@ -95,7 +95,7 @@ class NotificationDispatcher
             ->where('status', 'active')
             ->get();
 
-        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waAdminMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Pemberitahuan Pengajuan Ulang Laporan*\n\n"
             . "Yth. Administrator,\n"
             . "Laporan kendala jaringan berikut telah diperbaiki oleh pihak OPD dan diajukan kembali:\n\n"
@@ -138,7 +138,7 @@ class NotificationDispatcher
         }
 
         // 1. Broadcast to all assigned technicians
-        $waTechMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waTechMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Surat Tugas Penanganan Kendala Jaringan*\n\n"
             . "Yth. Tim Teknisi,\n"
             . "Anda telah ditugaskan dalam penanganan laporan kendala jaringan berikut:\n\n"
@@ -168,7 +168,7 @@ class NotificationDispatcher
 
         // 2. Notify Reporter OPD
         if ($reporter) {
-            $waOpdMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            $waOpdMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
                 . "*Pemberitahuan Progres Penanganan*\n\n"
                 . "Yth. Bapak/Ibu,\n"
                 . "Laporan kendala jaringan Anda telah diverifikasi dan tim teknisi telah ditugaskan ke lokasi:\n\n"
@@ -203,7 +203,7 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            $waMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
                 . "*Pemberitahuan Penolakan Laporan*\n\n"
                 . "Yth. Bapak/Ibu,\n"
                 . "Laporan kendala jaringan Anda tidak dapat diproses lebih lanjut:\n\n"
@@ -239,7 +239,7 @@ class NotificationDispatcher
             ->where('status', 'active')
             ->get();
 
-        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waAdminMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Pemberitahuan Pembatalan Laporan oleh OPD*\n\n"
             . "Yth. Administrator,\n"
             . "Laporan kendala jaringan berikut telah dibatalkan secara mandiri oleh pelapor OPD:\n\n"
@@ -278,7 +278,7 @@ class NotificationDispatcher
 
         $techNames = $ticket->technicians->pluck('name')->implode(', ');
 
-        $waAdminMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waAdminMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Pemberitahuan Pekerjaan Selesai (Menunggu Review Mutu)*\n\n"
             . "Yth. Administrator,\n"
             . "Tim teknisi telah menyelesaikan perbaikan lapangan dan mengajukan peninjauan mutu hasil kerja:\n\n"
@@ -313,7 +313,7 @@ class NotificationDispatcher
         $ticket->loadMissing(['department', 'technicians']);
         $technicians = $ticket->technicians;
 
-        $waTechMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+        $waTechMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
             . "*Instruksi Perbaikan Lanjutan / Revisi*\n\n"
             . "Yth. Tim Teknisi,\n"
             . "Administrator meminta tindak lanjut perbaikan tambahan pada tiket berikut:\n\n"
@@ -347,7 +347,7 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            $waMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
                 . "*Pemberitahuan Tiket Selesai & Resmi Ditutup*\n\n"
                 . "Yth. Bapak/Ibu,\n"
                 . "Perbaikan kendala jaringan pada laporan Anda telah diverifikasi dan resmi ditutup:\n\n"
@@ -382,7 +382,7 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            $waMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
                 . "*Pemberitahuan Penundaan Sementara Penanganan Gangguan*\n\n"
                 . "Yth. Bapak/Ibu,\n"
                 . "Penanganan kendala jaringan untuk laporan Anda sedang dijeda sementara karena adanya kendala di lapangan:\n\n"
@@ -416,7 +416,7 @@ class NotificationDispatcher
         $reporter = $ticket->reporter;
 
         if ($reporter) {
-            $waMessage = "*[HELPDESK DISKOMINFO KOTA PALU]*\n"
+            $waMessage = "*[SIPINTER - DISKOMINFO KOTA PALU]*\n"
                 . "*Pemberitahuan Kelanjutan Penanganan Gangguan*\n\n"
                 . "Yth. Bapak/Ibu,\n"
                 . "Tim teknisi Diskominfo telah melanjutkan kembali perbaikan jaringan untuk laporan Anda:\n\n"

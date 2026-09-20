@@ -683,12 +683,17 @@ class TicketActionController extends Controller
 
             DB::commit();
 
-            broadcast(new TicketReplyCreated($reply, $ticket->id));
+            try {
+                broadcast(new TicketReplyCreated($reply, $ticket->id));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("WebSocket broadcast failed for reply: " . $e->getMessage());
+            }
 
             return back();
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan.')->withInput();
+            \Illuminate\Support\Facades\Log::error("storeReply failed: " . $e->getMessage(), ['exception' => $e]);
+            return back()->with('error', 'Terjadi kesalahan saat mengirim tanggapan: ' . $e->getMessage())->withInput();
         }
     }
 

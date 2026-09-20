@@ -32,7 +32,7 @@ const submit = () => {
 
 <template>
     <GuestLayout>
-        <Head title="Masuk ke Sistem Helpdesk" />
+        <Head title="Masuk ke SIPINTER" />
 
         <div v-if="status" class="mb-4 p-3 rounded-lg bg-emerald-950/60 border border-emerald-800 text-xs font-medium text-emerald-300">
             {{ status }}
